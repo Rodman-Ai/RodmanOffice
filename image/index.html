@@ -105,6 +105,8 @@
         <button id="btn-clear" title="Clear canvas" aria-label="Clear">✕ Clear</button>
         <button id="btn-open" title="Open image" aria-label="Open">📂 Open</button>
         <button id="btn-save" title="Save PNG (Ctrl+S — Shift-click to upscale)" aria-label="Save">💾 Save</button>
+        <button id="btn-save-psd" title="Save as Photoshop (.psd)" aria-label="Save as PSD">PSD</button>
+        <button id="btn-save-pdf" title="Save as Photoshop PDF" aria-label="Save as PDF">PDF</button>
         <button id="btn-filter" title="Image filters" aria-label="Filters">🎛️ FX</button>
         <button id="btn-replay" title="Replay last drawing" aria-label="Replay">▶ Replay</button>
         <span class="zoom-group" role="group" aria-label="Zoom">
@@ -115,7 +117,7 @@
         <button id="btn-help" title="Help (?)" aria-label="Help">?</button>
         <button id="btn-mute" title="Mute sound (M)" aria-label="Mute">🔊</button>
       </div>
-      <input id="file-input" type="file" accept="image/*" hidden>
+      <input id="file-input" type="file" accept="image/*,.psd,.psb,.pdf,application/pdf,image/vnd.adobe.photoshop" hidden>
     </header>
 
     <main class="workspace">
