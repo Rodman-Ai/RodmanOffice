@@ -23,13 +23,41 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: crm/package-lock.json
+
+      - name: Install LeoCRM dependencies
+        working-directory: crm
+        run: npm ci
+
+      - name: Build LeoCRM static demo
+        working-directory: crm
+        env:
+          NEXT_PUBLIC_BASE_PATH: /RodmanOffice/crm
+        run: bash scripts/build-demo.sh
+
+      - name: Stage Pages artifact
+        run: |
+          mkdir -p _site
+          rsync -a \
+            --exclude='_site' \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='crm' \
+            ./ _site/
+          cp -r crm/out _site/crm
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: '.'
+          path: _site
 
   deploy:
     needs: build
