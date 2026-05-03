@@ -23,22 +23,45 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          package_json_file: sheets/package.json
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
-          cache-dependency-path: crm/package-lock.json
+          cache: pnpm
+          cache-dependency-path: sheets/pnpm-lock.yaml
+
+      - name: Cache npm (LeoCRM)
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('crm/package-lock.json') }}
+          restore-keys: ${{ runner.os }}-npm-
 
       - name: Install LeoCRM dependencies
         working-directory: crm
         run: npm ci
+
+      - name: Install AiCell dependencies
+        working-directory: sheets
+        run: pnpm install --frozen-lockfile
 
       - name: Build LeoCRM static demo
         working-directory: crm
         env:
           NEXT_PUBLIC_BASE_PATH: /RodmanOffice/crm
         run: bash scripts/build-demo.sh
+
+      - name: Build AiCell web app
+        working-directory: sheets
+        env:
+          VITE_BASE: /RodmanOffice/sheets/
+          VITE_API_BASE: ""
+        run: pnpm --filter @aicell/web build
 
       - name: Stage Pages artifact
         run: |
@@ -48,8 +71,10 @@ jobs:
             --exclude='.git' \
             --exclude='.github' \
             --exclude='crm' \
+            --exclude='sheets' \
             ./ _site/
           cp -r crm/out _site/crm
+          cp -r sheets/apps/web/dist _site/sheets
 
       - name: Setup Pages
         uses: actions/configure-pages@v5

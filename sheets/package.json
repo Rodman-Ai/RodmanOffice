@@ -1,0 +1,21 @@
+{
+  "name": "aicell",
+  "version": "0.0.0",
+  "private": true,
+  "packageManager": "pnpm@10.33.0",
+  "scripts": {
+    "dev": "pnpm -r --parallel --filter @aicell/api --filter @aicell/web dev",
+    "dev:api": "pnpm --filter @aicell/api dev",
+    "dev:web": "pnpm --filter @aicell/web dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "lint": "pnpm -r lint"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3"
+  }
+}

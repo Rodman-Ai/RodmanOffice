@@ -7,7 +7,7 @@ A complete office suite that runs free in your browser.
 | App | Folder | Status |
 |---|---|---|
 | Word Processor | [`word/`](./word/) | Live (vendored from [RodmanWord](https://github.com/Rodman-Ai/RodmanWord)) |
-| Spreadsheets | [`sheets/`](./sheets/) | Coming soon |
+| Spreadsheets | [`sheets/`](./sheets/) | Live (vendored from [AiCell](https://github.com/Rodman-Ai/AiCell), built in CI) |
 | Slideshows | [`slides/`](./slides/) | Coming soon |
 | Image Editor | [`image/`](./image/) | Coming soon |
 | Accounting | [`accounting/`](./accounting/) | Live (vendored from [RodBooks](https://github.com/Rodman-Ai/RodBooks)) |
@@ -20,13 +20,19 @@ sub-app's folder, so the browser only fetches the picked app's assets
 — no bundler, no shared runtime. Most sub-apps are self-contained
 static sites with their own service worker scoped to their own folder.
 
-The CRM (LeoCRM) is the exception: it's a Next.js 14 app, so its
-source lives in `crm/` and the deploy workflow runs `npm ci` +
-`scripts/build-demo.sh` to produce a static export under
-`/RodmanOffice/crm/` at deploy time. In demo mode, all `/api/*` calls
-are routed through a localStorage shim — Google sign-in, Gmail send,
-Sheets sync and Anthropic generation are mocked, so the public deploy
-is a tour rather than a working CRM.
+Two apps are exceptions and are built at deploy time:
+
+- **Spreadsheets (AiCell)** — pnpm monorepo with a Vite + React 19 web
+  app. The workflow runs `pnpm install` and `pnpm --filter @aicell/web
+  build` with `VITE_BASE=/RodmanOffice/sheets/` and an empty
+  `VITE_API_BASE` (which puts AiCell in demo mode — all backend calls
+  stub out, workbook state lives in browser storage).
+- **CRM (LeoCRM)** — Next.js 14 app. The workflow runs `npm ci` and
+  `scripts/build-demo.sh` with `NEXT_PUBLIC_BASE_PATH=/RodmanOffice/crm`
+  to produce a static export. In demo mode, all `/api/*` calls are
+  routed through a localStorage shim — Google sign-in, Gmail send,
+  Sheets sync and Anthropic generation are mocked, so the public deploy
+  is a tour rather than a working CRM.
 
 ## Layout
 
@@ -35,7 +41,7 @@ RodmanOffice/
 ├─ index.html, launcher.css, launcher.js, sw.js   ← launcher
 ├─ manifest.webmanifest, icon.svg, 404.html
 ├─ word/        ← RodmanWord (vendored)
-├─ sheets/      ← stub
+├─ sheets/      ← AiCell (vendored, pnpm + Vite — built in CI)
 ├─ slides/      ← stub
 ├─ image/       ← stub
 ├─ accounting/  ← RodBooks (vendored)
@@ -45,12 +51,19 @@ RodmanOffice/
 ## Deploy
 
 GitHub Pages, via `.github/workflows/pages.yml`. Pushes to `main`
-publish the suite. The workflow installs `crm/`'s npm dependencies
-and runs LeoCRM's `scripts/build-demo.sh` (with
-`NEXT_PUBLIC_BASE_PATH=/RodmanOffice/crm`) to produce
-`crm/out/`, then stages a `_site/` artifact that combines the static
-launcher + sub-apps + the LeoCRM export under `crm/`. All other apps
-are static drop-ins with no build step.
+publish the suite. The workflow:
+
+1. Sets up pnpm and Node 20 (with caches for both `pnpm` and `~/.npm`).
+2. Installs `crm/`'s npm dependencies and `sheets/`'s pnpm workspace.
+3. Builds LeoCRM with `NEXT_PUBLIC_BASE_PATH=/RodmanOffice/crm` →
+   `crm/out/`.
+4. Builds AiCell with `VITE_BASE=/RodmanOffice/sheets/` and empty
+   `VITE_API_BASE` → `sheets/apps/web/dist/`.
+5. Stages a `_site/` artifact: rsyncs everything except the `crm/` and
+   `sheets/` source trees, then drops the two build outputs in as
+   `_site/crm` and `_site/sheets`.
+
+All other apps are static drop-ins with no build step.
 
 ## Adding an app
 
@@ -69,9 +82,10 @@ patch each — a "← Apps" button that links to `../`:
 
 - `word/` ← [RodmanWord](https://github.com/Rodman-Ai/RodmanWord). Patched in `word/index.html` (title bar) and `word/styles.css` (`.rodmanoffice-back`).
 - `accounting/` ← [RodBooks](https://github.com/Rodman-Ai/RodBooks). Patched in `accounting/index.html` (top of sidebar) and `accounting/styles.css` (`.rodmanoffice-back`).
+- `sheets/` ← [AiCell](https://github.com/Rodman-Ai/AiCell) (pnpm + Vite + React 19, built in CI). Patched in `sheets/apps/web/src/App.tsx` (back-to-launcher anchor at the top-left of the toolbar) and `sheets/apps/web/src/styles.css` (`.rodmanoffice-back`).
 - `crm/` ← [LeoCRM](https://github.com/Rodman-Ai/LeoCRM) (Next.js, built in CI). Patched in `crm/src/components/AppShell.tsx` — a back-to-launcher anchor in the desktop sidebar and another in the mobile header, both linking to absolute path `/RodmanOffice/` (not Next's `<Link>`, since basePath rewriting would otherwise scope the URL under `/RodmanOffice/crm/`).
 
 To pull updates for `word/` or `accounting/`, re-copy the upstream
-repo over the folder and re-apply the one-line patch. For `crm/`,
-re-copy the upstream LeoCRM source, re-apply the AppShell patch, and
+repo over the folder and re-apply the one-line patch. For `sheets/`
+or `crm/`, re-copy the upstream source, re-apply the patch, and
 push — CI rebuilds the static export.
