@@ -217,10 +217,32 @@
     </div>
   </div>
 
-  <script src="js/sounds.js"></script>
-  <script src="js/modes.js"></script>
-  <script src="js/io.js"></script>
-  <script src="js/menus.js"></script>
-  <script src="js/app.js"></script>
+  <script src="js/sounds.js" defer></script>
+  <script src="js/modes.js" defer></script>
+  <script type="module">
+    // Bridge the shared /lib/images/ ESM engine back onto the
+    // window.IO global the editor's classic scripts expect. Module
+    // scripts and `<script defer>` both execute deferred, in source
+    // order — so this shim runs before menus.js / app.js below.
+    import * as imageio from '../lib/images/index.js';
+    window.IO = {
+      decodeFile: imageio.decodeFile,
+      decodeBlob: imageio.decodeBlob,
+      decodeDataURL: imageio.decodeDataURL,
+      decodeURL: imageio.decodeURL,
+      encodePNG: imageio.encodePNG,
+      encodeJPEG: imageio.encodeJPEG,
+      encodeWebP: imageio.encodeWebP,
+      encodeBMP: imageio.encodeBMP,
+      encodeICO: imageio.encodeICO,
+      to1Bit: imageio.to1Bit,
+      resize: imageio.resize,
+      composeSpriteSheet: imageio.composeSpriteSheet,
+      triggerDownload: imageio.triggerDownload,
+      suggestFilename: imageio.suggestFilename,
+    };
+  </script>
+  <script src="js/menus.js" defer></script>
+  <script src="js/app.js" defer></script>
 </body>
 </html>
