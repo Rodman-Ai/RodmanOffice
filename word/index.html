@@ -1,0 +1,1829 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#2b579a" />
+  <title>RodmanWord</title>
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="stylesheet" href="styles.css" />
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(() => {});
+      });
+    }
+  </script>
+</head>
+<body>
+  <header class="title-bar">
+    <a class="rodmanoffice-back" href="../" title="Back to RodmanOffice apps" aria-label="Back to RodmanOffice apps">
+      <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M14 7l-5 5 5 5V7z"/></svg>
+      <span>Apps</span>
+    </a>
+    <div class="app-brand">
+      <div class="app-logo" aria-hidden="true">W</div>
+      <div class="app-title">
+        <input
+          id="docTitle"
+          class="doc-title"
+          type="text"
+          value="Document1"
+          aria-label="Document title"
+          spellcheck="false"
+        />
+        <span class="app-subtitle">RodmanWord</span>
+      </div>
+    </div>
+    <div class="title-actions">
+      <span id="presencePill" class="presence-pill" hidden></span>
+      <button class="icon-btn" id="focusBtn" title="Focus mode (F11)" aria-label="Focus mode">⛶</button>
+      <button class="icon-btn" id="helpBtn" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts">?</button>
+      <button class="icon-btn" id="toggleRibbonBtn" title="Show/hide ribbon" aria-label="Toggle ribbon">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+          <path fill="currentColor" d="M7 10l5 5 5-5H7z"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <nav class="tabs" role="tablist" aria-label="Ribbon tabs">
+    <button class="tab" role="tab" title="Double-click to collapse the ribbon" data-tab="file">File</button>
+    <button class="tab active" role="tab" aria-selected="true" data-tab="home" title="Double-click to collapse the ribbon">Home</button>
+    <button class="tab" role="tab" title="Double-click to collapse the ribbon" data-tab="insert">Insert</button>
+    <button class="tab" role="tab" title="Double-click to collapse the ribbon" data-tab="references">References</button>
+    <button class="tab" role="tab" title="Double-click to collapse the ribbon" data-tab="layout">Layout</button>
+    <button class="tab" role="tab" title="Double-click to collapse the ribbon" data-tab="review">Review</button>
+    <button class="tab" role="tab" title="Double-click to collapse the ribbon" data-tab="view">View</button>
+  </nav>
+
+  <section class="ribbon" id="ribbon">
+    <!-- Home tab -->
+    <div class="ribbon-panel active" data-panel="home">
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn" data-cmd="undo" title="Undo (Ctrl+Z)"><span class="ico">↺</span></button>
+          <button class="ribbon-btn" data-cmd="redo" title="Redo (Ctrl+Y)"><span class="ico">↻</span></button>
+        </div>
+        <div class="group-label">Undo</div>
+      </div>
+
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn" id="cutBtn" title="Cut (Ctrl+X)">✂</button>
+          <button class="ribbon-btn" id="copyBtn" title="Copy (Ctrl+C)">⧉</button>
+          <button class="ribbon-btn" id="pasteBtn" title="Paste (Ctrl+V)">📋</button>
+          <button class="ribbon-btn" id="formatPainterBtn" title="Format painter">🖌</button>
+        </div>
+        <div class="group-label">Clipboard</div>
+      </div>
+
+      <div class="group">
+        <div class="group-row">
+          <select class="select" id="fontFamily" title="Font" aria-label="Font family">
+            <option value="Calibri, Arial, sans-serif">Calibri</option>
+            <option value="Arial, sans-serif">Arial</option>
+            <option value="Georgia, serif">Georgia</option>
+            <option value="'Times New Roman', Times, serif">Times New Roman</option>
+            <option value="'Courier New', Courier, monospace">Courier New</option>
+            <option value="Verdana, sans-serif">Verdana</option>
+            <option value="'Trebuchet MS', sans-serif">Trebuchet MS</option>
+            <option value="'Comic Sans MS', cursive">Comic Sans MS</option>
+            <option value="Tahoma, sans-serif">Tahoma</option>
+            <option value="'Segoe UI', sans-serif">Segoe UI</option>
+          </select>
+          <select class="select sm" id="fontSize" title="Font size" aria-label="Font size">
+            <option>8</option><option>9</option><option>10</option>
+            <option selected>11</option><option>12</option><option>14</option>
+            <option>16</option><option>18</option><option>20</option>
+            <option>22</option><option>24</option><option>28</option>
+            <option>32</option><option>36</option><option>48</option>
+            <option>72</option>
+          </select>
+        </div>
+        <div class="group-row">
+          <button class="ribbon-btn" data-cmd="bold" title="Bold (Ctrl+B)"><b>B</b></button>
+          <button class="ribbon-btn" data-cmd="italic" title="Italic (Ctrl+I)"><i>I</i></button>
+          <button class="ribbon-btn" data-cmd="underline" title="Underline (Ctrl+U)"><u>U</u></button>
+          <button class="ribbon-btn" data-cmd="strikeThrough" title="Strikethrough"><s>S</s></button>
+          <button class="ribbon-btn" data-cmd="subscript" title="Subscript">X<sub>2</sub></button>
+          <button class="ribbon-btn" data-cmd="superscript" title="Superscript">X<sup>2</sup></button>
+          <label class="ribbon-btn color" title="Font color">
+            <span style="color:#d23f31;font-weight:700">A</span>
+            <input type="color" id="foreColor" value="#000000" />
+          </label>
+          <label class="ribbon-btn color" title="Highlight color">
+            <span style="background:#fff59d;padding:0 3px">A</span>
+            <input type="color" id="hiliteColor" value="#ffff00" />
+          </label>
+          <button class="ribbon-btn" data-cmd="removeFormat" title="Clear formatting">⌫</button>
+        </div>
+        <div class="group-label">Font</div>
+      </div>
+
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn" data-cmd="insertUnorderedList" title="Bulleted list">• ≡</button>
+          <button class="ribbon-btn" data-cmd="insertOrderedList" title="Numbered list">1. ≡</button>
+          <button class="ribbon-btn" id="multiLevelListBtn" title="Multi-level numbered list">1.1 ≡</button>
+          <select class="select sm" id="bulletStyle" title="Bullet style" aria-label="Bullet style">
+            <option value="">Bullet…</option>
+            <option value="•">•</option>
+            <option value="◦">◦</option>
+            <option value="▪">▪</option>
+            <option value="→">→</option>
+            <option value="★">★</option>
+            <option value="✓">✓</option>
+            <option value="custom">Custom…</option>
+          </select>
+          <button class="ribbon-btn" id="collapseToLevelBtn" title="Collapse outline to level N">⇕ Lvl</button>
+        </div>
+        <div class="group-label">Lists</div>
+      </div>
+
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn" data-cmd="justifyLeft" title="Align left (Ctrl+L)">⯇</button>
+          <button class="ribbon-btn" data-cmd="justifyCenter" title="Center (Ctrl+E)">⯀</button>
+          <button class="ribbon-btn" data-cmd="justifyRight" title="Align right (Ctrl+R)">⯈</button>
+          <button class="ribbon-btn" data-cmd="justifyFull" title="Justify (Ctrl+J)">≡</button>
+          <button class="ribbon-btn" data-cmd="outdent" title="Decrease indent">⇤</button>
+          <button class="ribbon-btn" data-cmd="indent" title="Increase indent">⇥</button>
+          <select class="select sm" id="lineSpacing" title="Line spacing" aria-label="Line spacing">
+            <option value="">Line</option>
+            <option value="1">1.0</option>
+            <option value="1.15">1.15</option>
+            <option value="1.5">1.5</option>
+            <option value="2">2.0</option>
+            <option value="2.5">2.5</option>
+            <option value="3">3.0</option>
+          </select>
+          <select class="select sm" id="paraSpacing" title="Paragraph spacing" aria-label="Paragraph spacing">
+            <option value="">¶ ↕</option>
+            <option value="0">None</option>
+            <option value="0.4">Compact</option>
+            <option value="0.8">Default</option>
+            <option value="1.2">Loose</option>
+            <option value="1.6">Roomy</option>
+          </select>
+        </div>
+        <div class="group-label">Paragraph</div>
+      </div>
+
+      <div class="group">
+        <div class="group-row">
+          <select class="select" id="blockStyle" title="Style" aria-label="Paragraph style">
+            <option value="P">Normal</option>
+            <option value="H1">Heading 1</option>
+            <option value="H2">Heading 2</option>
+            <option value="H3">Heading 3</option>
+            <option value="H4">Heading 4</option>
+            <option value="BLOCKQUOTE">Quote</option>
+            <option value="PRE">Code</option>
+          </select>
+          <select class="select" id="customStyleSelect" title="Custom styles" aria-label="Custom paragraph style">
+            <option value="">Custom style…</option>
+          </select>
+          <button class="ribbon-btn" id="manageStylesBtn" title="Manage custom styles">⚙</button>
+        </div>
+        <div class="group-label">Styles</div>
+      </div>
+
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn" id="findBtn" title="Find &amp; Replace (Ctrl+F)">🔍 Find</button>
+        </div>
+        <div class="group-label">Editing</div>
+      </div>
+    </div>
+
+    <!-- Insert tab -->
+    <div class="ribbon-panel" data-panel="insert">
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn" id="coverPageBtn" title="Cover page">📄 Cover</button>
+          <button class="ribbon-btn" id="pageBreakBtn" title="Page break">¶ Page break</button>
+          <button class="ribbon-btn" id="sectionBreakBtn" title="Section break">§ Section</button>
+        </div>
+        <div class="group-label">Pages</div>
+      </div>
+
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn" id="insertTableBtn" title="Insert table">▦ Table</button>
+          <button class="ribbon-btn" id="textToTableBtn" title="Convert text to table">▦← Text→Table</button>
+          <button class="ribbon-btn" id="tableToTextBtn" title="Convert table to text">→T Table→Text</button>
+        </div>
+        <div class="group-label">Tables</div>
+      </div>
+
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn" id="insertImageBtn" title="Picture from file">🖼 Picture</button>
+          <div class="rwd-menu-host">
+            <button class="ribbon-btn" id="picturesMoreBtn" title="More picture options">More ▾</button>
+            <div class="rwd-menu" id="picturesMore">
+              <button id="insertGalleryBtn">▦🖼 Gallery</button>
+              <button id="insertCarouselBtn">↔🖼 Carousel</button>
+              <button id="insertLinkedImgBtn">🔗🖼 Linked image (URL)</button>
+            </div>
+          </div>
+          <div class="rwd-menu-host">
+            <button class="ribbon-btn" id="shapesMenuBtn" title="Shapes">▭ Shapes ▾</button>
+            <div class="rwd-menu" id="shapesMore">
+              <button id="shapeRectBtn">▭ Rectangle</button>
+              <button id="shapeEllipseBtn">◯ Ellipse</button>
+              <button id="shapeArrowBtn">→ Arrow</button>
+              <button id="textBoxBtn">▢T Text box</button>
+            </div>
+          </div>
+          <button class="ribbon-btn" id="chartBtn" title="Chart from data">📊 Chart</button>
+          <button class="ribbon-btn" id="equationBtn" title="Equation">∑ Equation</button>
+        </div>
+        <div class="group-label">Illustrations</div>
+      </div>
+
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn" id="insertVideoBtn" title="YouTube / Vimeo">▶ Video</button>
+          <button class="ribbon-btn" id="insertAudioBtn" title="Audio file">♪ Audio</button>
+          <button class="ribbon-btn" id="insertIframeBtn" title="Iframe (sandboxed)">▥ Iframe</button>
+          <button class="ribbon-btn" id="insertQrBtn" title="QR code">⊞ QR</button>
+          <button class="ribbon-btn" id="insertBarcodeBtn" title="Barcode">| || Barcode</button>
+        </div>
+        <div class="group-label">Media</div>
+      </div>
+
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn" id="insertLinkBtn" title="Insert link">🔗 Link</button>
+          <button class="ribbon-btn" id="bookmarkBtn" title="Add bookmark">🔖 Bookmark</button>
+          <button class="ribbon-btn" id="bookmarksMenuBtn" title="Jump to bookmark">📚 ▾</button>
+        </div>
+        <div class="group-label">Links</div>
+      </div>
+
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn" id="insertHeaderBtn" title="Page header">▔ Header</button>
+          <button class="ribbon-btn" id="insertFooterBtn" title="Page footer">▁ Footer</button>
+          <button class="ribbon-btn" id="insertPageNumBtn" title="Page number">№ Page #</button>
+          <select class="select sm" id="insertFieldSelect" title="Insert live field" aria-label="Insert field">
+            <option value="">∰ Field…</option>
+            <option value="page">Page number</option>
+            <option value="pages">Total pages</option>
+            <option value="date">Today's date</option>
+            <option value="time">Current time</option>
+            <option value="datetime">Date &amp; time</option>
+            <option value="docTitle">Document title</option>
+            <option value="author">Author</option>
+            <option value="wordCount">Word count</option>
+          </select>
+        </div>
+        <div class="group-label">Header &amp; Footer</div>
+      </div>
+
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn" id="wordArtBtn" title="Word art">✨ Word art</button>
+          <button class="ribbon-btn" id="dropCapBtn" title="Drop cap">A Drop cap</button>
+          <button class="ribbon-btn" id="pullQuoteBtn" title="Pull quote">❝ Pull quote</button>
+          <button class="ribbon-btn" id="codeBlockBtn" title="Code block">{ } Code</button>
+          <button class="ribbon-btn" id="watermarkBtn" title="Watermark">💧 Watermark</button>
+          <button class="ribbon-btn" id="tabStopBtn" title="Tab stop with leader">⇥ Tab</button>
+          <button class="ribbon-btn" id="loremBtn" title="Lorem ipsum">📝 Lorem</button>
+          <button class="ribbon-btn" id="insertDateBtn" title="Calendar date">📅 Date</button>
+          <button class="ribbon-btn" data-cmd="insertHorizontalRule" title="Horizontal line">― Hr</button>
+        </div>
+        <div class="group-label">Text</div>
+      </div>
+
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn" id="insertSymbolBtn" title="Symbols">Ω Symbol</button>
+          <button class="ribbon-btn" id="insertEmojiBtn" title="Emoji">😀 Emoji</button>
+        </div>
+        <div class="group-label">Symbols</div>
+      </div>
+
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn" id="formTextBtn" title="Text input">✎ Text</button>
+          <button class="ribbon-btn" id="formCheckBtn" title="Checkbox">☐ Check</button>
+          <button class="ribbon-btn" id="formSelectBtn" title="Dropdown">▾ Drop</button>
+          <button class="ribbon-btn" id="formDateBtn" title="Date field">📅 Date fld</button>
+          <button class="ribbon-btn" id="formNumberBtn" title="Number field">№ Num fld</button>
+          <button class="ribbon-btn" id="formExportBtn" title="Export form data">⤓ CSV</button>
+          <button class="ribbon-btn" id="fieldCodeBtn" title="Field codes">{ } Codes</button>
+        </div>
+        <div class="group-label">Forms</div>
+      </div>
+
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn" id="commentBtn" title="Add comment">💬 Comment</button>
+          <button class="ribbon-btn" id="quickPartsBtn" title="Quick parts">⚡ Quick</button>
+          <button class="ribbon-btn" id="dictateBtn" title="Voice dictation">🎙 Dictate</button>
+          <select class="select sm" id="changeCase" title="Change case" aria-label="Change case">
+            <option value="">Aa Case…</option>
+            <option value="upper">UPPERCASE</option>
+            <option value="lower">lowercase</option>
+            <option value="title">Title Case</option>
+            <option value="sentence">Sentence case</option>
+            <option value="toggle">tOGGLE cASE</option>
+          </select>
+        </div>
+        <div class="group-label">Editing</div>
+      </div>
+    </div>
+
+    <!-- References tab -->
+    <div class="ribbon-panel" data-panel="references">
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn" id="insertTocBtn" title="Insert table of contents">📑 TOC</button>
+          <button class="ribbon-btn" id="listOfFiguresBtn" title="List of figures / tables / equations">📃 Lists</button>
+        </div>
+        <div class="group-label">Contents</div>
+      </div>
+
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn" id="insertFootnoteBtn" title="Insert footnote">⁺¹ Footnote</button>
+          <button class="ribbon-btn" id="captionBtn" title="Insert auto-numbered caption">🏷 Caption</button>
+          <button class="ribbon-btn" id="crossRefBtn" title="Insert cross-reference">↗ Cross-ref</button>
+        </div>
+        <div class="group-label">Footnotes &amp; captions</div>
+      </div>
+
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn" id="citationBtn" title="Insert citation">📎 Cite</button>
+          <button class="ribbon-btn" id="bibliographyBtn" title="Insert bibliography">📚 Bibliography</button>
+          <select class="select sm" id="citationStyleSelect" title="Citation style">
+            <option value="apa">APA</option>
+            <option value="mla">MLA</option>
+            <option value="chicago">Chicago</option>
+            <option value="ieee">IEEE</option>
+            <option value="harvard">Harvard</option>
+            <option value="vancouver">Vancouver</option>
+          </select>
+        </div>
+        <div class="group-label">Citations</div>
+      </div>
+
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn" id="doiBtn" title="DOI lookup → citation">DOI</button>
+          <button class="ribbon-btn" id="isbnBtn" title="ISBN lookup → citation">ISBN</button>
+          <button class="ribbon-btn" id="bibtexBtn" title="Import BibTeX">BibTeX</button>
+        </div>
+        <div class="group-label">Lookup</div>
+      </div>
+
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn" id="indexMarkBtn" title="Mark index entry">≡ Mark</button>
+          <button class="ribbon-btn" id="insertIndexBtn" title="Insert back-of-book index">⊞ Index</button>
+        </div>
+        <div class="group-label">Index</div>
+      </div>
+    </div>
+
+    <!-- Layout tab -->
+    <div class="ribbon-panel" data-panel="layout">
+      <div class="group">
+        <div class="group-row">
+          <label class="control">
+            Size
+            <select id="pageSize" class="select">
+              <option value="letter">Letter</option>
+              <option value="a4" selected>A4</option>
+              <option value="legal">Legal</option>
+            </select>
+          </label>
+          <label class="control">
+            Orientation
+            <select id="orientation" class="select">
+              <option value="portrait">Portrait</option>
+              <option value="landscape">Landscape</option>
+            </select>
+          </label>
+        </div>
+        <div class="group-label">Page</div>
+      </div>
+      <div class="group">
+        <div class="group-row">
+          <label class="control">
+            Margins
+            <select id="margins" class="select">
+              <option value="normal">Normal</option>
+              <option value="narrow">Narrow</option>
+              <option value="wide">Wide</option>
+            </select>
+          </label>
+          <label class="control">
+            Columns
+            <select id="columns" class="select">
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+            </select>
+          </label>
+        </div>
+        <div class="group-label">Page setup</div>
+      </div>
+      <div class="group">
+        <div class="group-row">
+          <label class="control switch">
+            <input type="checkbox" id="lineNumbersToggle" />
+            <span>Line numbers</span>
+          </label>
+          <label class="control switch">
+            <input type="checkbox" id="hyphenationToggle" />
+            <span>Hyphenation</span>
+          </label>
+          <label class="control switch">
+            <input type="checkbox" id="widowOrphanToggle" checked />
+            <span>Widow/orphan</span>
+          </label>
+        </div>
+        <div class="group-label">Flow</div>
+      </div>
+      <div class="group">
+        <div class="group-row">
+          <select class="select sm" id="headingNumScheme" title="Heading numbering scheme">
+            <option value="">Heading №…</option>
+            <option value="off">No numbering</option>
+            <option value="1.1.1">1.1.1</option>
+            <option value="I.A.1">I.A.1</option>
+            <option value="A.1.a">A.1.a</option>
+            <option value="1)">1)</option>
+          </select>
+          <button class="ribbon-btn" id="restartNumberingBtn" title="Restart numbering here">↻ Restart</button>
+        </div>
+        <div class="group-label">Numbering</div>
+      </div>
+    </div>
+
+    <!-- Review tab -->
+    <div class="ribbon-panel" data-panel="review">
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn" id="reviewSpellBtn" title="Run spell check">📖 Spelling</button>
+          <button class="ribbon-btn" id="reviewGrammarBtn" title="Run grammar">✓ Grammar</button>
+          <button class="ribbon-btn" id="reviewWordCountBtn" title="Word count details">∑ Word count</button>
+        </div>
+        <div class="group-label">Proofing</div>
+      </div>
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn" id="reviewNewCommentBtn" title="New comment">💬 New</button>
+          <button class="ribbon-btn" id="reviewToggleCommentsBtn" title="Toggle comments pane">▣ Pane</button>
+          <button class="ribbon-btn" id="reviewResolveBtn" title="Resolve / unresolve current thread">✓ Resolve</button>
+        </div>
+        <div class="group-row">
+          <button class="ribbon-btn" id="reviewPrevCommentBtn" title="Previous comment">◀</button>
+          <button class="ribbon-btn" id="reviewNextCommentBtn" title="Next comment">▶</button>
+        </div>
+        <div class="group-label">Comments</div>
+      </div>
+      <div class="group">
+        <div class="group-row">
+          <label class="control switch" style="margin:0">
+            <input type="checkbox" id="reviewTrackChangesToggle" />
+            <span>Track changes</span>
+          </label>
+          <select class="select sm" id="reviewMarkupFilter" title="Show markup">
+            <option value="all">All markup</option>
+            <option value="ins">Insertions</option>
+            <option value="del">Deletions</option>
+            <option value="comments">Comments only</option>
+            <option value="none">No markup</option>
+          </select>
+          <select class="select sm" id="reviewerFilter" title="Filter by reviewer">
+            <option value="">All reviewers</option>
+          </select>
+          <button class="ribbon-btn" id="reviewPaneBtn" title="Reviewing pane">▤ Reviewing pane</button>
+        </div>
+        <div class="group-label">Tracking</div>
+      </div>
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn" id="reviewPrevChangeBtn" title="Previous change">◀</button>
+          <button class="ribbon-btn" id="reviewNextChangeBtn" title="Next change">▶</button>
+          <button class="ribbon-btn" id="reviewAcceptBtn" title="Accept current change">✔ Accept</button>
+          <button class="ribbon-btn" id="reviewRejectBtn" title="Reject current change">✘ Reject</button>
+        </div>
+        <div class="group-row">
+          <button class="ribbon-btn" id="reviewAcceptAllBtn" title="Accept every change">✔✔ Accept all</button>
+          <button class="ribbon-btn" id="reviewRejectAllBtn" title="Reject every change">✘✘ Reject all</button>
+        </div>
+        <div class="group-label">Changes</div>
+      </div>
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn" id="reviewCompareBtn" title="Compare with another doc">⇄ Compare</button>
+          <button class="ribbon-btn" id="reviewSideBySideBtn" title="Side-by-side compare">⇉ Side-by-side</button>
+          <button class="ribbon-btn" id="reviewMergeBtn" title="3-way merge">⊕ 3-way merge</button>
+        </div>
+        <div class="group-label">Compare</div>
+      </div>
+      <div class="group">
+        <div class="group-row">
+          <label class="control switch" style="margin:0">
+            <input type="checkbox" id="reviewRestrictEditToggle" />
+            <span>Restrict</span>
+          </label>
+          <button class="ribbon-btn" id="reviewMarkFinalBtn" title="Mark as final">🔒 Mark final</button>
+          <button class="ribbon-btn" id="reviewInspectBtn" title="Inspect document">🔎 Inspect</button>
+        </div>
+        <div class="group-label">Protect</div>
+      </div>
+      <div class="group">
+        <div class="group-row">
+          <select class="select sm" id="reviewLanguage" title="Proofing language">
+            <option value="en">English</option>
+            <option value="es">Spanish</option>
+            <option value="fr">French</option>
+            <option value="de">German</option>
+            <option value="it">Italian</option>
+            <option value="pt">Portuguese</option>
+            <option value="nl">Dutch</option>
+            <option value="ja">Japanese</option>
+            <option value="zh-CN">Chinese</option>
+            <option value="ko">Korean</option>
+            <option value="ru">Russian</option>
+            <option value="ar">Arabic</option>
+          </select>
+          <button class="ribbon-btn" id="reviewSectionLangBtn" title="Set language for current section">§ Section lang</button>
+          <button class="ribbon-btn" id="reviewTranslateBtn" title="Translate document">🌐 Translate</button>
+        </div>
+        <div class="group-label">Language</div>
+      </div>
+    </div>
+
+    <!-- View tab -->
+    <div class="ribbon-panel" data-panel="view">
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn" id="zoomOutBtn" title="Zoom out">−</button>
+          <input type="range" id="zoom" min="50" max="200" value="100" style="width:120px" />
+          <button class="ribbon-btn" id="zoomInBtn" title="Zoom in">+</button>
+          <span id="zoomLabel" style="font-size:11px;color:var(--muted);min-width:38px;text-align:right">100%</span>
+        </div>
+        <div class="group-row">
+          <button class="ribbon-btn" id="zoomFitWidthBtn" title="Fit width">↔ Fit</button>
+          <button class="ribbon-btn" id="zoomFitPageBtn" title="Fit page">▭ Page</button>
+          <button class="ribbon-btn" id="zoom100Btn" title="100%">100%</button>
+        </div>
+        <div class="group-label">Zoom</div>
+      </div>
+
+      <div class="group">
+        <div class="group-row">
+          <label class="control">
+            Theme
+            <select id="themeSelect" class="select">
+              <option value="">Light</option>
+              <option value="dark">Dark</option>
+              <option value="sepia">Sepia</option>
+              <option value="contrast">High contrast</option>
+            </select>
+          </label>
+          <label class="control switch" style="display:none">
+            <input type="checkbox" id="darkMode" />
+            <span>Dark mode</span>
+          </label>
+        </div>
+        <div class="group-label">Theme</div>
+      </div>
+
+      <div class="group">
+        <div class="group-row">
+          <label class="control switch">
+            <input type="checkbox" id="rulerToggle" checked />
+            <span>Ruler</span>
+          </label>
+          <label class="control switch">
+            <input type="checkbox" id="outlineToggle" />
+            <span>Navigation</span>
+          </label>
+          <label class="control switch">
+            <input type="checkbox" id="commentsPaneToggle" />
+            <span>Comments</span>
+          </label>
+          <label class="control switch">
+            <input type="checkbox" id="grammarToggle" />
+            <span>Grammar pane</span>
+          </label>
+        </div>
+        <div class="group-label">Show</div>
+      </div>
+
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn" id="focusBtn2" title="Focus mode (F11)">⛶ Focus</button>
+          <button class="ribbon-btn" id="readingModeBtn" title="Read-only reading view">📖 Read</button>
+          <button class="ribbon-btn" id="fullscreenEditorBtn" title="Full-screen editor">⛶ Full</button>
+          <div class="rwd-menu-host">
+            <button class="ribbon-btn" id="moreModesBtn" title="More view modes">More ▾</button>
+            <div class="rwd-menu" id="moreModes">
+              <button id="outlineEditBtn">≡↕ Outline edit</button>
+              <button id="twoPageBtn">▮▮ Two-page spread</button>
+              <button id="sxsReadingBtn">⇉ Side-by-side reading</button>
+              <button id="mobilePreviewBtn">📱 Mobile preview</button>
+              <button id="readingDyslexiaBtn">🧠 Dyslexia preset</button>
+            </div>
+          </div>
+        </div>
+        <div class="group-label">Modes</div>
+      </div>
+
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn" id="readAloudBtn" title="Read aloud (text-to-speech)">🔊 Aloud</button>
+        </div>
+        <div class="group-label">Read</div>
+      </div>
+
+      <div class="group">
+        <div class="group-row">
+          <label class="control switch">
+            <input type="checkbox" id="spellToggle" checked />
+            <span>Spell check</span>
+          </label>
+          <label class="control switch">
+            <input type="checkbox" id="autoCorrectToggle" />
+            <span>Auto-correct</span>
+          </label>
+          <label class="control switch">
+            <input type="checkbox" id="smartComposeToggle" />
+            <span>Smart Compose</span>
+          </label>
+        </div>
+        <div class="group-label">Writing aids</div>
+      </div>
+
+      <div class="group">
+        <div class="group-row">
+          <label class="control switch">
+            <input type="checkbox" id="recordMacroToggle" />
+            <span>Record</span>
+          </label>
+          <button class="ribbon-btn" id="runMacroBtn" title="Run saved macro">▶ Run…</button>
+        </div>
+        <div class="group-label">Macros</div>
+      </div>
+
+      <div class="group">
+        <div class="group-row">
+          <label class="control switch">
+            <input type="checkbox" id="trackChangesToggle" />
+            <span>Track changes</span>
+          </label>
+          <label class="control switch">
+            <input type="checkbox" id="restrictEditToggle" />
+            <span>Restrict</span>
+          </label>
+        </div>
+        <div class="group-label">Markup</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- File menu (backstage) -->
+  <div class="backstage" id="backstage" hidden>
+    <aside class="backstage-side">
+      <button class="back-btn" id="backCloseBtn" aria-label="Close menu">←</button>
+      <div class="backstage-search-wrap">
+        <input type="search" id="backstageSearch" placeholder="🔍 Search File menu" />
+      </div>
+      <ul class="backstage-rail">
+        <li><button data-section="home" class="active">🏠 Home</button></li>
+        <li><button data-section="new">📄 New</button></li>
+        <li><button data-section="open">📂 Open</button></li>
+        <li><button data-section="save">💾 Save / Save As</button></li>
+        <li><button data-section="print">🖨 Print</button></li>
+        <li><button data-section="share">🔗 Share</button></li>
+        <li><button data-section="cloud">☁ Cloud sync</button></li>
+        <li><button data-section="export">📤 Export</button></li>
+        <li><button data-section="info">ⓘ Info</button></li>
+        <li><button data-section="tools">🛠 Tools</button></li>
+        <li><button data-section="about">❓ About</button></li>
+      </ul>
+    </aside>
+    <main class="backstage-main" id="backstageMain">
+      <h1 id="backstageTitle">Home</h1>
+      <div id="backstageContent"></div>
+    </main>
+  </div>
+
+  <!-- Document workspace -->
+  <main class="workspace" id="workspace">
+    <aside class="outline-pane" id="outlinePane" hidden>
+      <header><span>Navigation</span>
+        <span id="outlineCount" class="muted" style="margin-left:auto;font-size:11px"></span>
+        <button class="icon-btn" id="outlineCloseBtn" aria-label="Close">✕</button>
+      </header>
+      <ol id="outlineList"></ol>
+      <div class="mini-map" id="miniMap" aria-hidden="true"></div>
+      <div class="outline-resize" id="outlineResize" aria-hidden="true"></div>
+    </aside>
+    <div class="workspace-main">
+      <div class="ruler" id="ruler" aria-hidden="true"></div>
+      <div class="page-wrap" id="pageWrap">
+        <div class="page a4 portrait margins-normal" id="page">
+          <div
+            id="docHeader"
+            class="page-header"
+            contenteditable="true"
+            spellcheck="true"
+            aria-label="Document header"
+            data-placeholder="Header (click to edit)"
+          ></div>
+          <article
+            id="editor"
+            class="editor"
+            contenteditable="true"
+            spellcheck="true"
+            aria-label="Document editor"
+            data-placeholder="Start typing your document here…"
+          ><h1>Welcome to RodmanWord</h1>
+<p>RodmanWord is a lightweight Microsoft Word–style editor that runs entirely in your browser. Start typing to replace this text, or use the <b>Home</b> tab above to format your content.</p>
+<p>Tips:</p>
+<ul>
+  <li>Press <b>Ctrl+B</b>, <b>Ctrl+I</b>, <b>Ctrl+U</b> to format text.</li>
+  <li>Press <b>Ctrl+S</b> to save your document, or <b>Ctrl+P</b> to print.</li>
+  <li>Use <b>File → Export HTML</b> to share, or <b>Print → Save as PDF</b>.</li>
+  <li>Press <b>?</b> for the full keyboard-shortcut list.</li>
+</ul>
+<p>Your work is auto-saved to this browser as you type.</p></article>
+          <div
+            id="docFooter"
+            class="page-footer"
+            contenteditable="true"
+            spellcheck="true"
+            aria-label="Document footer"
+            data-placeholder="Footer (click to edit)"
+          ></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="status-bar">
+    <span id="dirtyDot" class="dirty-dot" hidden>●</span>
+    <span id="statusPage">Page 1 of 1</span>
+    <span class="sep">•</span>
+    <button class="status-btn" id="statusWords">0 words</button>
+    <span class="sep">•</span>
+    <span id="statusChars">0 characters</span>
+    <span class="sep">•</span>
+    <span id="statusReading">0 min read</span>
+    <span class="sep">•</span>
+    <span id="statusCursor">Ln 1, Col 1</span>
+    <span class="sep">•</span>
+    <span id="statusSize">0 KB</span>
+    <span class="spacer"></span>
+    <span id="goalIndicator" class="goal-indicator" hidden>
+      <span id="goalLabel">Goal</span>
+      <span class="goal-bar"><span id="goalFill"></span></span>
+    </span>
+    <span id="dictationIndicator" hidden>🎙 Listening…</span>
+    <span id="ttsIndicator" hidden>🔊 Speaking…</span>
+    <span class="sep" id="formatPainterIndicator" hidden>🖌 Painter armed</span>
+    <span id="statusSaved">Saved</span>
+  </footer>
+
+  <!-- Find & Replace dialog -->
+  <div class="modal" id="findModal" hidden>
+    <div class="modal-card">
+      <header><h3>Find &amp; Replace</h3>
+        <button class="icon-btn" data-close-modal aria-label="Close">✕</button>
+      </header>
+      <div class="modal-body">
+        <label>Find <input id="findInput" type="text" list="findHistory" /></label>
+        <datalist id="findHistory"></datalist>
+        <label>Replace <input id="replaceInput" type="text" /></label>
+        <div style="display:flex;gap:14px;flex-wrap:wrap">
+          <label class="row"><input type="checkbox" id="matchCase" /> Match case</label>
+          <label class="row"><input type="checkbox" id="matchWord" /> Whole word</label>
+          <label class="row"><input type="checkbox" id="matchRegex" /> Regex</label>
+        </div>
+        <div style="display:flex;gap:12px;flex-wrap:wrap">
+          <label>Scope
+            <select id="findScope" class="select sm">
+              <option value="all">Whole document</option>
+              <option value="selection">Selection only</option>
+              <option value="comments">Comments only</option>
+              <option value="footnotes">Footnotes only</option>
+              <option value="headings">Headings only</option>
+            </select>
+          </label>
+          <label class="row"><input type="checkbox" id="findByFormatBold" /> Bold</label>
+          <label class="row"><input type="checkbox" id="findByFormatItalic" /> Italic</label>
+          <label class="row"><input type="checkbox" id="findByFormatUnderline" /> Underline</label>
+          <button class="btn" id="saveSearchBtn">★ Save search</button>
+          <button class="btn" id="searchAcrossBtn">Across recent</button>
+        </div>
+        <ul id="savedSearchesList" class="snippet-list"></ul>
+        <p id="findCount" class="muted"></p>
+      </div>
+      <footer>
+        <button class="btn" id="findPrevBtn">Previous</button>
+        <button class="btn" id="findNextBtn">Find next</button>
+        <button class="btn" id="replaceOneBtn">Replace</button>
+        <button class="btn primary" id="replaceAllBtn">Replace all</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Table dialog -->
+  <div class="modal" id="tableModal" hidden>
+    <div class="modal-card">
+      <header><h3>Insert table</h3>
+        <button class="icon-btn" data-close-modal aria-label="Close">✕</button>
+      </header>
+      <div class="modal-body">
+        <label>Rows <input id="tblRows" type="number" min="1" max="50" value="3" /></label>
+        <label>Columns <input id="tblCols" type="number" min="1" max="20" value="3" /></label>
+        <label class="row"><input id="tblBorders" type="checkbox" checked /> Show borders</label>
+      </div>
+      <footer>
+        <button class="btn" data-close-modal>Cancel</button>
+        <button class="btn primary" id="insertTableConfirm">Insert</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Symbol dialog -->
+  <div class="modal" id="symbolModal" hidden>
+    <div class="modal-card">
+      <header><h3>Insert symbol</h3>
+        <button class="icon-btn" data-close-modal aria-label="Close">✕</button>
+      </header>
+      <div class="modal-body symbol-grid" id="symbolGrid"></div>
+    </div>
+  </div>
+
+  <!-- Emoji dialog -->
+  <div class="modal" id="emojiModal" hidden>
+    <div class="modal-card lg">
+      <header><h3>Insert emoji</h3>
+        <button class="icon-btn" data-close-modal aria-label="Close">✕</button>
+      </header>
+      <div class="modal-body emoji-body">
+        <nav class="emoji-cats" id="emojiCats"></nav>
+        <div class="emoji-grid" id="emojiGrid"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Word count details dialog -->
+  <div class="modal" id="countModal" hidden>
+    <div class="modal-card">
+      <header><h3>Word count</h3>
+        <button class="icon-btn" data-close-modal aria-label="Close">✕</button>
+      </header>
+      <div class="modal-body count-body" id="countBody"></div>
+      <footer><button class="btn primary" data-close-modal>Close</button></footer>
+    </div>
+  </div>
+
+  <!-- Keyboard shortcuts dialog -->
+  <div class="modal" id="shortcutsModal" hidden>
+    <div class="modal-card lg">
+      <header><h3>Keyboard shortcuts</h3>
+        <button class="icon-btn" data-close-modal aria-label="Close">✕</button>
+      </header>
+      <div class="modal-body shortcuts-body">
+        <table>
+          <tr><th>Action</th><th>Shortcut</th></tr>
+          <tr><td>Bold</td><td><kbd>Ctrl/⌘ + B</kbd></td></tr>
+          <tr><td>Italic</td><td><kbd>Ctrl/⌘ + I</kbd></td></tr>
+          <tr><td>Underline</td><td><kbd>Ctrl/⌘ + U</kbd></td></tr>
+          <tr><td>Save document</td><td><kbd>Ctrl/⌘ + S</kbd></td></tr>
+          <tr><td>Open file</td><td><kbd>Ctrl/⌘ + O</kbd></td></tr>
+          <tr><td>New document</td><td><kbd>Ctrl/⌘ + N</kbd></td></tr>
+          <tr><td>Print / PDF</td><td><kbd>Ctrl/⌘ + P</kbd></td></tr>
+          <tr><td>Find &amp; replace</td><td><kbd>Ctrl/⌘ + F</kbd></td></tr>
+          <tr><td>Undo / Redo</td><td><kbd>Ctrl/⌘ + Z</kbd> / <kbd>Ctrl/⌘ + Y</kbd></td></tr>
+          <tr><td>Focus mode</td><td><kbd>F11</kbd></td></tr>
+          <tr><td>This help</td><td><kbd>?</kbd></td></tr>
+          <tr><td>Close dialog / focus</td><td><kbd>Esc</kbd></td></tr>
+          <tr><td>Insert tab character</td><td><kbd>Tab</kbd></td></tr>
+        </table>
+      </div>
+      <footer><button class="btn primary" data-close-modal>Got it</button></footer>
+    </div>
+  </div>
+
+  <!-- Grammar suggestions panel -->
+  <aside class="comments-pane" id="grammarPane" hidden style="top: 110px; right: 312px">
+    <header>
+      <span>Grammar</span>
+      <span id="grammarCount" class="muted" style="margin-left:auto;font-size:11px"></span>
+      <button class="icon-btn" id="grammarCloseBtn" aria-label="Close">✕</button>
+    </header>
+    <ol id="grammarList"></ol>
+  </aside>
+
+  <!-- Review panel (track changes) -->
+  <aside class="comments-pane" id="reviewPane" hidden style="top: 380px">
+    <header>
+      <span>Track changes</span>
+      <span id="reviewCount" class="muted" style="margin-left:auto;font-size:11px"></span>
+      <button class="icon-btn" id="reviewCloseBtn" aria-label="Close">✕</button>
+    </header>
+    <div class="comments-filter" style="display:flex;gap:6px">
+      <button class="btn" id="acceptAllBtn">Accept all</button>
+      <button class="btn" id="rejectAllBtn">Reject all</button>
+    </div>
+    <ol id="reviewList"></ol>
+  </aside>
+
+  <!-- Custom styles modal -->
+  <div class="modal" id="stylesModal" hidden>
+    <div class="modal-card lg">
+      <header><h3>Custom paragraph styles</h3>
+        <button class="icon-btn" data-close-modal aria-label="Close">✕</button>
+      </header>
+      <div class="modal-body">
+        <p class="muted">Define styles you can apply to paragraphs from the Custom style dropdown.</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <label>Style name <input id="styleName" type="text" placeholder="Body Text 2" /></label>
+          <label>Base tag
+            <select id="styleBaseTag" class="select">
+              <option value="p">Paragraph</option>
+              <option value="h1">Heading 1</option>
+              <option value="h2">Heading 2</option>
+              <option value="h3">Heading 3</option>
+              <option value="h4">Heading 4</option>
+              <option value="blockquote">Blockquote</option>
+              <option value="pre">Pre / code</option>
+            </select>
+          </label>
+          <label style="grid-column:1/-1">CSS rules
+            <textarea id="styleCss" rows="4" spellcheck="false"
+              placeholder="font-family: Georgia, serif; font-size: 12pt; color: #333; line-height: 1.6;"></textarea>
+          </label>
+        </div>
+        <button class="btn" id="saveStyleBtn">Save style</button>
+        <hr/>
+        <ul id="stylesList" class="snippet-list"></ul>
+      </div>
+      <footer><button class="btn primary" data-close-modal>Done</button></footer>
+    </div>
+  </div>
+
+  <!-- Brand kit modal -->
+  <div class="modal" id="brandKitModal" hidden>
+    <div class="modal-card lg">
+      <header><h3>Brand kit</h3>
+        <button class="icon-btn" data-close-modal aria-label="Close">✕</button>
+      </header>
+      <div class="modal-body">
+        <p class="muted">Logo + colors + fonts. Letterhead applies the logo to the page header on the first page.</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <label>Logo URL <input id="brandLogo" type="text" placeholder="https://… or data:image/…" /></label>
+          <label>Brand name <input id="brandName" type="text" placeholder="Acme Corp" /></label>
+          <label>Primary color <input id="brandPrimary" type="color" value="#2b579a" /></label>
+          <label>Secondary color <input id="brandSecondary" type="color" value="#d23f31" /></label>
+          <label>Heading font <input id="brandHeadingFont" type="text" placeholder="Segoe UI" /></label>
+          <label>Body font <input id="brandBodyFont" type="text" placeholder="Calibri" /></label>
+        </div>
+        <label class="row"><input type="checkbox" id="brandUseLetterhead" /> Apply as letterhead (first-page header)</label>
+      </div>
+      <footer>
+        <button class="btn" id="brandClearBtn">Clear</button>
+        <button class="btn primary" id="brandApplyBtn">Apply</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Cover page templates modal -->
+  <div class="modal" id="coverPageModal" hidden>
+    <div class="modal-card lg">
+      <header><h3>Cover page</h3>
+        <button class="icon-btn" data-close-modal aria-label="Close">✕</button>
+      </header>
+      <div class="modal-body">
+        <p class="muted">Pick a cover-page block to insert at the top of the document.</p>
+        <div id="coverPageGrid" class="template-grid"></div>
+      </div>
+      <footer><button class="btn" data-close-modal>Close</button></footer>
+    </div>
+  </div>
+
+  <!-- WebDAV sync modal -->
+  <div class="modal" id="webdavModal" hidden>
+    <div class="modal-card">
+      <header><h3>WebDAV / Nextcloud sync</h3>
+        <button class="icon-btn" data-close-modal aria-label="Close">✕</button>
+      </header>
+      <div class="modal-body">
+        <p class="muted">Save / load the document directly via WebDAV (Nextcloud, OwnCloud, Apache, etc.). Credentials live only in this browser.</p>
+        <label>Server URL <input id="wdUrl" type="text" placeholder="https://cloud.example.com/remote.php/dav/files/USER/" /></label>
+        <label>Username <input id="wdUser" type="text" /></label>
+        <label>Password / token <input id="wdPass" type="password" /></label>
+        <label>Filename <input id="wdFile" type="text" placeholder="document.rwd" /></label>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn" id="wdSaveBtn">Upload</button>
+          <button class="btn" id="wdLoadBtn">Download</button>
+        </div>
+        <p id="wdStatus" class="muted"></p>
+      </div>
+      <footer><button class="btn primary" data-close-modal>Close</button></footer>
+    </div>
+  </div>
+
+  <!-- Markdown live-preview modal -->
+  <div class="modal" id="mdPreviewModal" hidden>
+    <div class="modal-card lg" style="max-width:1100px">
+      <header><h3>Markdown live preview</h3>
+        <button class="icon-btn" data-close-modal aria-label="Close">✕</button>
+      </header>
+      <div class="modal-body" style="padding:0">
+        <div style="display:flex;gap:0;height:64vh">
+          <textarea id="mdInput" style="flex:1;border:none;border-right:1px solid var(--ribbon-border);padding:12px;font-family:'Courier New',monospace;font-size:13px" placeholder="# Markdown here…"></textarea>
+          <div id="mdRendered" style="flex:1;overflow:auto;padding:12px;background:var(--page-bg);font-size:13px"></div>
+        </div>
+      </div>
+      <footer>
+        <button class="btn" data-close-modal>Close</button>
+        <button class="btn" id="mdInsertBtn">Insert into editor</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Field code editor modal -->
+  <div class="modal" id="fieldCodeModal" hidden>
+    <div class="modal-card lg">
+      <header><h3>Field codes</h3>
+        <button class="icon-btn" data-close-modal aria-label="Close">✕</button>
+      </header>
+      <div class="modal-body">
+        <p class="muted">All live-field tokens currently in the document. Click one to jump to it; double-click to change its type.</p>
+        <ol id="fieldCodeList" class="snippet-list"></ol>
+      </div>
+      <footer><button class="btn primary" data-close-modal>Close</button></footer>
+    </div>
+  </div>
+
+  <!-- Document Themes modal -->
+  <div class="modal" id="themesModal" hidden>
+    <div class="modal-card lg">
+      <header><h3>Document themes</h3>
+        <button class="icon-btn" data-close-modal aria-label="Close">✕</button>
+      </header>
+      <div class="modal-body">
+        <p class="muted">Pick a theme — a coordinated font and color scheme applied across the document.</p>
+        <div id="themesGrid" class="template-grid"></div>
+        <hr/>
+        <p><b>Custom theme</b></p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <label>Body font <input id="themeBodyFont" type="text" placeholder="Calibri, Arial, sans-serif" /></label>
+          <label>Heading font <input id="themeHeadingFont" type="text" placeholder="Segoe UI, sans-serif" /></label>
+          <label>Accent 1 <input id="themeAccent1" type="color" value="#2b579a" /></label>
+          <label>Accent 2 <input id="themeAccent2" type="color" value="#d23f31" /></label>
+          <label>Accent 3 <input id="themeAccent3" type="color" value="#ff8f00" /></label>
+          <label>Accent 4 <input id="themeAccent4" type="color" value="#2e7d32" /></label>
+        </div>
+        <button class="btn" id="applyCustomThemeBtn">Apply custom theme</button>
+      </div>
+      <footer><button class="btn primary" data-close-modal>Done</button></footer>
+    </div>
+  </div>
+
+  <!-- Styles import/export modal -->
+  <div class="modal" id="stylesIOModal" hidden>
+    <div class="modal-card">
+      <header><h3>Styles import / export</h3>
+        <button class="icon-btn" data-close-modal aria-label="Close">✕</button>
+      </header>
+      <div class="modal-body">
+        <p class="muted">Copy this JSON to share styles with another document, or paste a previously-saved JSON to import.</p>
+        <label>Styles JSON
+          <textarea id="stylesIOJson" rows="8" spellcheck="false"></textarea>
+        </label>
+        <div style="display:flex;gap:6px">
+          <button class="btn" id="exportStylesBtn">Export current</button>
+          <button class="btn primary" id="importStylesBtn">Import</button>
+        </div>
+      </div>
+      <footer><button class="btn" data-close-modal>Close</button></footer>
+    </div>
+  </div>
+
+  <!-- Inspect Document modal -->
+  <div class="modal" id="inspectModal" hidden>
+    <div class="modal-card lg">
+      <header><h3>Inspect document</h3>
+        <button class="icon-btn" data-close-modal aria-label="Close">✕</button>
+      </header>
+      <div class="modal-body">
+        <p class="muted">Scan the document for hidden content, leftover comments, drafts, custom CSS, and stray metadata. Pick what to remove.</p>
+        <div id="inspectFindings"></div>
+      </div>
+      <footer>
+        <button class="btn" data-close-modal>Close</button>
+        <button class="btn primary" id="inspectCleanBtn">Clean selected</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Side-by-side compare modal -->
+  <div class="modal" id="sideBySideModal" hidden>
+    <div class="modal-card lg" style="max-width:1100px">
+      <header><h3>Side-by-side compare</h3>
+        <button class="icon-btn" data-close-modal aria-label="Close">✕</button>
+      </header>
+      <div class="modal-body" style="padding:0">
+        <div class="sxs-toolbar" style="padding:8px;display:flex;gap:8px;border-bottom:1px solid var(--ribbon-border)">
+          <label style="flex:1">Other version (paste plain text):</label>
+          <button class="btn" id="sxsSyncToggle">Sync scroll: ON</button>
+        </div>
+        <div class="sxs-pair" style="display:flex;gap:0;height:64vh">
+          <div style="flex:1;border-right:1px solid var(--ribbon-border);overflow:auto;padding:12px;background:var(--page-bg);font-size:13px" id="sxsLeft"></div>
+          <div style="flex:1;overflow:auto;padding:12px;background:var(--page-bg);font-size:13px" id="sxsRight"><textarea id="sxsRightInput" rows="20" style="width:100%;height:100%;border:none;outline:none;background:transparent;font-family:inherit;font-size:13px" placeholder="Paste the other version here…"></textarea></div>
+        </div>
+      </div>
+      <footer>
+        <button class="btn" data-close-modal>Close</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- 3-way merge modal -->
+  <div class="modal" id="mergeModal" hidden>
+    <div class="modal-card lg">
+      <header><h3>3-way merge</h3>
+        <button class="icon-btn" data-close-modal aria-label="Close">✕</button>
+      </header>
+      <div class="modal-body">
+        <p class="muted">Pick a base version and an "other" version. Each conflict block lets you choose which side to keep.</p>
+        <label>Base text <textarea id="mergeBase" rows="4" placeholder="Original text both versions started from"></textarea></label>
+        <label>Other text <textarea id="mergeOther" rows="4" placeholder="The other person's version"></textarea></label>
+        <button class="btn" id="mergeRunBtn">Compute merge</button>
+        <div id="mergeResult" class="compare-result"></div>
+      </div>
+      <footer>
+        <button class="btn" data-close-modal>Close</button>
+        <button class="btn primary" id="mergeApplyBtn">Apply merged result</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Collaborate (P2P WebRTC) modal -->
+  <div class="modal" id="collabModal" hidden>
+    <div class="modal-card lg">
+      <header><h3>Collaborate (peer-to-peer)</h3>
+        <button class="icon-btn" data-close-modal aria-label="Close">✕</button>
+      </header>
+      <div class="modal-body">
+        <p class="muted">Direct peer-to-peer editing over WebRTC. No server stores your document — peers exchange a one-time handshake code, then talk directly. Host shares the offer; guest pastes it and shares the answer back.</p>
+        <label>Your name <input id="collabName" type="text" placeholder="Alice" /></label>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn" id="collabHostBtn">▶ Start as host</button>
+          <button class="btn" id="collabJoinBtn">↳ Join as guest</button>
+          <button class="btn" id="collabDisconnectBtn" hidden>✕ Disconnect</button>
+        </div>
+        <hr/>
+        <div id="collabHostStep" hidden>
+          <p><b>Step 1.</b> Send this offer code to your guest:</p>
+          <textarea id="collabOfferOut" rows="3" readonly spellcheck="false"></textarea>
+          <button class="btn" id="collabCopyOfferBtn">Copy offer</button>
+          <p style="margin-top:10px"><b>Step 2.</b> Paste the guest's answer here:</p>
+          <textarea id="collabAnswerIn" rows="3" placeholder="Paste guest's answer code…" spellcheck="false"></textarea>
+          <button class="btn primary" id="collabAcceptAnswerBtn">Accept answer</button>
+        </div>
+        <div id="collabGuestStep" hidden>
+          <p><b>Step 1.</b> Paste the host's offer here:</p>
+          <textarea id="collabOfferIn" rows="3" placeholder="Paste host's offer code…" spellcheck="false"></textarea>
+          <button class="btn primary" id="collabSubmitOfferBtn">Generate answer</button>
+          <p style="margin-top:10px"><b>Step 2.</b> Send this answer back to the host:</p>
+          <textarea id="collabAnswerOut" rows="3" readonly spellcheck="false"></textarea>
+          <button class="btn" id="collabCopyAnswerBtn">Copy answer</button>
+        </div>
+        <p id="collabStatus" class="muted"></p>
+        <ul id="collabPeers" class="snippet-list"></ul>
+      </div>
+      <footer><button class="btn primary" data-close-modal>Close</button></footer>
+    </div>
+  </div>
+
+  <!-- Cloud / Gist sync modal -->
+  <div class="modal" id="cloudModal" hidden>
+    <div class="modal-card">
+      <header><h3>Cloud sync via GitHub Gist</h3>
+        <button class="icon-btn" data-close-modal aria-label="Close">✕</button>
+      </header>
+      <div class="modal-body">
+        <p class="muted">Stores the document as a private GitHub gist. Paste a personal access token with the <code>gist</code> scope. The token is kept only in this browser.</p>
+        <label>GitHub token <input id="ghToken" type="password" placeholder="ghp_…" /></label>
+        <label>Gist ID (leave blank to create a new gist)
+          <input id="ghGistId" type="text" placeholder="abc123…" /></label>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn" id="cloudSaveBtn">Save / update gist</button>
+          <button class="btn" id="cloudLoadBtn">Load from gist</button>
+        </div>
+        <p id="cloudStatus" class="muted"></p>
+      </div>
+      <footer><button class="btn primary" data-close-modal>Close</button></footer>
+    </div>
+  </div>
+
+  <!-- Macros modal -->
+  <div class="modal" id="macrosModal" hidden>
+    <div class="modal-card">
+      <header><h3>Macros</h3>
+        <button class="icon-btn" data-close-modal aria-label="Close">✕</button>
+      </header>
+      <div class="modal-body">
+        <p class="muted">Run a saved macro to replay its recorded commands.</p>
+        <ul id="macrosList" class="snippet-list"></ul>
+      </div>
+      <footer><button class="btn primary" data-close-modal>Close</button></footer>
+    </div>
+  </div>
+
+  <!-- Translate modal -->
+  <div class="modal" id="translateModal" hidden>
+    <div class="modal-card">
+      <header><h3>Translate document</h3>
+        <button class="icon-btn" data-close-modal aria-label="Close">✕</button>
+      </header>
+      <div class="modal-body">
+        <p class="muted">Opens the document text in your chosen translator. No data stays in this app.</p>
+        <label>Source <select id="trSource" class="select">
+          <option value="auto">Auto-detect</option>
+          <option value="en">English</option>
+          <option value="es">Spanish</option>
+          <option value="fr">French</option>
+          <option value="de">German</option>
+          <option value="it">Italian</option>
+          <option value="pt">Portuguese</option>
+          <option value="ja">Japanese</option>
+          <option value="zh-CN">Chinese (Simplified)</option>
+        </select></label>
+        <label>Target <select id="trTarget" class="select">
+          <option value="es">Spanish</option>
+          <option value="fr">French</option>
+          <option value="de">German</option>
+          <option value="it">Italian</option>
+          <option value="pt">Portuguese</option>
+          <option value="ja">Japanese</option>
+          <option value="zh-CN">Chinese (Simplified)</option>
+          <option value="ko">Korean</option>
+          <option value="ar">Arabic</option>
+          <option value="hi">Hindi</option>
+          <option value="ru">Russian</option>
+          <option value="en">English</option>
+        </select></label>
+        <label>Service
+          <select id="trService" class="select">
+            <option value="google">Google Translate</option>
+            <option value="deepl">DeepL</option>
+            <option value="bing">Bing Translator</option>
+          </select>
+        </label>
+        <label class="row">
+          <input type="checkbox" id="trSelectionOnly" /> Selected text only
+        </label>
+      </div>
+      <footer>
+        <button class="btn" data-close-modal>Cancel</button>
+        <button class="btn primary" id="trOpenBtn">Open translator</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Image crop modal -->
+  <div class="modal" id="cropModal" hidden>
+    <div class="modal-card lg">
+      <header><h3>Crop image</h3>
+        <button class="icon-btn" data-close-modal aria-label="Close">✕</button>
+      </header>
+      <div class="modal-body">
+        <p class="muted">Drag on the image to draw a crop region, then click Apply.</p>
+        <div id="cropArea" style="position:relative;display:inline-block;max-width:100%;user-select:none">
+          <img id="cropImg" alt="" style="max-width:100%;display:block"/>
+          <div id="cropRect" style="position:absolute;border:2px dashed #2b579a;background:rgba(43,87,154,0.15);pointer-events:none;display:none"></div>
+        </div>
+      </div>
+      <footer>
+        <button class="btn" data-close-modal>Cancel</button>
+        <button class="btn primary" id="cropApplyBtn">Apply crop</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Image effects modal -->
+  <div class="modal" id="effectsModal" hidden>
+    <div class="modal-card">
+      <header><h3>Image effects</h3>
+        <button class="icon-btn" data-close-modal aria-label="Close">✕</button>
+      </header>
+      <div class="modal-body">
+        <label>Brightness <input id="fxBrightness" type="range" min="0" max="200" value="100" /> <span id="fxBrightnessVal">100%</span></label>
+        <label>Contrast <input id="fxContrast" type="range" min="0" max="200" value="100" /> <span id="fxContrastVal">100%</span></label>
+        <label>Saturation <input id="fxSaturate" type="range" min="0" max="200" value="100" /> <span id="fxSaturateVal">100%</span></label>
+        <label>Blur <input id="fxBlur" type="range" min="0" max="10" value="0" step="0.5" /> <span id="fxBlurVal">0px</span></label>
+        <label>Hue rotate <input id="fxHue" type="range" min="0" max="360" value="0" /> <span id="fxHueVal">0°</span></label>
+        <label>Grayscale <input id="fxGray" type="range" min="0" max="100" value="0" /> <span id="fxGrayVal">0%</span></label>
+        <label>Sepia <input id="fxSepia" type="range" min="0" max="100" value="0" /> <span id="fxSepiaVal">0%</span></label>
+      </div>
+      <footer>
+        <button class="btn" id="fxResetBtn">Reset</button>
+        <button class="btn primary" data-close-modal>Done</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Print preview modal -->
+  <div class="modal" id="printPreviewModal" hidden>
+    <div class="modal-card lg" style="max-width:880px">
+      <header><h3>Print preview</h3>
+        <button class="icon-btn" data-close-modal aria-label="Close">✕</button>
+      </header>
+      <div class="modal-body" id="printPreviewBody"
+        style="background:#888;padding:18px;max-height:70vh;overflow:auto">
+      </div>
+      <footer>
+        <button class="btn" data-close-modal>Close</button>
+        <button class="btn primary" id="printFromPreviewBtn">Print…</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Chart modal -->
+  <div class="modal" id="chartModal" hidden>
+    <div class="modal-card lg">
+      <header><h3>Insert chart</h3>
+        <button class="icon-btn" data-close-modal aria-label="Close">✕</button>
+      </header>
+      <div class="modal-body">
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <label>Type
+            <select id="chartType" class="select">
+              <option value="bar">Horizontal bar</option>
+              <option value="column" selected>Vertical column</option>
+              <option value="line">Line</option>
+              <option value="pie">Pie</option>
+            </select>
+          </label>
+          <label>Title <input id="chartTitle" type="text" placeholder="Sales by quarter" /></label>
+        </div>
+        <label>Data (CSV — first column = labels, others = series)
+          <textarea id="chartData" rows="6"
+            placeholder="Quarter,Revenue,Expenses&#10;Q1,120,80&#10;Q2,140,90&#10;Q3,160,100&#10;Q4,200,110"></textarea>
+        </label>
+        <div id="chartPreview" class="equation-preview" style="text-align:center"></div>
+      </div>
+      <footer>
+        <button class="btn" data-close-modal>Cancel</button>
+        <button class="btn primary" id="chartInsertBtn">Insert</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Citation modal -->
+  <div class="modal" id="citationModal" hidden>
+    <div class="modal-card lg">
+      <header><h3>Citations</h3>
+        <button class="icon-btn" data-close-modal aria-label="Close">✕</button>
+      </header>
+      <div class="modal-body">
+        <p class="muted">Add a source, then insert a citation at the cursor. Style is APA-lite.</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <label>Author <input id="citAuthor" type="text" placeholder="Smith, J." /></label>
+          <label>Year <input id="citYear" type="text" placeholder="2024" /></label>
+          <label style="grid-column:1/-1">Title <input id="citTitle" type="text" placeholder="The work itself" /></label>
+          <label style="grid-column:1/-1">Source <input id="citSource" type="text" placeholder="Journal / Publisher / URL" /></label>
+        </div>
+        <button class="btn" id="addSourceBtn">Add this source</button>
+        <hr/>
+        <ul id="citList" class="snippet-list"></ul>
+      </div>
+      <footer><button class="btn primary" data-close-modal>Done</button></footer>
+    </div>
+  </div>
+
+  <!-- Equation editor -->
+  <div class="modal" id="equationModal" hidden>
+    <div class="modal-card lg">
+      <header>
+        <h3 id="equationModalTitle">Insert equation</h3>
+        <button class="icon-btn" data-close-modal aria-label="Close">✕</button>
+      </header>
+      <div class="modal-body">
+        <p class="muted">Type LaTeX-style math and see the rendered preview update live.</p>
+        <textarea id="equationInput" rows="3" spellcheck="false"
+          placeholder="x = \frac{-b \pm \sqrt{b^2 - 4ac}}{2a}"></textarea>
+        <div class="equation-palette" id="equationPalette" aria-label="Quick insert"></div>
+        <label class="row">
+          <input type="checkbox" id="equationDisplay" /> Display mode (block, larger)
+        </label>
+        <div class="equation-preview" id="equationPreview" aria-live="polite"></div>
+      </div>
+      <footer>
+        <button class="btn" id="equationDeleteBtn" hidden>Delete</button>
+        <button class="btn" data-close-modal>Cancel</button>
+        <button class="btn primary" id="equationInsertBtn">Insert</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Lorem ipsum dialog -->
+  <div class="modal" id="loremModal" hidden>
+    <div class="modal-card">
+      <header><h3>Insert Lorem ipsum</h3>
+        <button class="icon-btn" data-close-modal aria-label="Close">✕</button>
+      </header>
+      <div class="modal-body">
+        <label>Paragraphs <input id="loremCount" type="number" min="1" max="50" value="3" /></label>
+        <label class="row"><input type="checkbox" id="loremShort" /> Short paragraphs</label>
+      </div>
+      <footer>
+        <button class="btn" data-close-modal>Cancel</button>
+        <button class="btn primary" id="loremInsertBtn">Insert</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Quick parts dialog -->
+  <div class="modal" id="quickPartsModal" hidden>
+    <div class="modal-card">
+      <header><h3>Quick parts</h3>
+        <button class="icon-btn" data-close-modal aria-label="Close">✕</button>
+      </header>
+      <div class="modal-body">
+        <p>Save the current selection as a reusable snippet, or insert a saved one.</p>
+        <label>Snippet name <input id="snippetName" type="text" placeholder="e.g. Email signature" /></label>
+        <button class="btn" id="saveSnippetBtn">Save selection as snippet</button>
+        <hr/>
+        <ul id="snippetList" class="snippet-list"></ul>
+      </div>
+      <footer><button class="btn primary" data-close-modal>Done</button></footer>
+    </div>
+  </div>
+
+  <!-- Document properties dialog -->
+  <div class="modal" id="propsModal" hidden>
+    <div class="modal-card">
+      <header><h3>Document properties</h3>
+        <button class="icon-btn" data-close-modal aria-label="Close">✕</button>
+      </header>
+      <div class="modal-body">
+        <label>Title <input id="propTitle" type="text" /></label>
+        <label>Author <input id="propAuthor" type="text" /></label>
+        <label>Subject <input id="propSubject" type="text" /></label>
+        <label>Keywords <input id="propKeywords" type="text" placeholder="comma, separated" /></label>
+        <label>Description <input id="propDesc" type="text" /></label>
+        <div id="propStats" class="props-stats"></div>
+      </div>
+      <footer>
+        <button class="btn" data-close-modal>Cancel</button>
+        <button class="btn primary" id="savePropsBtn">Save</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Writing goal dialog -->
+  <div class="modal" id="goalModal" hidden>
+    <div class="modal-card">
+      <header><h3>Writing goal</h3>
+        <button class="icon-btn" data-close-modal aria-label="Close">✕</button>
+      </header>
+      <div class="modal-body">
+        <label>Target word count <input id="goalTarget" type="number" min="0" value="500" /></label>
+        <p class="muted">A progress bar will show in the status bar. Set to 0 to disable.</p>
+      </div>
+      <footer>
+        <button class="btn" data-close-modal>Cancel</button>
+        <button class="btn primary" id="saveGoalBtn">Save</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Comment thread dialog -->
+  <div class="modal" id="commentModal" hidden>
+    <div class="modal-card">
+      <header>
+        <h3 id="commentModalTitle">Comment</h3>
+        <span style="flex:1"></span>
+        <label class="row" style="color:#fff;font-size:12px;margin:0 8px">
+          <input type="checkbox" id="commentResolved" /> Resolved
+        </label>
+        <button class="icon-btn" data-close-modal aria-label="Close">✕</button>
+      </header>
+      <div class="modal-body">
+        <p id="commentSelectionPreview" class="muted"></p>
+        <div id="commentReplies" class="comment-replies"></div>
+        <label>Reply <textarea id="commentText" rows="3" placeholder="Type a reply… use @name to mention"></textarea></label>
+      </div>
+      <footer>
+        <button class="btn" id="deleteCommentBtn" hidden>Delete thread</button>
+        <button class="btn" data-close-modal>Close</button>
+        <button class="btn primary" id="saveCommentBtn">Add reply</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Comments side panel -->
+  <aside class="comments-pane" id="commentsPane" hidden>
+    <header>
+      <span>Comments</span>
+      <span id="commentsCount" class="muted" style="margin-left:auto;font-size:11px"></span>
+      <button class="icon-btn" id="commentsCloseBtn" aria-label="Close">✕</button>
+    </header>
+    <div class="comments-filter">
+      <label class="row" style="font-size:12px;color:var(--muted)">
+        <input type="checkbox" id="showResolvedComments" /> Show resolved
+      </label>
+    </div>
+    <ol id="commentsList"></ol>
+  </aside>
+
+  <!-- Table mini-toolbar -->
+  <div id="tableBar" class="float-bar" hidden>
+    <button data-tact="row-above" title="Insert row above">+ Row ↑</button>
+    <button data-tact="row-below" title="Insert row below">+ Row ↓</button>
+    <button data-tact="col-left" title="Insert column left">+ Col ←</button>
+    <button data-tact="col-right" title="Insert column right">+ Col →</button>
+    <button data-tact="del-row" title="Delete row">– Row</button>
+    <button data-tact="del-col" title="Delete column">– Col</button>
+    <button data-tact="formula" title="Set cell formula">ƒ</button>
+    <button data-tact="numfmt" title="Number format">$%</button>
+    <button data-tact="cell-color" title="Cell colour">▮</button>
+    <button data-tact="distribute" title="Distribute rows/columns evenly">⇆</button>
+    <button data-tact="header-repeat" title="Repeat header row on print">↻ Hdr</button>
+    <button data-tact="merge" title="Merge selected cells">⊟ Merge</button>
+    <button data-tact="split" title="Split cell">⊞ Split</button>
+    <button data-tact="sort-asc" title="Sort by this column A→Z">↑ Sort</button>
+    <button data-tact="sort-desc" title="Sort by this column Z→A">↓ Sort</button>
+    <select data-tact="style" title="Table style">
+      <option value="">Style…</option>
+      <option value="">Plain</option>
+      <option value="bordered">Bordered</option>
+      <option value="banded">Banded rows</option>
+      <option value="grid">Grid</option>
+      <option value="header">Header emphasis</option>
+      <option value="minimal">Minimal</option>
+    </select>
+    <button data-tact="del-table" title="Delete table">🗑 Table</button>
+  </div>
+
+  <!-- Image mini-toolbar -->
+  <div id="imageBar" class="float-bar" hidden>
+    <button data-iact="small">Small</button>
+    <button data-iact="medium">Medium</button>
+    <button data-iact="full">Full</button>
+    <span style="width:1px;background:var(--ribbon-border)"></span>
+    <button data-iact="align-left" title="Align left">⯇</button>
+    <button data-iact="align-center" title="Center">⯀</button>
+    <button data-iact="align-right" title="Align right">⯈</button>
+    <span style="width:1px;background:var(--ribbon-border)"></span>
+    <button data-iact="rotate-l" title="Rotate −90°">↺</button>
+    <button data-iact="rotate-r" title="Rotate +90°">↻</button>
+    <button data-iact="crop" title="Crop image">⌗ Crop</button>
+    <button data-iact="effects" title="Brightness / contrast / saturation">🎨 Effects</button>
+    <span style="width:1px;background:var(--ribbon-border)"></span>
+    <button data-iact="wrap-square" title="Square wrap">▣</button>
+    <button data-iact="wrap-tight" title="Tight wrap">▢</button>
+    <button data-iact="wrap-through" title="Through wrap">▥</button>
+    <button data-iact="wrap-behind" title="Behind text">▤</button>
+    <button data-iact="wrap-front" title="In front of text">▦</button>
+    <button data-iact="wrap-none" title="Inline (no wrap)">─</button>
+    <span style="width:1px;background:var(--ribbon-border)"></span>
+    <button data-iact="caption">Caption…</button>
+    <button data-iact="alt">Alt…</button>
+    <button data-iact="delete">🗑</button>
+  </div>
+
+  <!-- Read-aloud controls (floating bar shown while speaking) -->
+  <div id="ttsBar" class="tts-bar" hidden>
+    <select id="ttsVoice" aria-label="Voice"></select>
+    <label>Speed
+      <input type="range" id="ttsRate" min="0.5" max="2" step="0.1" value="1" />
+      <span id="ttsRateLabel">1.0×</span>
+    </label>
+    <button class="btn" id="ttsPauseBtn">Pause</button>
+    <button class="btn" id="ttsStopBtn">Stop</button>
+  </div>
+
+  <!-- Reading-mode bar -->
+  <button id="readingExitBtn" class="focus-mode-exit" hidden>Exit reading mode (Esc)</button>
+
+  <!-- Mark-final banner -->
+  <div id="finalBanner" class="final-banner" hidden>
+    🔒 This document is marked as <b>Final</b>. Editing is disabled.
+    <button class="btn" id="finalBannerEditBtn">Edit anyway</button>
+  </div>
+
+  <!-- Toast container -->
+  <div id="toastContainer" class="toasts"></div>
+
+  <!-- Link insertion modal -->
+  <div class="modal" id="linkModal" hidden>
+    <div class="modal-card">
+      <header><h3>Insert link</h3>
+        <button class="icon-btn" data-close-modal aria-label="Close">✕</button>
+      </header>
+      <div class="modal-body">
+        <label>Display text <input id="linkText" type="text" /></label>
+        <label>URL <input id="linkUrl" type="text" placeholder="https://" /></label>
+      </div>
+      <footer>
+        <button class="btn" data-close-modal>Cancel</button>
+        <button class="btn primary" id="insertLinkConfirm">Insert</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Custom confirm modal -->
+  <div class="modal" id="confirmModal" hidden>
+    <div class="modal-card">
+      <header><h3 id="confirmTitle">Confirm</h3>
+        <button class="icon-btn" data-close-modal aria-label="Close">✕</button>
+      </header>
+      <div class="modal-body">
+        <p id="confirmMessage" style="margin:0"></p>
+      </div>
+      <footer>
+        <button class="btn" id="confirmCancel">Cancel</button>
+        <button class="btn primary" id="confirmOk">OK</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- About modal -->
+  <div class="modal" id="aboutModal" hidden>
+    <div class="modal-card">
+      <header><h3>About RodmanWord</h3>
+        <button class="icon-btn" data-close-modal aria-label="Close">✕</button>
+      </header>
+      <div class="modal-body about-body">
+        <div class="about-logo">W</div>
+        <h2 id="aboutLabel" style="margin:8px 0">RodmanWord</h2>
+        <p class="muted">Browser-based Microsoft Word clone</p>
+        <p>
+          Version <b id="aboutVersion">…</b>
+          &nbsp;·&nbsp;
+          Build <span id="aboutBuild" style="color:var(--muted)">…</span>
+        </p>
+        <p style="font-size:11px;color:var(--muted)">
+          Service worker cache: <code id="aboutCache">…</code>
+        </p>
+        <p>Open source, MIT licensed. Runs entirely in your browser.</p>
+        <p><a href="https://github.com/Rodman-Ai/RodmanWord" target="_blank" rel="noopener">View source on GitHub →</a></p>
+      </div>
+      <footer><button class="btn primary" data-close-modal>Close</button></footer>
+    </div>
+  </div>
+
+  <!-- Bookmarks dropdown -->
+  <div id="bookmarksPopup" class="bookmarks-popup" hidden></div>
+
+  <!-- Mail merge modal -->
+  <div class="modal" id="mailMergeModal" hidden>
+    <div class="modal-card lg">
+      <header><h3>Mail merge</h3>
+        <button class="icon-btn" data-close-modal aria-label="Close">✕</button>
+      </header>
+      <div class="modal-body">
+        <p>Use <code>{{Field}}</code> placeholders in your document, then paste CSV (header row + data rows) below. One document is generated per row.</p>
+        <label>CSV data
+          <textarea id="mergeCsv" rows="6" placeholder="Name,City&#10;Alice,Paris&#10;Bob,Tokyo"></textarea>
+        </label>
+        <p id="mergeStatus" class="muted"></p>
+      </div>
+      <footer>
+        <button class="btn" data-close-modal>Cancel</button>
+        <button class="btn primary" id="runMergeBtn">Merge &amp; download</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Watermark modal -->
+  <div class="modal" id="watermarkModal" hidden>
+    <div class="modal-card">
+      <header><h3>Watermark</h3>
+        <button class="icon-btn" data-close-modal aria-label="Close">✕</button>
+      </header>
+      <div class="modal-body">
+        <label>Text <input id="watermarkText" type="text" placeholder="DRAFT" /></label>
+        <label class="row"><input type="checkbox" id="watermarkOn" /> Show watermark</label>
+      </div>
+      <footer>
+        <button class="btn" data-close-modal>Cancel</button>
+        <button class="btn primary" id="saveWatermarkBtn">Apply</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Command palette -->
+  <div class="modal" id="paletteModal" hidden>
+    <div class="modal-card">
+      <header><h3>Command palette</h3>
+        <button class="icon-btn" data-close-modal aria-label="Close">✕</button>
+      </header>
+      <div class="modal-body">
+        <input id="paletteInput" type="text" placeholder="Type to search commands…" autofocus />
+        <ul id="paletteResults" class="palette-list"></ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Compare docs modal -->
+  <div class="modal" id="compareModal" hidden>
+    <div class="modal-card lg">
+      <header><h3>Compare with another document</h3>
+        <button class="icon-btn" data-close-modal aria-label="Close">✕</button>
+      </header>
+      <div class="modal-body">
+        <p class="muted">Paste plain text from another version. Lines added are green, removed are red.</p>
+        <textarea id="compareInput" rows="8" placeholder="Paste plain text of the other document here…"></textarea>
+        <div id="compareResult" class="compare-result"></div>
+      </div>
+      <footer>
+        <button class="btn" data-close-modal>Close</button>
+        <button class="btn primary" id="runCompareBtn">Compare</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Custom CSS editor -->
+  <div class="modal" id="cssModal" hidden>
+    <div class="modal-card lg">
+      <header><h3>Custom CSS</h3>
+        <button class="icon-btn" data-close-modal aria-label="Close">✕</button>
+      </header>
+      <div class="modal-body">
+        <p class="muted">Custom CSS is applied to the editor. Useful for tweaking fonts, spacing, or printable colors.</p>
+        <textarea id="customCss" rows="10" spellcheck="false" placeholder="/* example */&#10;.editor h1 { letter-spacing: 0.05em; }"></textarea>
+      </div>
+      <footer>
+        <button class="btn" id="clearCssBtn">Clear</button>
+        <button class="btn" data-close-modal>Cancel</button>
+        <button class="btn primary" id="saveCssBtn">Apply</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Password protect modal -->
+  <div class="modal" id="encryptModal" hidden>
+    <div class="modal-card">
+      <header><h3>Save with password</h3>
+        <button class="icon-btn" data-close-modal aria-label="Close">✕</button>
+      </header>
+      <div class="modal-body">
+        <p class="muted">The document is encrypted with AES-GCM. Anyone opening the file will need this password.</p>
+        <label>Password <input id="encryptPwd" type="password" /></label>
+        <label>Confirm <input id="encryptPwd2" type="password" /></label>
+      </div>
+      <footer>
+        <button class="btn" data-close-modal>Cancel</button>
+        <button class="btn primary" id="encryptSaveBtn">Save .rwd.enc</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Calendar picker (date insert) -->
+  <div class="modal" id="calModal" hidden>
+    <div class="modal-card">
+      <header><h3>Insert date</h3>
+        <button class="icon-btn" data-close-modal aria-label="Close">✕</button>
+      </header>
+      <div class="modal-body">
+        <label>Date <input id="calInput" type="date" /></label>
+        <label>Format
+          <select id="calFormat">
+            <option value="long">April 30, 2026</option>
+            <option value="short">4/30/2026</option>
+            <option value="iso">2026-04-30</option>
+            <option value="full">Thursday, April 30, 2026</option>
+          </select>
+        </label>
+      </div>
+      <footer>
+        <button class="btn" data-close-modal>Cancel</button>
+        <button class="btn primary" id="calInsertBtn">Insert</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Watermark overlay -->
+  <div id="watermarkOverlay" class="watermark-overlay" hidden></div>
+
+  <input type="file" id="filePicker" accept=".rwd,.html,.htm,.txt,.md,.rwd.enc,.docx,.pdf,.rtf,.odt,.epub,application/json,application/pdf,application/rtf,application/epub+zip,application/vnd.oasis.opendocument.text,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden />
+  <input type="file" id="imagePicker" accept="image/*" hidden />
+
+  <script src="docx.js"></script>
+  <script src="pdfio.js"></script>
+  <script src="interop.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <rect width="128" height="128" rx="16" fill="#2b579a"/>
+  <text x="50%" y="56%" text-anchor="middle"
+        font-family="Segoe UI, Arial, sans-serif"
+        font-size="80" font-weight="800"
+        fill="#fff" dominant-baseline="middle">W</text>
+</svg>

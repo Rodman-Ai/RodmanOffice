@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#1e293b" />
+  <title>RodmanOffice</title>
+  <meta name="description" content="A complete office suite that runs free in your browser." />
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="stylesheet" href="launcher.css" />
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(() => {});
+      });
+    }
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-logo" aria-hidden="true">
+        <svg viewBox="0 0 64 64" width="28" height="28">
+          <rect width="64" height="64" rx="12" fill="url(#bg)"/>
+          <defs>
+            <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#3b82f6"/>
+              <stop offset="100%" stop-color="#8b5cf6"/>
+            </linearGradient>
+          </defs>
+          <g fill="#fff">
+            <rect x="14" y="14" width="16" height="16" rx="2"/>
+            <rect x="34" y="14" width="16" height="16" rx="2" opacity="0.85"/>
+            <rect x="14" y="34" width="16" height="16" rx="2" opacity="0.85"/>
+            <rect x="34" y="34" width="16" height="16" rx="2" opacity="0.7"/>
+          </g>
+        </svg>
+      </div>
+      <div class="brand-text">
+        <div class="brand-title">RodmanOffice</div>
+        <div class="brand-tagline">A complete office suite that runs free in your browser.</div>
+      </div>
+    </div>
+  </header>
+
+  <main class="launcher">
+    <h1 class="launcher-heading">Pick an app</h1>
+    <p class="launcher-sub">Each app loads on its own — only the one you choose is downloaded.</p>
+
+    <div class="tile-grid" id="tileGrid">
+      <a class="tile tile-word" href="./word/" data-app="word">
+        <div class="tile-icon" aria-hidden="true">
+          <svg viewBox="0 0 64 64" width="48" height="48">
+            <rect width="64" height="64" rx="10" fill="#2b579a"/>
+            <text x="50%" y="55%" text-anchor="middle" font-family="-apple-system,Segoe UI,Roboto,sans-serif" font-weight="700" font-size="34" fill="#fff" dominant-baseline="middle">W</text>
+          </svg>
+        </div>
+        <div class="tile-body">
+          <div class="tile-name">Word Processor</div>
+          <div class="tile-desc">Write, format and export documents — DOCX, PDF, ODT, RTF, EPUB and more.</div>
+        </div>
+      </a>
+
+      <a class="tile tile-sheets is-disabled" href="./sheets/" data-app="sheets" aria-disabled="true">
+        <div class="tile-icon" aria-hidden="true">
+          <svg viewBox="0 0 64 64" width="48" height="48">
+            <rect width="64" height="64" rx="10" fill="#217346"/>
+            <text x="50%" y="55%" text-anchor="middle" font-family="-apple-system,Segoe UI,Roboto,sans-serif" font-weight="700" font-size="34" fill="#fff" dominant-baseline="middle">X</text>
+          </svg>
+        </div>
+        <div class="tile-body">
+          <div class="tile-name">Spreadsheets <span class="tile-badge">Soon</span></div>
+          <div class="tile-desc">Cells, formulas, charts. Coming soon.</div>
+        </div>
+      </a>
+
+      <a class="tile tile-slides is-disabled" href="./slides/" data-app="slides" aria-disabled="true">
+        <div class="tile-icon" aria-hidden="true">
+          <svg viewBox="0 0 64 64" width="48" height="48">
+            <rect width="64" height="64" rx="10" fill="#b7472a"/>
+            <text x="50%" y="55%" text-anchor="middle" font-family="-apple-system,Segoe UI,Roboto,sans-serif" font-weight="700" font-size="34" fill="#fff" dominant-baseline="middle">P</text>
+          </svg>
+        </div>
+        <div class="tile-body">
+          <div class="tile-name">Slideshows <span class="tile-badge">Soon</span></div>
+          <div class="tile-desc">Build and present decks in your browser. Coming soon.</div>
+        </div>
+      </a>
+
+      <a class="tile tile-image is-disabled" href="./image/" data-app="image" aria-disabled="true">
+        <div class="tile-icon" aria-hidden="true">
+          <svg viewBox="0 0 64 64" width="48" height="48">
+            <rect width="64" height="64" rx="10" fill="#7e3ff2"/>
+            <text x="50%" y="55%" text-anchor="middle" font-family="-apple-system,Segoe UI,Roboto,sans-serif" font-weight="700" font-size="34" fill="#fff" dominant-baseline="middle">I</text>
+          </svg>
+        </div>
+        <div class="tile-body">
+          <div class="tile-name">Image Editor <span class="tile-badge">Soon</span></div>
+          <div class="tile-desc">Crop, paint, retouch. Coming soon.</div>
+        </div>
+      </a>
+
+      <a class="tile tile-accounting is-disabled" href="./accounting/" data-app="accounting" aria-disabled="true">
+        <div class="tile-icon" aria-hidden="true">
+          <svg viewBox="0 0 64 64" width="48" height="48">
+            <rect width="64" height="64" rx="10" fill="#d97706"/>
+            <text x="50%" y="55%" text-anchor="middle" font-family="-apple-system,Segoe UI,Roboto,sans-serif" font-weight="700" font-size="34" fill="#fff" dominant-baseline="middle">$</text>
+          </svg>
+        </div>
+        <div class="tile-body">
+          <div class="tile-name">Accounting <span class="tile-badge">Soon</span></div>
+          <div class="tile-desc">Track income, expenses and invoices. Coming soon.</div>
+        </div>
+      </a>
+
+      <a class="tile tile-crm is-disabled" href="./crm/" data-app="crm" aria-disabled="true">
+        <div class="tile-icon" aria-hidden="true">
+          <svg viewBox="0 0 64 64" width="48" height="48">
+            <rect width="64" height="64" rx="10" fill="#0891b2"/>
+            <text x="50%" y="55%" text-anchor="middle" font-family="-apple-system,Segoe UI,Roboto,sans-serif" font-weight="700" font-size="34" fill="#fff" dominant-baseline="middle">C</text>
+          </svg>
+        </div>
+        <div class="tile-body">
+          <div class="tile-name">CRM <span class="tile-badge">Soon</span></div>
+          <div class="tile-desc">Manage contacts, leads and pipelines. Coming soon.</div>
+        </div>
+      </a>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <span>© RodmanOffice</span>
+    <span class="footer-sep">·</span>
+    <a href="https://github.com/Rodman-Ai/RodmanOffice" rel="noopener">Source</a>
+  </footer>
+
+  <script src="launcher.js" defer></script>
+</body>
+</html>

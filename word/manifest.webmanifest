@@ -1,0 +1,19 @@
+{
+  "name": "RodmanWord",
+  "short_name": "RodmanWord",
+  "description": "Browser-based Microsoft Word clone — runs offline, no backend.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#2b579a",
+  "theme_color": "#2b579a",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
