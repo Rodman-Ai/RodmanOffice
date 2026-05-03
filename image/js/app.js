@@ -1645,14 +1645,40 @@
   $('btn-redo').addEventListener('click', () => { Sounds.click(); redo(); });
 
   // ---- Open image ----
+  // Routes by extension: PSD (.psd/.psb) and PDF dynamic-import the
+  // shared engines from /lib/images/; everything else stays on the
+  // existing IO.decodeFile path (browser Image API).
   const fileInput = $('file-input');
   $('btn-open').addEventListener('click', () => fileInput.click());
+  async function decodeOpenedFile(f) {
+    const ext = (f.name.split('.').pop() || '').toLowerCase();
+    if (ext === 'psd' || ext === 'psb') {
+      const buf = await f.arrayBuffer();
+      const psdMod = await import('../../lib/images/psd.js');
+      const { canvas, width, height } = await psdMod.decodePsd(buf);
+      return { canvas, width, height };
+    }
+    if (ext === 'pdf') {
+      const buf = await f.arrayBuffer();
+      const pdfMod = await import('../../lib/images/pdf.js');
+      let pageIndex = 0;
+      const total = await pdfMod.pdfPageCount(buf);
+      if (total > 1) {
+        const pick = window.prompt(`This PDF has ${total} pages. Open which page? (1-${total})`, '1');
+        const n = parseInt(pick || '1', 10);
+        if (Number.isInteger(n) && n >= 1 && n <= total) pageIndex = n - 1;
+      }
+      const { canvas, width, height } = await pdfMod.decodePdfPage(buf, pageIndex);
+      return { canvas, width, height };
+    }
+    return IO.decodeFile(f);
+  }
   fileInput.addEventListener('change', async () => {
     const f = fileInput.files && fileInput.files[0];
     fileInput.value = '';
     if (!f) return;
     try {
-      const { canvas: src, width: iw, height: ih } = await IO.decodeFile(f);
+      const { canvas: src, width: iw, height: ih } = await decodeOpenedFile(f);
       pushUndo();
       clearCanvas('#ffffff');
       const r = Math.min(W / iw, H / ih);
@@ -1660,7 +1686,36 @@
       ctx.drawImage(src, (W - dw) / 2, (H - dh) / 2, dw, dh);
       composite();
       scheduleAutosave();
-    } catch (e) { alert('Could not load that image.'); }
+    } catch (e) {
+      console.error(e);
+      alert('Could not load that image: ' + (e && e.message ? e.message : e));
+    }
+  });
+
+  // ---- Save as PSD / Save as Photoshop PDF ----
+  // Both routes use the merged-display canvas (composite()'s output)
+  // so brushes / layers / filter previews are all baked in.
+  const btnSavePsd = $('btn-save-psd');
+  if (btnSavePsd) btnSavePsd.addEventListener('click', async () => {
+    try {
+      const psdMod = await import('../../lib/images/psd.js');
+      const blob = psdMod.encodePsd(canvas);
+      IO.triggerDownload(blob, IO.suggestFilename(`retropaint-${Date.now()}`, 'psd'));
+    } catch (e) {
+      console.error(e);
+      alert('Could not save .psd: ' + (e && e.message ? e.message : e));
+    }
+  });
+  const btnSavePdf = $('btn-save-pdf');
+  if (btnSavePdf) btnSavePdf.addEventListener('click', async () => {
+    try {
+      const pdfMod = await import('../../lib/images/pdf.js');
+      const blob = await pdfMod.encodePdfFromCanvas(canvas, { format: 'jpeg', quality: 0.92 });
+      IO.triggerDownload(blob, IO.suggestFilename(`retropaint-${Date.now()}`, 'pdf'));
+    } catch (e) {
+      console.error(e);
+      alert('Could not save .pdf: ' + (e && e.message ? e.message : e));
+    }
   });
 
   // ---- Autosave + restore ----

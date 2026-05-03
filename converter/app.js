@@ -9,7 +9,7 @@
 // the relevant translation step on the main thread.
 
 import { detect } from './detect.js';
-import { targetsFor } from './matrix.js';
+import { targetsForItem } from './matrix.js';
 import { createQueue, downloadBlob, emitZip } from './bulk.js';
 import * as docs from '../lib/docs/index.js';
 import * as images from '../lib/images/index.js';
@@ -101,24 +101,84 @@ async function runDoc(source, target) {
 }
 
 // ---------- Image family (main thread) ----------
+//
+// Pipeline: source bytes → canvas → encode to target.
+// Decoding routes by source ext (PSD via decodePsd; everything else
+// via decodeToCanvas, which uses the browser Image API). Encoding
+// routes by target ext (PSD via encodePsd; PDF via the dedicated
+// single-image PDF writer; PNG/JPEG/WebP via canvasToBlob).
 
-async function runImage(source, target) {
-  if (target.ext === 'pdf') {
-    const blob = new Blob([source.bytes], { type: source.mime });
-    const dataUrl = await new Promise((resolve, reject) => {
-      const r = new FileReader();
-      r.onload = () => resolve(r.result);
-      r.onerror = () => reject(new Error('Could not read image'));
-      r.readAsDataURL(blob);
-    });
-    const html = `<p><img src="${dataUrl}" alt=""></p>`;
-    const blob2 = docs.savePdf(html, { title: source.name.replace(/\.[^.]+$/, '') });
-    const buf = await blob2.arrayBuffer();
+async function decodeImageSourceToCanvas(source) {
+  const ext = (source.name.split('.').pop() || '').toLowerCase();
+  if (ext === 'psd' || ext === 'psb') {
+    const { canvas } = await images.decodePsd(source.bytes);
+    return canvas;
+  }
+  return images.decodeToCanvas(source.bytes, source.mime);
+}
+
+async function encodeCanvasToTarget(canvas, target, name) {
+  if (target.ext === 'psd') {
+    const blob = images.encodePsd(canvas);
+    const buf = await blob.arrayBuffer();
     return { bytes: buf, mime: target.mime };
   }
-  const blob = await images.convertImage(source.bytes, source.mime, target.mime);
+  if (target.ext === 'pdf') {
+    // Photoshop PDF: a single-page PDF wrapping the canvas as a
+    // JPEG image. Photoshop, Acrobat and Preview all open it
+    // straight back as a flattened image.
+    const blob = await images.encodePdfFromCanvas(canvas, { format: 'jpeg', quality: 0.92 });
+    const buf = await blob.arrayBuffer();
+    return { bytes: buf, mime: target.mime };
+  }
+  // PNG / JPEG / WebP — alpha-flatten when targeting JPEG to avoid
+  // black backgrounds.
+  if (target.mime === 'image/jpeg' && hasAlpha(canvas)) {
+    const flat = document.createElement('canvas');
+    flat.width = canvas.width;
+    flat.height = canvas.height;
+    const ctx = flat.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, flat.width, flat.height);
+    ctx.drawImage(canvas, 0, 0);
+    const blob = await images.canvasToBlob(flat, target.mime, 0.92);
+    const buf = await blob.arrayBuffer();
+    return { bytes: buf, mime: target.mime };
+  }
+  const blob = await images.canvasToBlob(canvas, target.mime);
   const buf = await blob.arrayBuffer();
   return { bytes: buf, mime: target.mime };
+}
+
+function hasAlpha(canvas) {
+  const ctx = canvas.getContext('2d');
+  const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  for (let i = 3; i < data.length; i += 4) {
+    if (data[i] !== 255) return true;
+  }
+  return false;
+}
+
+async function runImage(source, target) {
+  const canvas = await decodeImageSourceToCanvas(source);
+  return encodeCanvasToTarget(canvas, target, source.name);
+}
+
+// ---------- PDF as image (any PDF rasterized to a canvas) ----------
+//
+// Triggered from the main dispatch when the source is a PDF and the
+// chosen target is an image format (PSD/PNG/JPEG/WebP). PDF→PDF is
+// out of scope (no-op) and PDF→other-document continues to flow
+// through runDoc.
+
+async function runPdfAsImage(source, target) {
+  const { canvas } = await images.decodePdfPage(source.bytes, 0);
+  return encodeCanvasToTarget(canvas, target, source.name);
+}
+
+function isImageTarget(target) {
+  if (!target) return false;
+  return target.ext === 'png' || target.ext === 'jpg' || target.ext === 'webp' || target.ext === 'psd';
 }
 
 // ---------- Spreadsheet family (worker for native; main thread for PDF) ----------
@@ -236,7 +296,7 @@ function renderRow(item) {
 
   const select = document.createElement('select');
   select.className = 'queue-target';
-  const options = targetsFor(item.detected.family);
+  const options = targetsForItem({ family: item.detected.family, ext: item.detected.ext });
   if (options.length === 0) {
     const opt = document.createElement('option');
     opt.textContent = 'Unsupported';
@@ -320,11 +380,17 @@ async function convertAll() {
         family: item.detected.family,
       };
       let output;
-      switch (item.detected.family) {
-        case 'document':    output = await runDoc(source, item.target); break;
-        case 'spreadsheet': output = await runSheet(source, item.target); break;
-        case 'image':       output = await runImage(source, item.target); break;
-        default: throw new Error('Unknown family: ' + item.detected.family);
+      // Cross-family bridge: PDF source + image target → rasterize.
+      const sourceExt = (source.name.split('.').pop() || '').toLowerCase();
+      if (sourceExt === 'pdf' && isImageTarget(item.target)) {
+        output = await runPdfAsImage(source, item.target);
+      } else {
+        switch (item.detected.family) {
+          case 'document':    output = await runDoc(source, item.target); break;
+          case 'spreadsheet': output = await runSheet(source, item.target); break;
+          case 'image':       output = await runImage(source, item.target); break;
+          default: throw new Error('Unknown family: ' + item.detected.family);
+        }
       }
 
       const outName = renameWithExt(item.file.name, item.target.ext);

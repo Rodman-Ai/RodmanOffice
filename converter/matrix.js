@@ -27,6 +27,7 @@ const IMAGE_OUTPUTS = [
   { ext: 'png',  mime: 'image/png', label: 'PNG (.png)' },
   { ext: 'jpg',  mime: 'image/jpeg', label: 'JPEG (.jpg)' },
   { ext: 'webp', mime: 'image/webp', label: 'WebP (.webp)' },
+  { ext: 'psd',  mime: 'image/vnd.adobe.photoshop', label: 'Photoshop (.psd)' },
   { ext: 'pdf',  mime: 'application/pdf', label: 'PDF (.pdf)' },
 ];
 
@@ -39,4 +40,15 @@ export const MATRIX = {
 
 export function targetsFor(family) {
   return MATRIX[family] || [];
+}
+
+// Per-source augmentation. PDF is a document for text/PDF→PDF flows
+// but can also be rasterized into any image format — surface those
+// extra options on PDF inputs so the dropdown actually offers them.
+const PDF_IMAGE_BRIDGE = IMAGE_OUTPUTS.filter((o) => o.ext !== 'pdf');
+
+export function targetsForItem({ family, ext }) {
+  const base = targetsFor(family);
+  if (family === 'document' && ext === 'pdf') return [...base, ...PDF_IMAGE_BRIDGE];
+  return base;
 }
