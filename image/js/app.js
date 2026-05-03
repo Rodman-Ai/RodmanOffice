@@ -97,7 +97,7 @@
   setInterval(() => { antsPhase = (antsPhase + 1) % 8; if (state.selection || state.floating) composite(); }, 80);
 
   const state = {
-    mode: 'mspaint',
+    mode: 'photoshop',
     tool: 'pencil',
     primary: '#000000',
     secondary: '#ffffff',
@@ -1534,6 +1534,7 @@
     buildPalette();
     $('canvas-title').textContent = PaintModes.titles[mode];
     const MODE_LABELS = {
+      photoshop: 'Photoshop',
       mspaint: 'MS Paint 95',
       mariopaint: 'Mario Paint',
       kidpix: 'Kid Pix',
@@ -1548,7 +1549,10 @@
     const mascot = $('tux-mascot');
     if (mascot) mascot.hidden = mode !== 'tuxpaint';
   }
-  const VALID_MODES = ['mspaint','mariopaint','kidpix','macpaint','tuxpaint','psp','procreate','aseprite','gimp'];
+  const VALID_MODES = ['photoshop','mspaint','mariopaint','kidpix','macpaint','tuxpaint','psp','procreate','aseprite','gimp'];
+  // Modes that should show the Photoshop-style layers panel + doc tabs.
+  const LAYERS_MODES = new Set(['photoshop', 'psp']);
+  function modeHasLayers(m) { return LAYERS_MODES.has(m); }
 
   function updateStatusPos(p) {
     $('status-pos').textContent = `${p.x}, ${p.y}`;
@@ -1566,11 +1570,9 @@
     if (e.shiftKey) { resetAll(); return; }
     if (confirm('Clear the canvas?')) { pushUndo(); clearCanvas('#ffffff'); scheduleAutosave(); }
   });
-  $('btn-save').addEventListener('click', () => {
-    const a = document.createElement('a');
-    a.download = `retro-paint-${state.mode}-${Date.now()}.png`;
-    a.href = canvas.toDataURL('image/png');
-    a.click();
+  $('btn-save').addEventListener('click', async () => {
+    const blob = await IO.encodePNG(canvas);
+    IO.triggerDownload(blob, `retro-paint-${state.mode}-${Date.now()}.png`);
   });
   $('primary-swatch').addEventListener('click', () => openHsvPicker(true));
   $('secondary-swatch').addEventListener('click', () => openHsvPicker(false));
@@ -1645,23 +1647,20 @@
   // ---- Open image ----
   const fileInput = $('file-input');
   $('btn-open').addEventListener('click', () => fileInput.click());
-  fileInput.addEventListener('change', () => {
+  fileInput.addEventListener('change', async () => {
     const f = fileInput.files && fileInput.files[0];
+    fileInput.value = '';
     if (!f) return;
-    const img = new Image();
-    img.onload = () => {
+    try {
+      const { canvas: src, width: iw, height: ih } = await IO.decodeFile(f);
       pushUndo();
       clearCanvas('#ffffff');
-      const r = Math.min(W / img.width, H / img.height);
-      const dw = img.width * r, dh = img.height * r;
-      ctx.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
+      const r = Math.min(W / iw, H / ih);
+      const dw = iw * r, dh = ih * r;
+      ctx.drawImage(src, (W - dw) / 2, (H - dh) / 2, dw, dh);
       composite();
-      URL.revokeObjectURL(img.src);
       scheduleAutosave();
-    };
-    img.onerror = () => alert('Could not load that image.');
-    img.src = URL.createObjectURL(f);
-    fileInput.value = '';
+    } catch (e) { alert('Could not load that image.'); }
   });
 
   // ---- Autosave + restore ----
@@ -1669,24 +1668,26 @@
   function scheduleAutosave() {
     if (saveTimer) clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
+      // Autosave still uses dataURL for localStorage persistence (Blobs
+      // can't be stored in localStorage). Encode-to-PNG-as-string is the
+      // one place where the editor diverges from the IO module's Blob path.
       try { localStorage.setItem('retropaint:canvas', canvas.toDataURL('image/png')); }
       catch (e) { /* quota or security */ }
     }, 1500);
   }
-  function tryRestore() {
+  async function tryRestore() {
     let data;
     try { data = localStorage.getItem('retropaint:canvas'); } catch (e) { return; }
     if (!data) return;
-    const img = new Image();
-    img.onload = () => {
+    try {
+      const { canvas: src } = await IO.decodeDataURL(data);
       if (confirm('Restore your last drawing?')) {
-        ctx.drawImage(img, 0, 0);
+        ctx.drawImage(src, 0, 0);
         composite();
       } else {
         try { localStorage.removeItem('retropaint:canvas'); } catch (e) {}
       }
-    };
-    img.src = data;
+    } catch (e) { /* corrupt or stale autosave; ignore */ }
   }
 
   // ---- Keyboard shortcuts ----
@@ -1709,16 +1710,22 @@
     if (mod) return;
     if (e.key === 'Enter' && state.floating) { commitFloating(); return; }
     if (e.key === 'Escape') { state.floating = null; state.selection = null; composite(); return; }
-    if (e.key === '1') return setMode('mspaint');
-    if (e.key === '2') return setMode('mariopaint');
-    if (e.key === '3') return setMode('kidpix');
-    if (e.key === '4') return setMode('macpaint');
-    if (e.key === '5') return setMode('tuxpaint');
-    if (e.key === '6') return setMode('psp');
-    if (e.key === '7') return setMode('procreate');
-    if (e.key === '8') return setMode('aseprite');
-    if (e.key === '9') return setMode('gimp');
-    if (k === 'm') return setMuted(!state.muted);
+    if (e.key >= '1' && e.key <= '9') {
+      const num = +e.key;
+      if (state.mode === 'photoshop') {
+        const list = (PaintModes.tools && PaintModes.tools.photoshop) || [];
+        const t = list[num - 1];
+        if (t) { setTool(t.id, t); Sounds.click(); }
+        return;
+      }
+      const RETRO_BY_NUMBER = ['mspaint','mariopaint','kidpix','macpaint','tuxpaint','psp','procreate','aseprite','gimp'];
+      const target = RETRO_BY_NUMBER[num - 1];
+      if (target) return setMode(target);
+    }
+    // Mute on Shift+M everywhere; bare M is reserved as the marquee tool
+    // shortcut in Photoshop mode and only mutes in retro modes.
+    if (k === 'm' && e.shiftKey) return setMuted(!state.muted);
+    if (k === 'm' && state.mode !== 'photoshop') return setMuted(!state.muted);
     if (k === 'y') return $('btn-symmetry').click();
     if (k === 'g') return $('btn-grid').click();
     if (k === '?' || (e.shiftKey && k === '/')) { e.preventDefault(); return showHelp(); }
@@ -1822,28 +1829,9 @@
   }
 
   // ---- 1-bit B&W threshold pass (MacPaint) ----
-  // Bayer 4x4 ordered dither for grayscale tones.
-  const BAYER4 = [
-    [ 0,  8,  2, 10],
-    [12,  4, 14,  6],
-    [ 3, 11,  1,  9],
-    [15,  7, 13,  5]
-  ];
   function thresholdActiveLayerToBW() {
     const img = ctx.getImageData(0, 0, W, H);
-    const d = img.data;
-    for (let y = 0; y < H; y++) {
-      for (let x = 0; x < W; x++) {
-        const o = (y * W + x) * 4;
-        if (d[o+3] === 0) continue;
-        const luma = d[o] * 0.299 + d[o+1] * 0.587 + d[o+2] * 0.114;
-        const t = (BAYER4[y & 3][x & 3] + 0.5) * 16;  // 0..256
-        const bw = luma > t ? 255 : 0;
-        d[o] = d[o+1] = d[o+2] = bw;
-        d[o+3] = 255;
-      }
-    }
-    ctx.putImageData(img, 0, 0);
+    ctx.putImageData(IO.to1Bit(img, { dither: 'bayer4' }), 0, 0);
     composite();
   }
 
@@ -2061,17 +2049,29 @@
   // ---- Help overlay ----
   $('btn-help').addEventListener('click', () => showHelp());
   function showHelp() {
-    showModal('Retro Paint — Help', `
-      <p><b>Modes:</b> 1 / 2 / 3 — MS Paint · Mario Paint · Kid Pix</p>
-      <p><b>Tools:</b> hover any tool button, or use single-letter hotkeys
-        — P pencil · B brush · E eraser · F fill · K pick · S spray
-        · L line · R rect · O oval · G gradient · T text · A select.</p>
-      <p><b>Edit:</b> Ctrl+Z undo · Ctrl+Shift+Z redo · Ctrl+S save · Ctrl+O open.</p>
-      <p><b>View:</b> + / − / 0 zoom · Space+drag (or 2-finger) pan · G grid · Y mirror · M mute.</p>
-      <p><b>Shapes:</b> hold Shift while dragging for square / circle / 45° line.</p>
-      <p><b>Symmetry:</b> Off → H → V → Both → 4-way → 8-way kaleidoscope.</p>
-      <p><b>Animation:</b> use the bar at the bottom — add frames, scrub, play, toggle onion skin.</p>
-      <p><b>FX:</b> the FX button applies image filters (invert / grayscale / sepia / posterize / blur).</p>
+    showModal('Help — keyboard shortcuts', `
+      <p><b>Modes:</b> Photoshop is the default. Retro modes (MS Paint 95,
+        Mario Paint, Kid Pix, MacPaint, Tux Paint, Paint Shop Pro,
+        Procreate, Aseprite, GIMP) live in the <b>Bonus</b> menu.</p>
+      <p><b>Number keys:</b> in Photoshop mode <kbd>1</kbd>–<kbd>9</kbd>
+        select the first nine tools in the toolbox. In any retro mode they
+        switch between the nine retro modes.</p>
+      <p><b>Photoshop tools:</b>
+        <kbd>M</kbd> marquee · <kbd>L</kbd> lasso · <kbd>W</kbd> wand ·
+        <kbd>C</kbd> crop · <kbd>I</kbd> eyedropper · <kbd>B</kbd> brush ·
+        <kbd>N</kbd> pencil · <kbd>E</kbd> eraser · <kbd>S</kbd> clone ·
+        <kbd>O</kbd> dodge · <kbd>P</kbd> pen · <kbd>T</kbd> text ·
+        <kbd>U</kbd> rectangle.</p>
+      <p><b>Edit:</b> <kbd>Ctrl+Z</kbd> undo · <kbd>Ctrl+Shift+Z</kbd> redo
+        · <kbd>Ctrl+S</kbd> save · <kbd>Ctrl+O</kbd> open ·
+        <kbd>Ctrl+A</kbd> select all · <kbd>Ctrl+C/X/V</kbd> copy/cut/paste.</p>
+      <p><b>View:</b> <kbd>+</kbd> / <kbd>−</kbd> / <kbd>0</kbd> zoom ·
+        Space+drag (or 2-finger) pan · <kbd>G</kbd> grid · <kbd>Y</kbd>
+        mirror · <kbd>V</kbd> bg pattern · <kbd>Shift+M</kbd> mute.</p>
+      <p><b>Shapes:</b> hold <kbd>Shift</kbd> while dragging for square /
+        circle / 45° line.</p>
+      <p><b>Animation:</b> <kbd>Shift+F</kbd> opens the flipbook bar.</p>
+      <p>Every action is also available from the menu bar above.</p>
     `, { hideCancel: true, okText: 'Got it' });
   }
 
@@ -2362,15 +2362,9 @@
     if (e.shiftKey) {
       const scale = +(prompt('Save at scale?', '2') || '1');
       if (scale > 0 && scale <= 8) {
-        const off = document.createElement('canvas');
-        off.width = W * scale; off.height = H * scale;
-        const c2 = off.getContext('2d');
-        c2.imageSmoothingEnabled = false;
-        c2.drawImage(canvas, 0, 0, off.width, off.height);
-        const a = document.createElement('a');
-        a.download = `retro-paint-${state.mode}-${scale}x-${Date.now()}.png`;
-        a.href = off.toDataURL('image/png');
-        a.click();
+        const off = IO.resize(canvas, scale);
+        const blob = await IO.encodePNG(off);
+        IO.triggerDownload(blob, `retro-paint-${state.mode}-${scale}x-${Date.now()}.png`);
         e.stopImmediatePropagation();
       }
     }
@@ -2402,7 +2396,7 @@
   function renderLayersPanel() {
     const panel = $('psp-layers-panel');
     if (!panel) return;
-    panel.hidden = state.mode !== 'psp';
+    panel.hidden = !modeHasLayers(state.mode);
     if (panel.hidden) return;
     const list = $('psp-layers-list');
     list.innerHTML = '';
@@ -2504,7 +2498,7 @@
   function renderTabs() {
     const bar = $('psp-tabs');
     if (!bar) return;
-    bar.hidden = state.mode !== 'psp';
+    bar.hidden = !modeHasLayers(state.mode);
     if (bar.hidden) return;
     bar.innerHTML = '';
     docs.forEach((d, i) => {
@@ -2785,23 +2779,11 @@
   // ---- GIF export from animation flipbook (via tiny encoder) ----
   // Minimal GIF89a encoder for 256-color frames using neuquant-like
   // simple median-cut; we use 64-color quantization for speed.
-  function exportFlipbookGIF() {
+  async function exportFlipbookGIF() {
     if (!state.frames || state.frames.length < 2) { alert('Add frames first.'); return; }
-    // Use a simple approach: encode each frame as a PNG and stitch
-    // them into an APNG — but APNG isn't a "GIF". A genuine GIF
-    // encoder is large. For now, export a vertical sprite-sheet PNG.
-    const frames = state.frames;
-    const w = W, h = H;
-    const sheet = window.document.createElement('canvas');
-    sheet.width = w; sheet.height = h * frames.length;
-    const sctx = sheet.getContext('2d');
-    for (let i = 0; i < frames.length; i++) {
-      sctx.putImageData(frames[i], 0, i * h);
-    }
-    const a = window.document.createElement('a');
-    a.download = `retro-paint-spritesheet-${Date.now()}.png`;
-    a.href = sheet.toDataURL('image/png');
-    a.click();
+    const sheet = IO.composeSpriteSheet(state.frames, { layout: 'vertical' });
+    const blob = await IO.encodePNG(sheet);
+    IO.triggerDownload(blob, `retro-paint-spritesheet-${Date.now()}.png`);
   }
 
   // ---- Clipboard (cut/copy/paste of selection) ----
@@ -2887,38 +2869,34 @@
 
   // ---- Drag-drop image to load ----
   canvas.addEventListener('dragover', (e) => { e.preventDefault(); });
-  canvas.addEventListener('drop', (e) => {
+  canvas.addEventListener('drop', async (e) => {
     e.preventDefault();
     const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
     if (!f || !f.type.startsWith('image/')) return;
-    const img = new Image();
-    img.onload = () => {
+    try {
+      const { canvas: src, width: iw, height: ih } = await IO.decodeFile(f);
       pushUndo();
-      const r = Math.min(W / img.width, H / img.height);
-      const dw = img.width * r, dh = img.height * r;
-      ctx.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
+      const r = Math.min(W / iw, H / ih);
+      const dw = iw * r, dh = ih * r;
+      ctx.drawImage(src, (W - dw) / 2, (H - dh) / 2, dw, dh);
       composite();
-      URL.revokeObjectURL(img.src);
-    };
-    img.src = URL.createObjectURL(f);
+    } catch (_) { /* ignore unreadable drop */ }
   });
 
   // ---- Paste from system clipboard (image) ----
-  window.addEventListener('paste', (e) => {
+  window.addEventListener('paste', async (e) => {
     const items = e.clipboardData && e.clipboardData.items;
     if (!items) return;
     for (const it of items) {
       if (it.type && it.type.startsWith('image/')) {
         const blob = it.getAsFile();
-        const img = new Image();
-        img.onload = () => {
-          pushUndo();
-          ctx.drawImage(img, 10, 10);
-          composite();
-          URL.revokeObjectURL(img.src);
-        };
-        img.src = URL.createObjectURL(blob);
         e.preventDefault();
+        try {
+          const { canvas: src } = await IO.decodeBlob(blob);
+          pushUndo();
+          ctx.drawImage(src, 10, 10);
+          composite();
+        } catch (_) { /* ignore */ }
         return;
       }
     }
@@ -2953,7 +2931,7 @@
   }
   // Hook into endStroke + filter ops to refresh thumbnails.
   const _composite = composite;
-  composite = function () { _composite(); if (state.mode === 'psp') refreshLayersPanelSoon(); };
+  composite = function () { _composite(); if (modeHasLayers(state.mode)) refreshLayersPanelSoon(); };
 
   // ====================================================================
   // PHASE 1 (round 2) — workflow + modern UX features
@@ -3833,7 +3811,7 @@
       drawAnts(displayCtx, f.x, f.y, f.imageData.width, f.imageData.height);
     }
     displayCtx.restore();
-    if (state.mode === 'psp') refreshLayersPanelSoon();
+    if (modeHasLayers(state.mode)) refreshLayersPanelSoon();
   };
 
   // ---- Adjustment layers (non-destructive) ----
@@ -5062,9 +5040,9 @@
     setMuted(localStorage.getItem('retropaint:muted') === '1');
   } catch (e) {}
 
-  let savedMode = 'mspaint';
-  try { savedMode = localStorage.getItem('retropaint:mode') || 'mspaint'; } catch (e) {}
-  if (!VALID_MODES.includes(savedMode)) savedMode = 'mspaint';
+  let savedMode = 'photoshop';
+  try { savedMode = localStorage.getItem('retropaint:mode') || 'photoshop'; } catch (e) {}
+  if (!VALID_MODES.includes(savedMode)) savedMode = 'photoshop';
   setMode(savedMode);
   updateUndoButtons();
   tryRestore();
@@ -5075,4 +5053,17 @@
       navigator.serviceWorker.register('sw.js').catch(() => {});
     });
   }
+
+  // ---- Bridge for menus.js ----
+  // Expose only what the menu bar needs to dispatch. Everything else stays
+  // private to this IIFE. Buttons reachable via `getElementById(...).click()`
+  // are not re-exposed here.
+  window.RP = {
+    applyFilter,
+    openLevels, openHSL, openColorBalance, openThreshold,
+    openHistoryPanel, openSnapshots, shortcutsModal,
+    nextBgPattern,
+    newLayer, dupLayer, mergeDown, delLayer,
+    saveSnapshotState
+  };
 })();

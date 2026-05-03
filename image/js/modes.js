@@ -437,6 +437,17 @@
 
   // ---- Palettes ----
   const PALETTES = {
+    // Photoshop: black/white + foreground/background defaults + a small
+    // swatches strip. The HSV picker is the primary color tool here.
+    photoshop: [
+      '#000000', '#ffffff',
+      '#1a1a1a', '#333333', '#4d4d4d', '#666666',
+      '#808080', '#999999', '#b3b3b3', '#cccccc',
+      '#e63946', '#f4a261', '#e9c46a', '#2a9d8f',
+      '#264653', '#457b9d', '#1d3557', '#a8dadc',
+      '#ff006e', '#fb5607', '#ffbe0b', '#8338ec',
+      '#3a86ff', '#06d6a0', '#ef476f', '#118ab2'
+    ],
     mspaint: [
       '#000000', '#7f7f7f', '#7f0000', '#7f7f00',
       '#007f00', '#007f7f', '#00007f', '#7f007f',
@@ -518,6 +529,34 @@
   // ---- Tool definitions per mode ----
   // Tool entries: { id, label, icon, kind, opts? }
   const TOOLS = {
+    // Photoshop: a curated, canonical Photoshop toolbox. Advanced tools
+    // (curves, masks, vector pen, timeline, etc.) will be promoted into
+    // the menu bar in a later step; the GIMP bonus mode keeps the full
+    // exhaustive list for now.
+    photoshop: [
+      { id: 'select', label: 'Marquee', icon: '⬚', shortcut: 'm' },
+      { id: 'lasso',  label: 'Lasso',   icon: '◌', shortcut: 'l' },
+      { id: 'wand',   label: 'Wand',    icon: '🪄', shortcut: 'w' },
+      { id: 'crop',   label: 'Crop',    icon: '⛶', shortcut: 'c' },
+      { id: 'eyedrop', label: 'Eyedrop', icon: '💧', shortcut: 'i' },
+      { id: 'brush',  label: 'Brush',   icon: '🖌️', shortcut: 'b' },
+      { id: 'pencil', label: 'Pencil',  icon: '✏️', shortcut: 'n' },
+      { id: 'eraser', label: 'Eraser',  icon: '🧽', shortcut: 'e' },
+      { id: 'fill',   label: 'Bucket',  icon: '🪣', shortcut: 'g' },
+      { id: 'gradient', label: 'Gradient', icon: '🌈' },
+      { id: 'spray',  label: 'Airbrush', icon: '💨' },
+      { id: 'smudge', label: 'Smudge',  icon: '👆' },
+      { id: 'clone',  label: 'Clone',   icon: '🖼️', shortcut: 's' },
+      { id: 'dodge',  label: 'Dodge',   icon: '☼', shortcut: 'o' },
+      { id: 'burn',   label: 'Burn',    icon: '☾' },
+      { id: 'penTool', label: 'Pen',    icon: '✒️', shortcut: 'p' },
+      { id: 'text',   label: 'Text',    icon: 'T', shortcut: 't' },
+      { id: 'line',   label: 'Line',    icon: '╱' },
+      { id: 'rect',   label: 'Rect',    icon: '▭', shortcut: 'u' },
+      { id: 'rectFill', label: 'Rect•', icon: '▬' },
+      { id: 'ellipse', label: 'Oval',   icon: '◯' },
+      { id: 'ellipseFill', label: 'Oval•', icon: '⬤' }
+    ],
     mspaint: [
       { id: 'pencil', label: 'Pencil', icon: '✏️', shortcut: 'p' },
       { id: 'brush', label: 'Brush', icon: '🖌️', shortcut: 'b' },
@@ -861,6 +900,7 @@
     stamps: { mariopaint: MARIO_STAMPS, kidpix: KIDPIX_STAMPS },
     drawStamp,
     titles: {
+      photoshop: 'Untitled-1 @ 100% (RGB/8)',
       mspaint: 'untitled — Paint',
       mariopaint: '* Mario Paint *',
       kidpix: 'KID PIX !',

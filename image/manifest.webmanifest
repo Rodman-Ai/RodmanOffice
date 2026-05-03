@@ -1,13 +1,13 @@
 {
-  "name": "Retro Paint",
-  "short_name": "Retro Paint",
-  "description": "MS Paint 95, Mario Paint, and Kid Pix in your browser.",
+  "name": "Rodman Image Editor",
+  "short_name": "Image Editor",
+  "description": "A Photoshop-style image editor with nine retro paint modes hiding in the Bonus menu.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#008080",
-  "theme_color": "#008080",
+  "background_color": "#2b2b2b",
+  "theme_color": "#2b2b2b",
   "categories": ["entertainment", "graphics", "kids"],
   "icons": [
     {

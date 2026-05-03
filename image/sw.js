@@ -1,5 +1,5 @@
 /* Retro Paint — minimal offline-cache service worker */
-const CACHE = 'retro-paint-v1';
+const CACHE = 'retro-paint-v6';
 const ASSETS = [
   './',
   './index.html',
@@ -8,6 +8,8 @@ const ASSETS = [
   './icon.svg',
   './js/app.js',
   './js/modes.js',
+  './js/menus.js',
+  './js/io.js',
   './js/sounds.js'
 ];
 
