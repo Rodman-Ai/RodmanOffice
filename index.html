@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#1e293b" />
   <title>RodmanOffice</title>
-  <meta name="description" content="A complete office suite that runs free in your browser." />
+  <meta name="description" content="A complete office suite that runs free in your browser. Seven apps, no backend, no signup, no upload." />
   <link rel="icon" href="icon.svg" type="image/svg+xml" />
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="stylesheet" href="launcher.css" />
@@ -58,7 +58,13 @@
         </div>
         <div class="tile-body">
           <div class="tile-name">Word Processor</div>
-          <div class="tile-desc">Write, format and export documents — DOCX, PDF, ODT, RTF, EPUB and more.</div>
+          <div class="tile-desc">RodmanWord — write, format, export.</div>
+          <ul class="tile-features">
+            <li>Hand-rolled DOCX + PDF writers, zero external libraries</li>
+            <li>Ten output formats: DOCX, PDF, ODT, RTF, EPUB, MD, HTML, AsciiDoc, LaTeX, TXT</li>
+            <li>Templates, themes, headers/footers with page numbers</li>
+            <li>Autosave, installable PWA, fully offline</li>
+          </ul>
         </div>
       </a>
 
@@ -71,7 +77,13 @@
         </div>
         <div class="tile-body">
           <div class="tile-name">Spreadsheets</div>
-          <div class="tile-desc">AiCell — cells, formulas, charts and an Ask-Claude side panel. CSV/XLSX import &amp; export.</div>
+          <div class="tile-desc">AiCell — cells, formulas, charts, AI.</div>
+          <ul class="tile-features">
+            <li>HyperFormula calc engine — 400+ functions</li>
+            <li>Recharts-powered charts, conditional formatting</li>
+            <li>Ask-Claude side panel for AI cell formulas</li>
+            <li>CSV / XLSX import &amp; export, React + Vite + TypeScript</li>
+          </ul>
         </div>
       </a>
 
@@ -84,7 +96,13 @@
         </div>
         <div class="tile-body">
           <div class="tile-name">Slideshows</div>
-          <div class="tile-desc">RodmanSlides — build and present decks. Themes, transitions, shapes, images, PDF export.</div>
+          <div class="tile-desc">RodmanSlides — build and present decks.</div>
+          <ul class="tile-features">
+            <li>PPTX import &amp; export — hand-rolled OOXML writer</li>
+            <li>Themes, transitions, shapes, images, text frames</li>
+            <li>Present mode (F5) with speaker notes pane</li>
+            <li>Autosave, PDF export, no external slide library</li>
+          </ul>
         </div>
       </a>
 
@@ -97,7 +115,13 @@
         </div>
         <div class="tile-body">
           <div class="tile-name">Image Editor</div>
-          <div class="tile-desc">A Photoshop-style image editor with layers, selections, and adjustments — plus nine retro paint modes hiding in the Bonus menu.</div>
+          <div class="tile-desc">Photoshop-style — plus a hidden retro mode menu.</div>
+          <ul class="tile-features">
+            <li>Layers, selections, adjustments, filter FX, undo/redo</li>
+            <li>PSD + Photoshop PDF read &amp; write; PNG, JPEG, WebP, BMP, ICO encoders</li>
+            <li>Open any PDF as an image — page picker via PDF.js</li>
+            <li>Bonus: nine retro paint modes (MS Paint, Mario Paint, Kid Pix, Aseprite…)</li>
+          </ul>
         </div>
       </a>
 
@@ -110,7 +134,13 @@
         </div>
         <div class="tile-body">
           <div class="tile-name">Accounting</div>
-          <div class="tile-desc">RodBooks — AI-first books for creators. Deals, invoices, banking, tax.</div>
+          <div class="tile-desc">RodBooks — AI-first books for solo creators.</div>
+          <ul class="tile-features">
+            <li>Deals, invoices, banking, tax in one workspace</li>
+            <li>Claude-assisted bookkeeping &amp; categorisation</li>
+            <li>Plain-English reports, no jargon required</li>
+            <li>Local-first — your books stay in your browser</li>
+          </ul>
         </div>
       </a>
 
@@ -123,7 +153,13 @@
         </div>
         <div class="tile-body">
           <div class="tile-name">CRM</div>
-          <div class="tile-desc">LeoCRM — AI lead-gen on top of your Google Workspace. Sheets-as-database, Claude-drafted emails.</div>
+          <div class="tile-desc">LeoCRM — AI lead-gen on top of Google Workspace.</div>
+          <ul class="tile-features">
+            <li>Sheets-as-database — your spreadsheet is the source of truth</li>
+            <li>Claude-drafted outreach emails, tone-matched</li>
+            <li>Lead enrichment + pipeline views built in</li>
+            <li>Next.js static demo, no backend required</li>
+          </ul>
         </div>
       </a>
 
@@ -136,16 +172,56 @@
         </div>
         <div class="tile-body">
           <div class="tile-name">File Converter</div>
-          <div class="tile-desc">RodmanConvert — drop any file, pick a format. Documents, spreadsheets and images, all in your browser.</div>
+          <div class="tile-desc">RodmanConvert — drop any file, pick a format.</div>
+          <ul class="tile-features">
+            <li>40+ conversions across documents, spreadsheets, images</li>
+            <li>Cross-family bridges: CSV→PDF, PNG→PDF, PDF→PNG, PDF→PSD…</li>
+            <li>Bulk mode — drop many files; optional .zip bundle</li>
+            <li>Web Worker for heavy parsing; nothing leaves your device</li>
+          </ul>
         </div>
       </a>
     </div>
+
+    <section class="about" aria-labelledby="aboutHeading">
+      <h2 id="aboutHeading" class="about-heading">About RodmanOffice</h2>
+      <div class="about-grid">
+        <div class="about-col">
+          <h3 class="about-col-title">What it is</h3>
+          <p>
+            A complete, open-source office suite that runs entirely in your browser.
+            Seven apps — no backend, no signup, no upload, no install required.
+            Each app is a separate Progressive Web App you can pin to your home screen and use offline.
+          </p>
+        </div>
+        <div class="about-col">
+          <h3 class="about-col-title">How it's built</h3>
+          <ul class="about-list">
+            <li><strong>Static site</strong> hosted on GitHub Pages, deployed via GitHub Actions.</li>
+            <li><strong>Vanilla HTML/CSS/JS</strong> for Word, Slides, Image and the Converter — no build step required.</li>
+            <li><strong>React + Vite + TypeScript</strong> for AiCell (spreadsheets); <strong>Next.js</strong> for LeoCRM.</li>
+            <li><strong>Web Workers</strong> for off-main-thread parsing; <strong>Service Workers</strong> for offline support.</li>
+            <li><strong>Shared <code>/lib/</code> engines</strong> for documents, spreadsheets, slides and images — one source of truth across the suite.</li>
+          </ul>
+        </div>
+        <div class="about-col">
+          <h3 class="about-col-title">Privacy</h3>
+          <p>
+            Every conversion, edit and export happens locally in your browser.
+            Files never leave your device — there's no server to upload them to.
+            All open source — read the code, fork it, run it yourself.
+          </p>
+        </div>
+      </div>
+    </section>
   </main>
 
   <footer class="footer">
     <span>© RodmanOffice</span>
     <span class="footer-sep">·</span>
-    <a href="https://github.com/Rodman-Ai/RodmanOffice" rel="noopener">Source</a>
+    <a href="https://github.com/Rodman-Ai/RodmanOffice" rel="noopener">Source on GitHub</a>
+    <span class="footer-sep">·</span>
+    <a href="https://github.com/Rodman-Ai/RodmanOffice/issues" rel="noopener">Report an issue</a>
   </footer>
 
   <script src="launcher.js" defer></script>
