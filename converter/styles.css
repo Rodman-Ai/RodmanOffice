@@ -189,7 +189,126 @@ html, body {
   color: var(--text-dim);
 }
 
+/* ----- About / Supported formats ----- */
+.about {
+  margin-top: 48px;
+  padding-top: 32px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+.about-heading {
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0 0 18px;
+}
+.about-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+}
+.about-col {
+  background: linear-gradient(180deg, rgba(30,41,59,0.55), rgba(15,23,42,0.55));
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px 20px;
+}
+.about-col-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--accent-hover);
+  margin: 0 0 10px;
+}
+.about-col p {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-dim);
+  margin: 0;
+}
+.about-col p em {
+  font-style: normal;
+  color: var(--text);
+  background: rgba(255,255,255,0.05);
+  padding: 0 4px;
+  border-radius: 3px;
+}
+.about-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.about-list li {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-dim);
+  padding-left: 14px;
+  position: relative;
+}
+.about-list li::before {
+  content: "›";
+  position: absolute;
+  left: 0;
+  top: 0;
+  color: var(--accent-hover);
+}
+.about-list strong {
+  color: var(--text);
+  font-weight: 600;
+}
+.about-list code,
+.about-col p code,
+.format-matrix code {
+  background: rgba(255,255,255,0.06);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 11.5px;
+}
+
+/* Supported-formats matrix — definition-list of family + direction. */
+.format-matrix {
+  margin: 0;
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  column-gap: 12px;
+  row-gap: 6px;
+  align-items: baseline;
+}
+.format-matrix dt {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.format-matrix dt .dir {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--accent-hover);
+  background: rgba(13,148,136,0.18);
+  border: 1px solid rgba(13,148,136,0.35);
+  padding: 1px 5px;
+  border-radius: 999px;
+}
+.format-matrix dd {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+
+@media (max-width: 900px) {
+  .about-grid { grid-template-columns: 1fr; }
+}
+
 @media (max-width: 600px) {
   .queue-row { grid-template-columns: 1fr 130px 28px; }
   .queue-status { display: none; }
+  .about { margin-top: 32px; padding-top: 24px; }
 }
