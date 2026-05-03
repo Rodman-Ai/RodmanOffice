@@ -444,7 +444,7 @@ export function App() {
       items: [
         { kind: "item", label: "Function reference…", onClick: () => setPickerOpen(true) },
         { kind: "item", label: "Audit formulas…", onClick: () => setAuditOpen(true) },
-        { kind: "item", label: "About AiCell", onClick: () => alert("AiCell — AI-native spreadsheet. Ask Claude what you'd normally click for.") },
+        { kind: "item", label: "About RodmanSheets", onClick: () => alert("RodmanSheets — AI-native spreadsheet. Ask Claude what you'd normally click for.") },
       ],
     },
   ];
@@ -543,7 +543,7 @@ export function App() {
           <span aria-hidden>←</span>
           <span>Apps</span>
         </a>
-        <h1>AiCell</h1>
+        <h1>RodmanSheets</h1>
         <label>
           Import
           <input
@@ -675,12 +675,12 @@ export function App() {
 
 function SaveIndicator({ state }: { state: SaveState }) {
   let text = "";
-  let color = "var(--aicell-header-fg)";
+  let color = "inherit";
   if (state.kind === "saving") text = "Saving…";
   else if (state.kind === "saved") text = `Saved ${formatTime(state.at)}`;
   else if (state.kind === "error") {
     text = `Save failed`;
-    color = "var(--aicell-error)";
+    color = "#ffd2d2";
   }
   if (!text) return null;
   return (

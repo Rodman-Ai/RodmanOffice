@@ -19,9 +19,9 @@ type Props = {
 };
 
 const PRESETS: { label: string; style: Partial<CellFormat> }[] = [
-  { label: "Red fill", style: { bg: "#fee2e2", color: "#991b1b" } },
-  { label: "Yellow fill", style: { bg: "#fef3c7", color: "#92400e" } },
-  { label: "Green fill", style: { bg: "#dcfce7", color: "#166534" } },
+  { label: "Red fill", style: { bg: "#ffc7ce", color: "#9c0006" } },
+  { label: "Yellow fill", style: { bg: "#ffeb9c", color: "#9c5700" } },
+  { label: "Green fill", style: { bg: "#c6efce", color: "#006100" } },
   { label: "Blue fill", style: { bg: "#dbeafe", color: "#1e40af" } },
   { label: "Bold", style: { bold: true } },
 ];

@@ -20,7 +20,7 @@ import {
 import type { Sheet, ChartSpec } from "@aicell/shared";
 import { cellKey } from "@aicell/shared";
 
-const COLORS = ["#2563eb", "#16a34a", "#dc2626", "#ca8a04", "#9333ea", "#0891b2"];
+const COLORS = ["#107c41", "#2b579a", "#b7472a", "#ca8a04", "#9333ea", "#0891b2"];
 
 type Row = Record<string, string | number>;
 

@@ -1,12 +1,35 @@
 :root {
-  --aicell-border: #e2e2e6;
-  --aicell-header-bg: #f5f5f7;
+  /* Excel brand */
+  --primary: #107c41;
+  --primary-dark: #0b5a2f;
+  --primary-light: #1a9f55;
+
+  /* Shared shell tokens (mirrors RodmanWord) */
+  --tab-active: #ffffff;
+  --tab-inactive: #f3f3f3;
+  --ribbon-bg: #f3f3f3;
+  --ribbon-border: #d6d6d6;
+  --workspace-bg: #e6e6e6;
+  --page-bg: #ffffff;
+  --text: #222;
+  --muted: #666;
+  --shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+  --status-bg: #107c41;
+  --status-fg: #fff;
+  --hover: rgba(16, 124, 65, 0.10);
+  --active: rgba(16, 124, 65, 0.20);
+  --selection: #c6efce;
+
+  /* Grid tokens — keep names so existing rules continue to work */
+  --aicell-border: var(--ribbon-border);
+  --aicell-header-bg: var(--ribbon-bg);
   --aicell-header-fg: #4a4a52;
   --aicell-row-alt: #fafafb;
-  --aicell-selected: #d4e4ff;
-  --aicell-selected-border: #2563eb;
+  --aicell-selected: var(--selection);
+  --aicell-selected-border: var(--primary);
   --aicell-error: #b91c1c;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+
+  font-family: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
 }
 
 * {
@@ -44,9 +67,9 @@ body,
   display: flex;
   gap: 8px;
   align-items: center;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--aicell-border);
-  background: var(--aicell-header-bg);
+  padding: 6px 12px;
+  background: var(--primary);
+  color: #fff;
   flex-shrink: 0;
 }
 
@@ -55,6 +78,24 @@ body,
   font-weight: 600;
   margin: 0;
   margin-right: 12px;
+  color: #fff;
+  letter-spacing: 0.2px;
+}
+
+.toolbar h1::before {
+  content: "X";
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin-right: 8px;
+  background: #fff;
+  color: var(--primary);
+  border-radius: 4px;
+  font-weight: 800;
+  font-size: 14px;
+  vertical-align: middle;
 }
 
 /* RodmanOffice — back-to-launcher button injected into the toolbar. */
@@ -63,30 +104,31 @@ body,
   align-items: center;
   gap: 4px;
   padding: 4px 10px;
-  border: 1px solid var(--aicell-border);
-  background: white;
-  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
   font-size: 12px;
   font-weight: 500;
-  color: var(--aicell-header-fg);
+  color: #fff;
   text-decoration: none;
   cursor: pointer;
 }
-.rodmanoffice-back:hover { background: #f0f0f3; }
+.rodmanoffice-back:hover { background: rgba(255, 255, 255, 0.25); }
 
 .toolbar button,
 .toolbar label {
   padding: 4px 10px;
-  border: 1px solid var(--aicell-border);
-  background: white;
-  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  border-radius: 3px;
   font-size: 13px;
   cursor: pointer;
 }
 
 .toolbar button:hover,
 .toolbar label:hover {
-  background: #f0f0f3;
+  background: rgba(255, 255, 255, 0.25);
 }
 
 .toolbar input[type="file"] {
@@ -96,7 +138,7 @@ body,
 .toolbar .status {
   margin-left: auto;
   font-size: 12px;
-  color: var(--aicell-header-fg);
+  color: rgba(255, 255, 255, 0.85);
 }
 
 .formula-bar {
@@ -177,7 +219,7 @@ body,
 }
 
 .grid-cell.in-range {
-  background: rgba(212, 228, 255, 0.55);
+  background: rgba(198, 239, 206, 0.55);
 }
 
 .grid-cell.anchor {
@@ -249,8 +291,8 @@ body,
 }
 
 .col-chevron:hover {
-  background: rgba(37, 99, 235, 0.15);
-  color: var(--aicell-selected-border);
+  background: var(--hover);
+  color: var(--primary);
 }
 
 .col-chevron-popup {
@@ -283,7 +325,7 @@ body,
 }
 
 .col-chevron-popup button:hover:not(:disabled) {
-  background: rgba(37, 99, 235, 0.1);
+  background: var(--hover);
 }
 
 .col-chevron-popup button:disabled {
@@ -327,32 +369,34 @@ body,
 .sheet-tabs {
   display: flex;
   gap: 2px;
-  padding: 4px 8px;
-  background: var(--aicell-header-bg);
-  border-top: 1px solid var(--aicell-border);
+  padding: 4px 8px 0;
+  background: var(--ribbon-bg);
+  border-top: 1px solid var(--ribbon-border);
   flex-shrink: 0;
   overflow-x: auto;
 }
 
 .sheet-tab {
-  background: white;
-  border: 1px solid var(--aicell-border);
-  border-radius: 4px 4px 0 0;
-  padding: 3px 12px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-bottom: 2px solid transparent;
+  border-radius: 3px 3px 0 0;
+  padding: 4px 14px;
   font-size: 12px;
   cursor: pointer;
   white-space: nowrap;
-  color: var(--aicell-header-fg);
+  color: var(--text);
 }
 
 .sheet-tab:hover {
-  background: #f0f0f3;
+  background: var(--hover);
 }
 
 .sheet-tab.active {
-  background: var(--aicell-selected);
-  border-color: var(--aicell-selected-border);
-  color: #1f2937;
+  background: var(--page-bg);
+  border-color: var(--ribbon-border);
+  border-bottom-color: var(--primary);
+  color: var(--primary);
   font-weight: 600;
 }
 
@@ -482,7 +526,7 @@ body,
 }
 
 .side-panel-input button {
-  background: #2563eb;
+  background: var(--primary);
   color: white;
   border: none;
   border-radius: 4px;
@@ -491,19 +535,24 @@ body,
   cursor: pointer;
 }
 
+.side-panel-input button:hover:not(:disabled) {
+  background: var(--primary-dark);
+}
+
 .side-panel-input button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
 .toolbar .ask-claude {
-  background: #2563eb;
-  color: white;
-  border-color: #2563eb;
+  background: #fff;
+  color: var(--primary);
+  border-color: #fff;
+  font-weight: 600;
 }
 
 .toolbar .ask-claude:hover {
-  background: #1d4ed8;
+  background: rgba(255, 255, 255, 0.9);
 }
 
 /* Chart strip */
@@ -605,7 +654,7 @@ body,
 
 .plan-step-tool {
   font-weight: 700;
-  color: #2563eb;
+  color: var(--primary);
 }
 
 .plan-actions {
@@ -624,9 +673,13 @@ body,
 }
 
 .plan-actions button.primary {
-  background: #16a34a;
+  background: var(--primary);
   color: white;
-  border-color: #16a34a;
+  border-color: var(--primary);
+}
+
+.plan-actions button.primary:hover:not(:disabled) {
+  background: var(--primary-dark);
 }
 
 .plan-actions button.primary:disabled {
@@ -639,8 +692,8 @@ body,
   display: flex;
   gap: 2px;
   padding: 0 8px;
-  background: var(--aicell-header-bg);
-  border-bottom: 1px solid var(--aicell-border);
+  background: var(--ribbon-bg);
+  border-bottom: 1px solid var(--ribbon-border);
   flex-shrink: 0;
   font-size: 13px;
   position: relative;
@@ -657,14 +710,18 @@ body,
   padding: 6px 12px;
   font: inherit;
   font-size: 13px;
-  color: #1f2937;
+  color: var(--text);
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: 3px;
 }
 
 .menubar-button:hover,
 .menubar-button.open {
-  background: rgba(37, 99, 235, 0.12);
+  background: var(--hover);
+}
+
+.menubar-button.open {
+  background: var(--active);
 }
 
 .menu-popup {
@@ -688,13 +745,13 @@ body,
   justify-content: space-between;
   padding: 5px 14px;
   cursor: pointer;
-  color: #1f2937;
+  color: var(--text);
   white-space: nowrap;
   gap: 24px;
 }
 
 .menu-item:hover {
-  background: rgba(37, 99, 235, 0.1);
+  background: var(--hover);
 }
 
 .menu-item.disabled {
@@ -718,14 +775,14 @@ body,
   background: var(--aicell-border);
 }
 
-/* Format toolbar */
+/* Format toolbar (ribbon-like) */
 .format-toolbar {
   display: flex;
   align-items: center;
   gap: 4px;
   padding: 4px 12px;
-  border-bottom: 1px solid var(--aicell-border);
-  background: var(--aicell-header-bg);
+  border-bottom: 1px solid var(--ribbon-border);
+  background: var(--ribbon-bg);
   flex-shrink: 0;
   font-size: 12px;
   height: 32px;
@@ -733,12 +790,12 @@ body,
 
 .fmt-btn {
   background: white;
-  border: 1px solid var(--aicell-border);
-  border-radius: 4px;
+  border: 1px solid var(--ribbon-border);
+  border-radius: 3px;
   padding: 2px 8px;
   font-size: 12px;
   cursor: pointer;
-  color: #1f2937;
+  color: var(--text);
   min-width: 26px;
   height: 24px;
   display: inline-flex;
@@ -747,13 +804,13 @@ body,
 }
 
 .fmt-btn:hover {
-  background: #f0f0f3;
+  background: var(--hover);
 }
 
 .fmt-btn.active {
-  background: var(--aicell-selected);
-  border-color: var(--aicell-selected-border);
-  color: #1e40af;
+  background: var(--active);
+  border-color: var(--primary);
+  color: var(--primary-dark);
 }
 
 .fmt-clear {
@@ -876,13 +933,13 @@ body,
 }
 
 .find-replace-actions button.primary {
-  background: #2563eb;
+  background: var(--primary);
   color: white;
-  border-color: #2563eb;
+  border-color: var(--primary);
 }
 
 .find-replace-actions button.primary:hover:not(:disabled) {
-  background: #1d4ed8;
+  background: var(--primary-dark);
 }
 
 .find-replace-actions button:disabled {
@@ -981,9 +1038,9 @@ body,
 
 .cf-add-btn {
   margin-left: auto;
-  background: #2563eb;
+  background: var(--primary);
   color: white;
-  border: 1px solid #2563eb;
+  border: 1px solid var(--primary);
   border-radius: 4px;
   padding: 4px 12px;
   font-size: 12px;
@@ -991,7 +1048,7 @@ body,
 }
 
 .cf-add-btn:hover {
-  background: #1d4ed8;
+  background: var(--primary-dark);
 }
 
 .cf-empty {
@@ -1104,13 +1161,13 @@ body,
 }
 
 .comment-actions button.primary {
-  background: #2563eb;
+  background: var(--primary);
   color: white;
-  border-color: #2563eb;
+  border-color: var(--primary);
 }
 
 .comment-actions button.primary:hover {
-  background: #1d4ed8;
+  background: var(--primary-dark);
 }
 
 /* Audit panel */
@@ -1173,7 +1230,7 @@ body,
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 11px;
   cursor: pointer;
-  color: #2563eb;
+  color: var(--primary);
 }
 
 .audit-jump:hover {
@@ -1317,8 +1374,8 @@ body,
 
 .function-picker-item.active,
 .function-picker-item:hover {
-  background: rgba(37, 99, 235, 0.08);
-  border-left-color: var(--aicell-selected-border);
+  background: var(--hover);
+  border-left-color: var(--primary);
 }
 
 .function-picker-name {
@@ -1330,7 +1387,7 @@ body,
 .function-picker-sig {
   font-size: 12px;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  color: #2563eb;
+  color: var(--primary);
   margin-top: 1px;
 }
 
@@ -1342,8 +1399,8 @@ body,
 
 /* Side panel — Ask Claude empty-state intro */
 .panel-intro {
-  background: #f0f7ff;
-  border: 1px solid #bfdbfe;
+  background: #e6f4ea;
+  border: 1px solid #b9e2c4;
   border-radius: 6px;
   padding: 12px 14px;
   display: flex;
@@ -1354,7 +1411,7 @@ body,
 .panel-intro h3 {
   margin: 0;
   font-size: 14px;
-  color: #1e40af;
+  color: var(--primary-dark);
 }
 
 .panel-intro p {
