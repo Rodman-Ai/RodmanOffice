@@ -28,6 +28,8 @@ const EXT_TABLE = {
   bmp:  { family: 'image', mime: 'image/bmp', ext: 'bmp' },
   webp: { family: 'image', mime: 'image/webp', ext: 'webp' },
   svg:  { family: 'image', mime: 'image/svg+xml', ext: 'svg' },
+  psd:  { family: 'image', mime: 'image/vnd.adobe.photoshop', ext: 'psd' },
+  psb:  { family: 'image', mime: 'image/vnd.adobe.photoshop', ext: 'psb' },
 };
 
 function magicSniff(bytes) {

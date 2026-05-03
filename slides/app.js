@@ -522,6 +522,24 @@
       a.click();
       setTimeout(() => URL.revokeObjectURL(url), 0);
     },
+    importPptx() { $('#pptxFileInput').click(); },
+    exportPptx() {
+      if (!window.RodmanSlidesIO || !window.RodmanSlidesIO.savePptx) {
+        alert('PPTX engine failed to load. Reload the page and try again.');
+        return;
+      }
+      try {
+        const blob = window.RodmanSlidesIO.savePptx(deck);
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = (deck.title || 'presentation').replace(/[^\w\-]+/g, '_') + '.pptx';
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 0);
+      } catch (err) {
+        alert('Could not export .pptx: ' + (err.message || err));
+      }
+    },
     exportPdf() { exportToPdf(); },
     resetDeck() {
       if (!confirm('Wipe local deck storage and start fresh? This cannot be undone.')) return;
@@ -617,6 +635,32 @@
     };
     reader.readAsText(f);
     e.target.value = '';
+  });
+
+  $('#pptxFileInput').addEventListener('change', async (e) => {
+    const f = e.target.files[0];
+    e.target.value = '';
+    if (!f) return;
+    if (!window.RodmanSlidesIO || !window.RodmanSlidesIO.loadPptx) {
+      alert('PPTX engine failed to load. Reload the page and try again.');
+      return;
+    }
+    try {
+      const buf = await f.arrayBuffer();
+      const imported = await window.RodmanSlidesIO.loadPptx(buf);
+      // Merge imported shape into the deck shape the editor expects: keep
+      // the existing theme, take over title + slides.
+      const fresh = D.newDeck();
+      fresh.title = imported.title || f.name.replace(/\.pptx$/i, '');
+      fresh.slides = imported.slides;
+      deck = fresh;
+      state.selectedSlideId = deck.slides[0] ? deck.slides[0].id : null;
+      state.selectedElementId = null;
+      bootstrap();
+      scheduleSave();
+    } catch (err) {
+      alert('Could not import .pptx: ' + (err.message || err));
+    }
   });
 
   // ---------- Notes pane ----------

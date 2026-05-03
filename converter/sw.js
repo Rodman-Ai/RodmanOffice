@@ -1,6 +1,6 @@
 // RodmanConvert service worker — offline app shell.
 // Network-first, cache-fallback. Mirrors /word/sw.js's strategy.
-const VERSION = 'rconv-v1';
+const VERSION = 'rconv-v2';
 const APP_SHELL = [
   './',
   './index.html',

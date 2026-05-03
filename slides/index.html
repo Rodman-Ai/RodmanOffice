@@ -53,13 +53,15 @@
       <div class="group">
         <div class="group-row">
           <button class="ribbon-btn wide" data-cmd="newDeck">New</button>
-          <button class="ribbon-btn wide" data-cmd="openDeck">Open…</button>
+          <button class="ribbon-btn wide" data-cmd="openDeck">Open .json…</button>
+          <button class="ribbon-btn wide" data-cmd="importPptx">Import .pptx…</button>
         </div>
         <div class="group-label">Deck</div>
       </div>
       <div class="group">
         <div class="group-row">
           <button class="ribbon-btn wide" data-cmd="saveDeck">Save .json</button>
+          <button class="ribbon-btn wide" data-cmd="exportPptx">Export .pptx</button>
           <button class="ribbon-btn wide" data-cmd="exportPdf">Export PDF</button>
         </div>
         <div class="group-label">Save / Export</div>
@@ -293,11 +295,24 @@
 
   <input type="file" id="imageFileInput" accept="image/*" hidden />
   <input type="file" id="deckFileInput" accept="application/json,.json" hidden />
+  <input type="file" id="pptxFileInput" accept=".pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation" hidden />
 
-  <script src="deck.js"></script>
-  <script src="themes.js"></script>
-  <script src="render.js"></script>
-  <script src="present.js"></script>
+  <script type="module">
+    // Bridge the shared /lib/slides/ PPTX engine onto window.RodmanSlidesIO
+    // so the classic-script app.js can import / export .pptx without
+    // becoming a module itself. Module scripts and `<script defer>`
+    // both execute deferred, in source order — this shim runs before
+    // the deck/render/app scripts below.
+    import * as slidesio from '../lib/slides/index.js';
+    window.RodmanSlidesIO = {
+      savePptx: slidesio.savePptx,
+      loadPptx: slidesio.loadPptx,
+    };
+  </script>
+  <script src="deck.js" defer></script>
+  <script src="themes.js" defer></script>
+  <script src="render.js" defer></script>
+  <script src="present.js" defer></script>
   <script src="app.js" defer></script>
 </body>
 </html>

@@ -8,15 +8,15 @@
 //
 // Keep VERSION in sync with RW_BUILD.cache in app.js so the About
 // dialog displays the same version users actually have cached.
-const VERSION = 'rwd-v9';
+const VERSION = 'rwd-v10';
+// Note: the doc engines now live in /lib/docs/ which is outside this
+// SW's scope (./), so we cannot precache them here. They're fetched
+// from the network on first load and then cached by the HTTP layer.
 const APP_SHELL = [
   './',
   './index.html',
   './styles.css',
   './app.js',
-  './docx.js',
-  './pdfio.js',
-  './interop.js',
   './manifest.webmanifest',
   './icon.svg',
 ];
