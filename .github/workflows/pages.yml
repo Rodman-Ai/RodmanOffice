@@ -16,6 +16,11 @@ concurrency:
   group: "pages"
   cancel-in-progress: true
 
+# Opt into Node 24 for all third-party JS actions (silences the
+# Node 20 deprecation warning emitted by the runner).
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -86,6 +91,10 @@ jobs:
 
   deploy:
     needs: build
+    # Only deploy from main — feature branches still build (so we know
+    # CI passes pre-merge), but skip the deploy step to avoid the
+    # github-pages environment protection rule rejecting them.
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
