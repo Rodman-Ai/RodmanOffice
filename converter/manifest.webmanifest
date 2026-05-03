@@ -1,0 +1,19 @@
+{
+  "name": "RodmanConvert",
+  "short_name": "Convert",
+  "description": "Drop a file, pick a format, get a download. All in your browser.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0d9488",
+  "theme_color": "#0d9488",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0d9488" />
+  <title>RodmanConvert</title>
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="stylesheet" href="styles.css" />
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(() => {});
+      });
+    }
+  </script>
+</head>
+<body>
+  <header class="title-bar">
+    <a class="rodmanoffice-back" href="../" title="Back to RodmanOffice apps" aria-label="Back to RodmanOffice apps">
+      <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M14 7l-5 5 5 5V7z"/></svg>
+      <span>Apps</span>
+    </a>
+    <div class="app-brand">
+      <div class="app-logo" aria-hidden="true">F</div>
+      <div class="app-title">
+        <span class="app-name">File Converter</span>
+        <span class="app-subtitle">RodmanConvert</span>
+      </div>
+    </div>
+    <div class="title-actions"></div>
+  </header>
+
+  <main class="stage">
+    <section id="dropZone" class="drop-zone" aria-label="Drop files to convert">
+      <div class="drop-icon" aria-hidden="true">
+        <svg viewBox="0 0 64 64" width="56" height="56"><path fill="currentColor" d="M32 6l14 14h-9v18h-10V20h-9zM10 44h44v12H10z"/></svg>
+      </div>
+      <p class="drop-title">Drop files here</p>
+      <p class="drop-sub">or <button id="pickBtn" class="link-btn" type="button">choose files</button>. Documents, spreadsheets, images.</p>
+      <input id="fileInput" type="file" multiple hidden />
+    </section>
+
+    <section id="queueSection" class="queue-section" hidden>
+      <header class="queue-header">
+        <h2 class="queue-title">Queue</h2>
+        <label class="zip-toggle">
+          <input id="zipToggle" type="checkbox" />
+          <span>Bundle in .zip</span>
+        </label>
+        <button id="convertBtn" class="primary-btn" type="button">Convert all</button>
+        <button id="clearBtn" class="secondary-btn" type="button">Clear</button>
+      </header>
+      <ul id="queueList" class="queue-list"></ul>
+    </section>
+
+    <p class="footer-note">Everything runs in your browser. Files never leave your device.</p>
+  </main>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
