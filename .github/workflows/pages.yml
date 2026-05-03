@@ -83,6 +83,13 @@ jobs:
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
+        # Force Pages source = "GitHub Actions" on every run. If the
+        # site was created with "Deploy from a branch", this flips it
+        # so the workflow's _site artifact is what actually gets served
+        # — without this, /crm/ and /sheets/ 404 because the source
+        # tree has no index.html at those slug roots.
+        with:
+          enablement: true
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
