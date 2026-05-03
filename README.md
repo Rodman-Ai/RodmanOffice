@@ -8,7 +8,7 @@ A complete office suite that runs free in your browser.
 |---|---|---|
 | Word Processor | [`word/`](./word/) | Live (vendored from [RodmanWord](https://github.com/Rodman-Ai/RodmanWord)) |
 | Spreadsheets | [`sheets/`](./sheets/) | Live (vendored from [AiCell](https://github.com/Rodman-Ai/AiCell), built in CI) |
-| Slideshows | [`slides/`](./slides/) | Coming soon |
+| Slideshows | [`slides/`](./slides/) | Live (RodmanSlides — built in-suite) |
 | Image Editor | [`image/`](./image/) | Live (vendored from [Retro-paint](https://github.com/Rodman-Ai/Retro-paint)) |
 | Accounting | [`accounting/`](./accounting/) | Live (vendored from [RodBooks](https://github.com/Rodman-Ai/RodBooks)) |
 | CRM | [`crm/`](./crm/) | Live (vendored from [LeoCRM](https://github.com/Rodman-Ai/LeoCRM), built in CI) |
@@ -42,7 +42,7 @@ RodmanOffice/
 ├─ manifest.webmanifest, icon.svg, 404.html
 ├─ word/        ← RodmanWord (vendored)
 ├─ sheets/      ← AiCell (vendored, pnpm + Vite — built in CI)
-├─ slides/      ← stub
+├─ slides/      ← RodmanSlides (built in-suite, vanilla static)
 ├─ image/       ← Retro-paint (vendored)
 ├─ accounting/  ← RodBooks (vendored)
 └─ crm/         ← LeoCRM (vendored, Next.js — built in CI)

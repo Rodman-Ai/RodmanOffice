@@ -3,16 +3,301 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="theme-color" content="#1e293b" />
-  <title>RodmanOffice — Slideshows</title>
-  <link rel="icon" href="../icon.svg" type="image/svg+xml" />
-  <link rel="stylesheet" href="../launcher.css" />
+  <meta name="theme-color" content="#b7472a" />
+  <title>RodmanSlides</title>
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="stylesheet" href="styles.css" />
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(() => {});
+      });
+    }
+  </script>
 </head>
 <body>
-  <main class="stub">
-    <h1>Slideshows — coming soon</h1>
-    <p>Build and present decks in your browser. We'll let you know when this app is ready.</p>
-    <a class="back" href="../">← Back to apps</a>
+  <header class="title-bar">
+    <a class="rodmanoffice-back" href="../" title="Back to RodmanOffice apps" aria-label="Back to RodmanOffice apps">
+      <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M14 7l-5 5 5 5V7z"/></svg>
+      <span>Apps</span>
+    </a>
+    <div class="app-brand">
+      <div class="app-logo" aria-hidden="true">P</div>
+      <div class="app-title">
+        <input id="deckTitle" class="doc-title" type="text" value="Untitled Presentation" aria-label="Presentation title" spellcheck="false" />
+        <span class="app-subtitle">RodmanSlides</span>
+      </div>
+    </div>
+    <div class="title-actions">
+      <span id="saveIndicator" class="save-indicator">Saved</span>
+      <button class="icon-btn" id="presentBtn" title="Start presentation (F5)" aria-label="Present">▶</button>
+      <button class="icon-btn" id="helpBtn" title="Help" aria-label="Help">?</button>
+    </div>
+  </header>
+
+  <nav class="tabs" role="tablist" aria-label="Ribbon tabs">
+    <button class="tab" role="tab" data-tab="file">File</button>
+    <button class="tab active" role="tab" aria-selected="true" data-tab="home">Home</button>
+    <button class="tab" role="tab" data-tab="insert">Insert</button>
+    <button class="tab" role="tab" data-tab="design">Design</button>
+    <button class="tab" role="tab" data-tab="transitions">Transitions</button>
+    <button class="tab" role="tab" data-tab="animations">Animations</button>
+    <button class="tab" role="tab" data-tab="slideshow">Slide Show</button>
+    <button class="tab" role="tab" data-tab="view">View</button>
+  </nav>
+
+  <section class="ribbon" id="ribbon">
+    <!-- File -->
+    <div class="ribbon-panel" data-panel="file">
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn wide" data-cmd="newDeck">New</button>
+          <button class="ribbon-btn wide" data-cmd="openDeck">Open…</button>
+        </div>
+        <div class="group-label">Deck</div>
+      </div>
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn wide" data-cmd="saveDeck">Save .json</button>
+          <button class="ribbon-btn wide" data-cmd="exportPdf">Export PDF</button>
+        </div>
+        <div class="group-label">Save / Export</div>
+      </div>
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn wide" data-cmd="resetDeck" title="Wipe local storage and start fresh">Reset</button>
+        </div>
+        <div class="group-label">Danger</div>
+      </div>
+    </div>
+
+    <!-- Home -->
+    <div class="ribbon-panel active" data-panel="home">
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn" data-cmd="undo" title="Undo (Ctrl+Z)">↺</button>
+          <button class="ribbon-btn" data-cmd="redo" title="Redo (Ctrl+Y)">↻</button>
+        </div>
+        <div class="group-label">Undo</div>
+      </div>
+
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn wide" data-cmd="newSlide" title="New slide">+ New Slide</button>
+          <button class="ribbon-btn" data-cmd="duplicateSlide" title="Duplicate slide">⎘</button>
+          <button class="ribbon-btn" data-cmd="deleteSlide" title="Delete slide">🗑</button>
+        </div>
+        <div class="group-label">Slides</div>
+      </div>
+
+      <div class="group">
+        <div class="group-row">
+          <select class="select" id="layoutSelect" title="Slide layout">
+            <option value="title">Title slide</option>
+            <option value="titleAndContent" selected>Title + content</option>
+            <option value="twoContent">Two content</option>
+            <option value="sectionHeader">Section header</option>
+            <option value="blank">Blank</option>
+          </select>
+        </div>
+        <div class="group-label">Layout</div>
+      </div>
+
+      <div class="group">
+        <div class="group-row">
+          <select class="select" id="fontFamily" title="Font family">
+            <option value="">Theme font</option>
+            <option value="Calibri, Arial, sans-serif">Calibri</option>
+            <option value="'Segoe UI', sans-serif">Segoe UI</option>
+            <option value="Arial, sans-serif">Arial</option>
+            <option value="Georgia, serif">Georgia</option>
+            <option value="'Times New Roman', Times, serif">Times New Roman</option>
+            <option value="'Courier New', monospace">Courier New</option>
+            <option value="'Trebuchet MS', sans-serif">Trebuchet MS</option>
+            <option value="Verdana, sans-serif">Verdana</option>
+          </select>
+          <select class="select sm" id="fontSize" title="Font size">
+            <option>10</option><option>12</option><option>14</option><option>16</option>
+            <option>18</option><option>20</option><option selected>24</option><option>28</option>
+            <option>32</option><option>36</option><option>44</option><option>54</option>
+            <option>60</option><option>72</option><option>96</option>
+          </select>
+        </div>
+        <div class="group-row">
+          <button class="ribbon-btn" data-cmd="bold" title="Bold (Ctrl+B)"><b>B</b></button>
+          <button class="ribbon-btn" data-cmd="italic" title="Italic (Ctrl+I)"><i>I</i></button>
+          <button class="ribbon-btn" data-cmd="underline" title="Underline (Ctrl+U)"><u>U</u></button>
+          <input class="color-input" type="color" id="textColor" title="Text color" value="#000000" />
+        </div>
+        <div class="group-label">Font</div>
+      </div>
+
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn" data-cmd="alignLeft" title="Align left">⬅</button>
+          <button class="ribbon-btn" data-cmd="alignCenter" title="Align center">⬌</button>
+          <button class="ribbon-btn" data-cmd="alignRight" title="Align right">➡</button>
+          <button class="ribbon-btn" data-cmd="bulletList" title="Bullets">•</button>
+        </div>
+        <div class="group-label">Paragraph</div>
+      </div>
+
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn" data-cmd="bringForward" title="Bring forward">⤴</button>
+          <button class="ribbon-btn" data-cmd="sendBackward" title="Send backward">⤵</button>
+          <button class="ribbon-btn" data-cmd="deleteElement" title="Delete element (Del)">✕</button>
+        </div>
+        <div class="group-label">Arrange</div>
+      </div>
+    </div>
+
+    <!-- Insert -->
+    <div class="ribbon-panel" data-panel="insert">
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn wide" data-cmd="insertText">Text box</button>
+        </div>
+        <div class="group-label">Text</div>
+      </div>
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn wide" data-cmd="insertImage">Picture…</button>
+        </div>
+        <div class="group-label">Images</div>
+      </div>
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn" data-cmd="insertShape" data-shape="rect" title="Rectangle">▭</button>
+          <button class="ribbon-btn" data-cmd="insertShape" data-shape="ellipse" title="Ellipse">○</button>
+          <button class="ribbon-btn" data-cmd="insertShape" data-shape="line" title="Line">─</button>
+          <button class="ribbon-btn" data-cmd="insertShape" data-shape="arrow" title="Arrow">→</button>
+          <button class="ribbon-btn" data-cmd="insertShape" data-shape="callout" title="Callout">💬</button>
+        </div>
+        <div class="group-label">Shapes</div>
+      </div>
+      <div class="group">
+        <div class="group-row">
+          <input class="color-input" type="color" id="shapeFill" title="Shape fill" value="#b7472a" />
+        </div>
+        <div class="group-label">Fill</div>
+      </div>
+    </div>
+
+    <!-- Design -->
+    <div class="ribbon-panel" data-panel="design">
+      <div class="group themes-group">
+        <div class="group-row" id="themeStrip"><!-- populated by app.js --></div>
+        <div class="group-label">Themes</div>
+      </div>
+      <div class="group">
+        <div class="group-row">
+          <select class="select" id="slideSizeSelect" title="Slide size">
+            <option value="16:9" selected>Widescreen 16:9</option>
+            <option value="4:3">Standard 4:3</option>
+          </select>
+        </div>
+        <div class="group-label">Slide size</div>
+      </div>
+    </div>
+
+    <!-- Transitions -->
+    <div class="ribbon-panel" data-panel="transitions">
+      <div class="group">
+        <div class="group-row" id="transitionStrip"><!-- populated by app.js --></div>
+        <div class="group-label">Transition</div>
+      </div>
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn wide" data-cmd="applyTransitionToAll" title="Apply current transition to all slides">Apply to all</button>
+        </div>
+        <div class="group-label">Timing</div>
+      </div>
+    </div>
+
+    <!-- Animations -->
+    <div class="ribbon-panel" data-panel="animations">
+      <div class="group">
+        <div class="group-row">
+          <span class="ribbon-empty">In-slide animations are coming in a later release.</span>
+        </div>
+        <div class="group-label">Coming soon</div>
+      </div>
+    </div>
+
+    <!-- Slide Show -->
+    <div class="ribbon-panel" data-panel="slideshow">
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn wide" data-cmd="presentFromStart">From beginning</button>
+          <button class="ribbon-btn wide" data-cmd="presentFromCurrent">From current</button>
+        </div>
+        <div class="group-label">Start show</div>
+      </div>
+    </div>
+
+    <!-- View -->
+    <div class="ribbon-panel" data-panel="view">
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn wide" data-cmd="toggleNotes">Toggle notes</button>
+          <button class="ribbon-btn wide" data-cmd="toggleSorter">Slide sorter</button>
+        </div>
+        <div class="group-label">Views</div>
+      </div>
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn" data-cmd="zoomOut" title="Zoom out">−</button>
+          <span id="zoomDisplay" class="zoom-display">100%</span>
+          <button class="ribbon-btn" data-cmd="zoomIn" title="Zoom in">+</button>
+          <button class="ribbon-btn" data-cmd="zoomFit" title="Fit to window">⤢</button>
+        </div>
+        <div class="group-label">Zoom</div>
+      </div>
+    </div>
+  </section>
+
+  <main class="workspace" id="workspace">
+    <aside class="slide-list-pane" id="slideListPane" aria-label="Slide list">
+      <div class="slide-list" id="slideList"><!-- thumbnails inserted here --></div>
+      <button class="add-slide-btn" id="addSlideBottom" title="New slide">+ Add slide</button>
+    </aside>
+
+    <section class="editor-area" id="editorArea">
+      <div class="editor-scroll" id="editorScroll">
+        <div class="stage-shadow" id="stageShadow">
+          <div class="stage" id="stage">
+            <!-- slide elements rendered here -->
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <aside class="notes-pane" id="notesPane" hidden aria-label="Speaker notes">
+      <div class="notes-label">Speaker notes</div>
+      <textarea id="notesArea" placeholder="Click here to add notes for this slide…"></textarea>
+    </aside>
+
+    <section class="sorter-area" id="sorterArea" hidden aria-label="Slide sorter">
+      <div class="sorter-grid" id="sorterGrid"></div>
+    </section>
   </main>
+
+  <footer class="status-bar">
+    <span id="statusSlideCounter">Slide 1 of 1</span>
+    <span id="statusTheme">Office</span>
+    <span class="status-spacer"></span>
+    <span id="statusZoom">100%</span>
+  </footer>
+
+  <input type="file" id="imageFileInput" accept="image/*" hidden />
+  <input type="file" id="deckFileInput" accept="application/json,.json" hidden />
+
+  <script src="deck.js"></script>
+  <script src="themes.js"></script>
+  <script src="render.js"></script>
+  <script src="present.js"></script>
+  <script src="app.js" defer></script>
 </body>
 </html>

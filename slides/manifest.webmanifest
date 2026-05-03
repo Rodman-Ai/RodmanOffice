@@ -1,0 +1,19 @@
+{
+  "name": "RodmanSlides",
+  "short_name": "RodmanSlides",
+  "description": "Browser-based PowerPoint clone — runs offline, no backend.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#b7472a",
+  "theme_color": "#b7472a",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,0 +1,498 @@
+/* RodmanSlides — visuals adapted from RodmanWord with PowerPoint-orange theme. */
+
+:root {
+  --primary: #b7472a;
+  --primary-dark: #8b3520;
+  --primary-light: #d05c3d;
+  --tab-active: #ffffff;
+  --tab-inactive: #f3f3f3;
+  --ribbon-bg: #f3f3f3;
+  --ribbon-border: #d6d6d6;
+  --workspace-bg: #c8c8c8;
+  --pane-bg: #f7f7f7;
+  --pane-border: #d6d6d6;
+  --text: #222;
+  --muted: #666;
+  --shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+  --status-bg: #b7472a;
+  --status-fg: #fff;
+  --hover: rgba(183, 71, 42, 0.1);
+  --active: rgba(183, 71, 42, 0.2);
+  --selection: #ffd1c2;
+  --slide-shadow: 0 8px 28px rgba(0, 0, 0, 0.25);
+
+  /* Slide-stage theme tokens (set by themes.applyToStage) */
+  --slide-bg: #ffffff;
+  --slide-primary: var(--primary);
+  --slide-accent: #1f6fb2;
+  --slide-title: #1a1a1a;
+  --slide-body: #333333;
+  --slide-font-heading: "Calibri Light", "Segoe UI", -apple-system, sans-serif;
+  --slide-font-body: Calibri, "Segoe UI", -apple-system, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0; padding: 0; height: 100%;
+  font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--workspace-bg);
+  overflow: hidden;
+}
+
+body {
+  display: grid;
+  grid-template-rows: auto auto auto 1fr auto;
+  height: 100vh;
+}
+
+/* Title bar ----------------------------------------------------------------- */
+.title-bar {
+  background: var(--primary);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  padding: 6px 10px;
+  gap: 8px;
+  user-select: none;
+}
+
+.rodmanoffice-back {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 28px; padding: 0 10px;
+  border-radius: 4px;
+  color: inherit; text-decoration: none;
+  font-size: 12px; font-weight: 500;
+  background: rgba(255, 255, 255, 0.10);
+}
+.rodmanoffice-back:hover { background: rgba(255, 255, 255, 0.22); }
+.rodmanoffice-back svg { display: block; }
+
+.app-brand {
+  display: flex; align-items: center; gap: 10px;
+  margin-left: 4px;
+}
+.app-logo {
+  width: 28px; height: 28px;
+  display: grid; place-items: center;
+  background: rgba(0, 0, 0, 0.18);
+  border-radius: 4px;
+  font-weight: 700; font-size: 16px;
+}
+.app-title { display: flex; flex-direction: column; line-height: 1.1; }
+.doc-title {
+  background: transparent; border: 1px solid transparent;
+  color: inherit; font-size: 14px; font-weight: 500;
+  padding: 2px 6px; border-radius: 3px;
+  width: 280px; max-width: 40vw;
+}
+.doc-title:hover { border-color: rgba(255, 255, 255, 0.3); }
+.doc-title:focus { outline: none; border-color: rgba(255, 255, 255, 0.7); background: rgba(255,255,255,0.08); }
+.app-subtitle {
+  font-size: 11px; opacity: 0.85; padding-left: 6px;
+}
+
+.title-actions {
+  margin-left: auto;
+  display: flex; align-items: center; gap: 4px;
+}
+.save-indicator {
+  font-size: 12px; opacity: 0.85;
+  padding: 0 8px;
+}
+.icon-btn {
+  background: transparent; border: none; color: inherit;
+  width: 32px; height: 28px; border-radius: 4px;
+  cursor: pointer; display: grid; place-items: center;
+  font-size: 14px; font-family: inherit;
+}
+.icon-btn:hover { background: rgba(255, 255, 255, 0.15); }
+
+/* Tabs --------------------------------------------------------------------- */
+.tabs {
+  background: var(--primary-dark);
+  display: flex; padding: 0 6px;
+  overflow-x: auto;
+}
+.tabs::-webkit-scrollbar { display: none; }
+
+.tab {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.85);
+  font-family: inherit; font-size: 13px;
+  padding: 8px 16px;
+  cursor: pointer;
+  border-top-left-radius: 4px; border-top-right-radius: 4px;
+  white-space: nowrap;
+}
+.tab:hover { background: rgba(255, 255, 255, 0.08); color: #fff; }
+.tab.active {
+  background: var(--ribbon-bg);
+  color: var(--text);
+  font-weight: 500;
+}
+
+/* Ribbon ------------------------------------------------------------------- */
+.ribbon {
+  background: var(--ribbon-bg);
+  border-bottom: 1px solid var(--ribbon-border);
+  min-height: 92px;
+  padding: 4px 8px;
+  display: flex;
+  gap: 2px;
+  overflow-x: auto;
+}
+.ribbon::-webkit-scrollbar { height: 6px; }
+.ribbon::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 3px; }
+
+.ribbon-panel { display: none; gap: 2px; }
+.ribbon-panel.active { display: flex; animation: panelIn 0.15s ease; }
+
+@keyframes panelIn {
+  from { opacity: 0; transform: translateY(-2px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.group {
+  display: flex; flex-direction: column;
+  border-right: 1px solid var(--ribbon-border);
+  padding: 4px 8px;
+  min-width: 60px;
+}
+.group-row {
+  display: flex; align-items: center; gap: 2px;
+  padding: 2px 0;
+}
+.group-label {
+  font-size: 10px; color: var(--muted);
+  text-align: center; padding-top: 4px; margin-top: auto;
+}
+
+.ribbon-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text);
+  font-family: inherit; font-size: 13px;
+  padding: 4px 8px;
+  min-width: 28px; height: 28px;
+  border-radius: 3px;
+  cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.ribbon-btn:hover { background: var(--hover); border-color: var(--ribbon-border); }
+.ribbon-btn.active, .ribbon-btn:active {
+  background: var(--active);
+  border-color: var(--ribbon-border);
+}
+.ribbon-btn.wide { min-width: 100px; padding: 4px 10px; }
+
+.select {
+  font-family: inherit; font-size: 13px;
+  height: 28px; padding: 2px 8px;
+  border: 1px solid var(--ribbon-border);
+  background: #fff; border-radius: 3px;
+  color: var(--text);
+}
+.select.sm { width: 60px; }
+
+.color-input {
+  width: 28px; height: 28px;
+  border: 1px solid var(--ribbon-border);
+  border-radius: 3px;
+  padding: 0; background: #fff;
+  cursor: pointer;
+}
+
+.ribbon-empty { color: var(--muted); font-size: 12px; padding: 6px 4px; }
+
+.zoom-display { min-width: 48px; text-align: center; font-size: 12px; color: var(--muted); }
+
+/* Theme strip (Design tab) */
+.theme-card {
+  width: 96px; height: 60px;
+  border: 1px solid var(--ribbon-border);
+  border-radius: 4px;
+  margin-right: 6px;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.theme-card:hover { border-color: var(--primary); }
+.theme-card.active { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(183,71,42,0.3); }
+.theme-card .tc-bar {
+  position: absolute; top: 6px; left: 6px; right: 6px; height: 4px;
+  border-radius: 2px;
+}
+.theme-card .tc-block {
+  position: absolute; left: 6px; right: 6px; height: 8px;
+  border-radius: 2px;
+}
+.theme-card .tc-name {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  background: rgba(255,255,255,0.92);
+  font-size: 10px; padding: 2px 4px;
+  border-top: 1px solid var(--ribbon-border);
+  text-align: center;
+}
+
+/* Transition strip */
+.transition-card {
+  width: 80px; height: 56px;
+  border: 1px solid var(--ribbon-border);
+  border-radius: 4px;
+  margin-right: 6px;
+  cursor: pointer;
+  background: #fff;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+.transition-card:hover { border-color: var(--primary); }
+.transition-card.active { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(183,71,42,0.3); }
+.transition-card .tc-icon { font-size: 18px; margin-bottom: 2px; }
+
+/* Workspace = three-pane: slide list | editor | (notes or sorter overlay) */
+.workspace {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  min-height: 0;
+  background: var(--workspace-bg);
+  position: relative;
+}
+.workspace.with-notes {
+  grid-template-columns: 200px 1fr 280px;
+}
+
+/* Slide list pane */
+.slide-list-pane {
+  background: var(--pane-bg);
+  border-right: 1px solid var(--pane-border);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.slide-list {
+  flex: 1; overflow-y: auto;
+  padding: 8px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.slide-list-item {
+  position: relative;
+  background: #fff;
+  border: 2px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  overflow: hidden;
+  user-select: none;
+  flex-shrink: 0;
+}
+.slide-list-item:hover { border-color: var(--primary-light); }
+.slide-list-item.active { border-color: var(--primary); }
+.slide-list-item .sli-num {
+  position: absolute; left: -22px; top: 50%; transform: translateY(-50%);
+  font-size: 11px; color: var(--muted);
+  width: 18px; text-align: right;
+}
+.slide-list-item .sli-thumb {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: var(--slide-bg);
+}
+.slide-list-item .sli-thumb .thumb-stage {
+  pointer-events: none;
+}
+
+.add-slide-btn {
+  margin: 8px; padding: 8px;
+  background: #fff;
+  border: 1px dashed var(--pane-border);
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: inherit; font-size: 12px; color: var(--muted);
+}
+.add-slide-btn:hover { border-color: var(--primary); color: var(--primary); }
+
+/* Editor area */
+.editor-area {
+  position: relative;
+  overflow: hidden;
+  display: flex; flex-direction: column;
+  min-width: 0;
+}
+.editor-scroll {
+  flex: 1;
+  overflow: auto;
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+}
+.stage-shadow {
+  box-shadow: var(--slide-shadow);
+  background: #fff;
+  border-radius: 2px;
+  /* Width/height set by JS based on zoom */
+}
+.stage {
+  width: 1280px; height: 720px;
+  position: relative;
+  overflow: hidden;
+  transform-origin: top left;
+  background: var(--slide-bg);
+}
+
+.slide-element {
+  user-select: none;
+  cursor: move;
+}
+.slide-element.is-selected {
+  outline: 1.5px dashed var(--primary);
+  outline-offset: 1px;
+}
+.slide-element[data-kind="text"] .slide-text { cursor: text; }
+.slide-element[data-kind="text"][contenteditable="true"] { cursor: text; }
+
+.slide-text[contenteditable="true"] {
+  outline: none;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.resize-handle { z-index: 10; }
+
+/* Notes pane */
+.notes-pane {
+  background: var(--pane-bg);
+  border-left: 1px solid var(--pane-border);
+  display: flex; flex-direction: column;
+  padding: 8px;
+}
+.notes-label {
+  font-size: 11px; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+.notes-pane textarea {
+  flex: 1;
+  font-family: inherit; font-size: 13px;
+  border: 1px solid var(--pane-border);
+  border-radius: 3px;
+  padding: 8px;
+  resize: none;
+  min-height: 120px;
+}
+.notes-pane textarea:focus { outline: 2px solid var(--primary); outline-offset: -1px; }
+
+/* Slide sorter (overlays the editor area) */
+.sorter-area {
+  position: absolute; inset: 0;
+  background: var(--workspace-bg);
+  overflow: auto;
+  padding: 24px;
+  z-index: 5;
+}
+.sorter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+}
+.sorter-grid .slide-list-item {
+  background: #fff;
+}
+
+/* Status bar */
+.status-bar {
+  background: var(--status-bg);
+  color: var(--status-fg);
+  display: flex; align-items: center;
+  padding: 4px 12px;
+  gap: 16px;
+  font-size: 12px;
+}
+.status-bar .status-spacer { flex: 1; }
+
+/* Present mode ------------------------------------------------------------- */
+.present-overlay {
+  position: fixed; inset: 0;
+  background: var(--slide-bg, #000);
+  display: grid; place-items: center;
+  z-index: 1000;
+  outline: none;
+}
+.present-stage-wrap {
+  position: relative;
+  width: 100vw; height: 100vh;
+  overflow: hidden;
+}
+.present-stage {
+  position: absolute; inset: 0;
+  display: grid; place-items: center;
+}
+.present-stage > * {
+  width: min(100vw, calc(100vh * 16 / 9));
+  height: min(100vh, calc(100vw * 9 / 16));
+  position: relative;
+}
+.present-stage[data-transition="fade"].entering   { animation: ptFade 0.4s ease forwards; }
+.present-stage[data-transition="fade"].leave      { animation: ptFadeOut 0.4s ease forwards; }
+.present-stage[data-transition="push"].entering   { animation: ptPushIn 0.4s ease forwards; }
+.present-stage[data-transition="push"].leave      { animation: ptPushOut 0.4s ease forwards; }
+.present-stage[data-transition="wipe"].entering   { animation: ptWipeIn 0.4s ease forwards; }
+.present-stage[data-transition="wipe"].leave      { animation: ptFadeOut 0.4s ease forwards; }
+.present-stage[data-transition="zoom"].entering   { animation: ptZoomIn 0.4s ease forwards; }
+.present-stage[data-transition="zoom"].leave      { animation: ptZoomOut 0.4s ease forwards; }
+
+@keyframes ptFade   { from { opacity: 0; } to { opacity: 1; } }
+@keyframes ptFadeOut{ from { opacity: 1; } to { opacity: 0; } }
+@keyframes ptPushIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+@keyframes ptPushOut{ from { transform: translateX(0); } to { transform: translateX(-100%); } }
+@keyframes ptWipeIn { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+@keyframes ptZoomIn { from { opacity: 0; transform: scale(0.94); } to { opacity: 1; transform: scale(1); } }
+@keyframes ptZoomOut{ from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(1.06); } }
+
+.present-controls {
+  position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
+  background: rgba(20,20,20,0.78); color: #fff;
+  border-radius: 999px; padding: 6px 12px;
+  display: flex; align-items: center; gap: 12px;
+  font-size: 13px;
+  opacity: 0; transition: opacity 0.2s;
+  z-index: 1001;
+}
+.present-overlay:hover .present-controls,
+.present-overlay:focus .present-controls { opacity: 1; }
+.present-controls .pc-btn {
+  background: transparent; border: none; color: inherit;
+  font-size: 18px; line-height: 1;
+  cursor: pointer; padding: 4px 8px; border-radius: 4px;
+}
+.present-controls .pc-btn:hover { background: rgba(255,255,255,0.18); }
+
+/* Print-to-PDF -------------------------------------------------------------- */
+@media print {
+  @page { size: 11in 6.1875in landscape; margin: 0; }
+  body * { visibility: hidden; }
+  .print-deck, .print-deck * { visibility: visible; }
+  .print-deck {
+    position: absolute; left: 0; top: 0; width: 100%;
+  }
+  .print-deck .print-slide {
+    page-break-after: always;
+    width: 1280px; height: 720px;
+    transform-origin: top left;
+    position: relative;
+    overflow: hidden;
+    background: var(--slide-bg);
+  }
+  .print-deck .print-slide:last-child { page-break-after: auto; }
+}
+
+/* Mobile / small screens --------------------------------------------------- */
+@media (max-width: 720px) {
+  .workspace { grid-template-columns: 1fr; }
+  .slide-list-pane { display: none; }
+  .ribbon { min-height: 70px; }
+  .doc-title { width: 160px; }
+}
