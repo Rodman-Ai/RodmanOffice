@@ -56,6 +56,48 @@
     </section>
 
     <p class="footer-note">Everything runs in your browser. Files never leave your device.</p>
+
+    <section class="about" aria-labelledby="aboutHeading">
+      <h2 id="aboutHeading" class="about-heading">About RodmanConvert</h2>
+      <div class="about-grid">
+        <div class="about-col">
+          <h3 class="about-col-title">What it does</h3>
+          <p>
+            Drop any document, spreadsheet or image — pick a target format — get a download.
+            Single-file or bulk; bulk defaults to one download per file as each conversion finishes,
+            with an opt-in <em>"Bundle in .zip"</em> checkbox if you'd rather have one archive.
+            Cross-family bridges (CSV → PDF, PNG → PDF, PDF → PNG, PDF → PSD…) work automatically.
+          </p>
+        </div>
+        <div class="about-col">
+          <h3 class="about-col-title">How it's built</h3>
+          <ul class="about-list">
+            <li><strong>Vanilla ES modules</strong> — no bundler, no build step.</li>
+            <li>A <strong>Web Worker</strong> handles spreadsheet parsing off the main thread; document and image jobs run on the main thread (they need DOM canvas / DOMParser).</li>
+            <li>Shared <code>/lib/</code> engines: hand-rolled DOCX, PDF (text + single-image), PPTX, RTF, ODT, EPUB, MD, HTML, AsciiDoc, LaTeX and CSV writers/readers.</li>
+            <li>Vendored libraries: <code>@e965/xlsx</code> for XLSX, <code>ag-psd</code> for Photoshop files, <code>PDF.js</code> for "open any PDF as an image".</li>
+            <li>Installable PWA — works offline once loaded.</li>
+          </ul>
+        </div>
+        <div class="about-col">
+          <h3 class="about-col-title">Supported formats</h3>
+          <dl class="format-matrix">
+            <dt>Documents <span class="dir">read</span></dt>
+            <dd>DOCX · PDF · RTF · ODT · EPUB · MD · HTML · TXT</dd>
+            <dt>Documents <span class="dir">write</span></dt>
+            <dd>DOCX · PDF · RTF · ODT · EPUB · MD · HTML · TXT · AsciiDoc · LaTeX</dd>
+            <dt>Spreadsheets <span class="dir">read</span></dt>
+            <dd>XLSX · XLS · CSV</dd>
+            <dt>Spreadsheets <span class="dir">write</span></dt>
+            <dd>XLSX · CSV · PDF</dd>
+            <dt>Images <span class="dir">read</span></dt>
+            <dd>PNG · JPEG · GIF · BMP · WEBP · SVG · PSD · PSB · PDF (any page)</dd>
+            <dt>Images <span class="dir">write</span></dt>
+            <dd>PNG · JPEG · WEBP · PSD · PDF (Photoshop-compatible)</dd>
+          </dl>
+        </div>
+      </div>
+    </section>
   </main>
 
   <script type="module" src="app.js"></script>
