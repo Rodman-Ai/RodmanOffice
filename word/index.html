@@ -1821,9 +1821,23 @@
   <input type="file" id="filePicker" accept=".rwd,.html,.htm,.txt,.md,.rwd.enc,.docx,.pdf,.rtf,.odt,.epub,application/json,application/pdf,application/rtf,application/epub+zip,application/vnd.oasis.opendocument.text,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden />
   <input type="file" id="imagePicker" accept="image/*" hidden />
 
-  <script src="docx.js"></script>
-  <script src="pdfio.js"></script>
-  <script src="interop.js"></script>
-  <script src="app.js"></script>
+  <script type="module">
+    // Bridge the shared /lib/docs/ ESM engines back onto the window
+    // globals app.js expects. Module scripts and `<script defer>`
+    // both execute after the document is parsed, in source order —
+    // so this shim runs before app.js below it.
+    import * as docs from '../lib/docs/index.js';
+    window.RodmanDocx = {
+      saveDocx: docs.saveDocx, loadDocx: docs.loadDocx,
+      __buildZip: docs.buildZip, __readZip: docs.readZip,
+    };
+    window.RodmanPdf = { savePdf: docs.savePdf, loadPdf: docs.loadPdf };
+    window.RodmanInterop = {
+      rtfExport: docs.rtfExport, odtExport: docs.odtExport, epubExport: docs.epubExport,
+      mdExport: docs.mdExport, asciidocExport: docs.asciidocExport, latexExport: docs.latexExport,
+      rtfImport: docs.rtfImport, odtImport: docs.odtImport, epubImport: docs.epubImport,
+    };
+  </script>
+  <script src="app.js" defer></script>
 </body>
 </html>
