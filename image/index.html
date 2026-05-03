@@ -1,18 +1,156 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="theme-color" content="#1e293b" />
-  <title>RodmanOffice — Image Editor</title>
-  <link rel="icon" href="../icon.svg" type="image/svg+xml" />
-  <link rel="stylesheet" href="../launcher.css" />
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+  <meta name="theme-color" content="#008080">
+  <title>Retro Paint — MS Paint 95 · Mario Paint · Kid Pix</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23008080'/%3E%3Crect x='3' y='3' width='10' height='10' fill='%23fff'/%3E%3Crect x='5' y='5' width='2' height='2' fill='%23f00'/%3E%3Crect x='9' y='5' width='2' height='2' fill='%2300f'/%3E%3Crect x='7' y='9' width='2' height='2' fill='%23ff0'/%3E%3C/svg%3E">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icon.svg">
+  <link rel="stylesheet" href="styles.css">
 </head>
-<body>
-  <main class="stub">
-    <h1>Image Editor — coming soon</h1>
-    <p>Crop, paint and retouch images. We'll let you know when this app is ready.</p>
-    <a class="back" href="../">← Back to apps</a>
-  </main>
+<body class="mode-mspaint">
+  <div class="app">
+    <header class="app-header">
+      <a class="rodmanoffice-back" href="../" title="Back to RodmanOffice apps" aria-label="Back to RodmanOffice apps">
+        <span aria-hidden>←</span>
+        <span>Apps</span>
+      </a>
+      <div class="brand">
+        <span class="brand-icon">🎨</span>
+        <span class="brand-text">Retro Paint</span>
+      </div>
+      <nav class="mode-switch" role="tablist" aria-label="Choose paint mode">
+        <button data-mode="mspaint" class="mode-btn is-active" role="tab" aria-selected="true">MS Paint 95</button>
+        <button data-mode="mariopaint" class="mode-btn" role="tab" aria-selected="false">Mario Paint</button>
+        <button data-mode="kidpix" class="mode-btn" role="tab" aria-selected="false">Kid Pix</button>
+        <button data-mode="macpaint" class="mode-btn" role="tab" aria-selected="false">MacPaint</button>
+        <button data-mode="tuxpaint" class="mode-btn" role="tab" aria-selected="false">Tux Paint</button>
+        <button data-mode="psp" class="mode-btn" role="tab" aria-selected="false">Paint Shop Pro</button>
+        <button data-mode="procreate" class="mode-btn" role="tab" aria-selected="false">Procreate</button>
+        <button data-mode="aseprite" class="mode-btn" role="tab" aria-selected="false">Aseprite</button>
+        <button data-mode="gimp" class="mode-btn" role="tab" aria-selected="false">GIMP</button>
+      </nav>
+      <div class="header-actions">
+        <button id="btn-undo" title="Undo (Ctrl+Z)" aria-label="Undo">↶ Undo</button>
+        <button id="btn-redo" title="Redo (Ctrl+Shift+Z)" aria-label="Redo">↷ Redo</button>
+        <button id="btn-new" title="New canvas" aria-label="New">📄 New</button>
+        <button id="btn-clear" title="Clear canvas" aria-label="Clear">✕ Clear</button>
+        <button id="btn-open" title="Open image" aria-label="Open">📂 Open</button>
+        <button id="btn-save" title="Save PNG (Ctrl+S — Shift-click to upscale)" aria-label="Save">💾 Save</button>
+        <button id="btn-filter" title="Image filters" aria-label="Filters">🎛️ FX</button>
+        <button id="btn-replay" title="Replay last drawing" aria-label="Replay">▶ Replay</button>
+        <span class="zoom-group" role="group" aria-label="Zoom">
+          <button id="btn-zoom-out" title="Zoom out (-)">−</button>
+          <button id="btn-zoom-reset" title="Reset zoom (0)">100%</button>
+          <button id="btn-zoom-in" title="Zoom in (+)">+</button>
+        </span>
+        <button id="btn-help" title="Help (?)" aria-label="Help">?</button>
+        <button id="btn-mute" title="Mute sound (M)" aria-label="Mute">🔊</button>
+      </div>
+      <input id="file-input" type="file" accept="image/*" hidden>
+    </header>
+
+    <main class="workspace">
+      <aside class="tools-panel">
+        <div id="tools" class="tools-grid"></div>
+        <div class="size-picker">
+          <label for="brush-size">Size</label>
+          <input id="brush-size" type="range" min="1" max="32" value="4">
+          <span id="brush-size-display">4</span>
+        </div>
+        <div class="size-picker">
+          <label for="brush-opacity">Alpha</label>
+          <input id="brush-opacity" type="range" min="5" max="100" value="100">
+          <span id="brush-opacity-display">100</span>
+        </div>
+        <div class="symmetry-picker">
+          <label>Mirror</label>
+          <button id="btn-symmetry" title="Toggle symmetry mirror (Y)" aria-label="Symmetry">⌒ Off</button>
+        </div>
+        <div class="symmetry-picker">
+          <label>Grid</label>
+          <button id="btn-grid" title="Toggle pixel grid (G)" aria-label="Grid">⊞ Off</button>
+        </div>
+      </aside>
+
+      <section class="canvas-area">
+        <div id="psp-tabs" class="psp-tabs" hidden></div>
+        <div class="canvas-frame">
+          <div class="canvas-titlebar" id="canvas-titlebar">
+            <span id="canvas-title">untitled — Paint</span>
+            <span class="titlebar-buttons">
+              <span class="tb-btn">_</span>
+              <span class="tb-btn">▢</span>
+              <span class="tb-btn">×</span>
+            </span>
+          </div>
+          <div class="canvas-stage">
+            <canvas id="canvas" width="640" height="480" aria-label="Drawing canvas"></canvas>
+          </div>
+          <div id="brush-cursor" aria-hidden="true"></div>
+        </div>
+        <div class="status-bar" id="status-bar">
+          <span id="status-tool">Pencil</span>
+          <span id="status-pos">0, 0</span>
+          <span id="status-mode">MS Paint 95</span>
+        </div>
+        <div id="anim-bar" class="anim-bar" hidden>
+          <button id="anim-prev" title="Previous frame">⟨</button>
+          <span id="anim-frame">1 / 1</span>
+          <button id="anim-next" title="Next frame">⟩</button>
+          <button id="anim-add" title="Add frame">+</button>
+          <button id="anim-del" title="Delete frame">−</button>
+          <button id="anim-play" title="Play animation">▶</button>
+          <label class="anim-onion"><input id="anim-onion" type="checkbox"> Onion</label>
+        </div>
+      </section>
+
+      <aside class="palette-panel">
+        <div class="palette-current">
+          <div class="palette-swatch primary" id="primary-swatch" title="Primary color"></div>
+          <div class="palette-swatch secondary" id="secondary-swatch" title="Secondary color"></div>
+        </div>
+        <div id="palette" class="palette-grid"></div>
+        <div class="recent-label">Recent</div>
+        <div id="recent-colors" class="palette-grid"></div>
+        <div id="psp-layers-panel" class="psp-layers-panel" hidden>
+          <div class="psp-layers-title">Layers</div>
+          <div id="psp-layers-list"></div>
+          <div class="psp-layers-actions">
+            <button id="psp-layer-add" title="New layer">＋</button>
+            <button id="psp-layer-dup" title="Duplicate">⎘</button>
+            <button id="psp-layer-merge" title="Merge down">⤓</button>
+            <button id="psp-layer-del" title="Delete">🗑</button>
+          </div>
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <div id="splash" class="splash" hidden>
+    <div class="splash-content"><div class="splash-text"></div></div>
+  </div>
+
+  <div id="tux-mascot" class="tux-mascot" hidden>
+    <div class="tux-bubble" id="tux-bubble">Pick a tool to start painting!</div>
+    <div class="tux-icon" aria-hidden="true">🐧</div>
+  </div>
+
+  <div id="modal" class="modal" hidden>
+    <div class="modal-card">
+      <div class="modal-title" id="modal-title">Title</div>
+      <div class="modal-body" id="modal-body"></div>
+      <div class="modal-actions">
+        <button id="modal-ok">OK</button>
+        <button id="modal-cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/sounds.js"></script>
+  <script src="js/modes.js"></script>
+  <script src="js/app.js"></script>
 </body>
 </html>

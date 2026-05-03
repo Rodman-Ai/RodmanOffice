@@ -1,0 +1,1118 @@
+/* =========================================================
+   Retro Paint — common layout + three theme stylesheets
+   ========================================================= */
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
+body {
+  font-family: "Tahoma", "Segoe UI", system-ui, sans-serif;
+  font-size: 12px;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: none;
+}
+button { font: inherit; cursor: pointer; }
+
+/* ---- App skeleton ---- */
+.app {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  height: 100dvh;
+  width: 100vw;
+}
+.app-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  flex-wrap: wrap;
+}
+.brand { display: flex; align-items: center; gap: 6px; font-weight: bold; }
+.brand-icon { font-size: 18px; }
+.mode-switch { display: flex; gap: 4px; flex: 1; flex-wrap: wrap; }
+.mode-btn { padding: 4px 10px; }
+.header-actions { display: flex; gap: 4px; }
+
+/* RodmanOffice — back-to-launcher button injected at the head of the app header. */
+.rodmanoffice-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  background: rgba(255,255,255,0.6);
+  color: inherit;
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 600;
+}
+.rodmanoffice-back:hover { background: rgba(255,255,255,0.9); }
+
+.workspace {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.tools-panel, .palette-panel {
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  gap: 6px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.35) transparent;
+}
+.tools-panel::-webkit-scrollbar,
+.palette-panel::-webkit-scrollbar { width: 6px; }
+.tools-panel::-webkit-scrollbar-thumb,
+.palette-panel::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 3px;
+}
+.tools-panel::-webkit-scrollbar-track,
+.palette-panel::-webkit-scrollbar-track { background: transparent; }
+.zoom-group { display: inline-flex; gap: 2px; }
+.zoom-group button { min-width: 30px; padding: 2px 6px; }
+.tools-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 38px);
+  gap: 3px;
+}
+.tool-btn {
+  width: 38px; height: 38px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px;
+  line-height: 1;
+  padding: 0;
+  position: relative;
+}
+.tool-btn[data-active="true"] { outline: 2px solid currentColor; }
+.tool-btn .tool-label {
+  position: absolute;
+  bottom: -16px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 9px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.tool-btn:hover .tool-label { opacity: 1; }
+
+.size-picker {
+  margin-top: 8px;
+  display: flex; flex-direction: column; gap: 4px;
+  align-items: center; font-size: 11px;
+}
+.size-picker input { width: 76px; }
+
+.symmetry-picker {
+  margin-top: 4px;
+  display: flex; flex-direction: column; gap: 4px;
+  align-items: center; font-size: 11px;
+}
+.symmetry-picker button { font-size: 11px; padding: 3px 6px; }
+
+#brush-cursor {
+  position: fixed;
+  pointer-events: none;
+  border: 1.5px solid rgba(0, 0, 0, 0.7);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.6);
+  border-radius: 50%;
+  display: none;
+  z-index: 50;
+}
+#btn-mute { min-width: 30px; }
+#btn-redo[disabled], #btn-undo[disabled] { opacity: 0.5; cursor: not-allowed; }
+
+.recent-label { font-size: 10px; opacity: 0.7; margin-top: 6px; text-align: center; }
+
+/* Animation flipbook bar — inline below the canvas */
+.anim-bar {
+  display: flex; gap: 4px; align-items: center; justify-content: center;
+  padding: 4px 6px; border: 2px solid #000; background: #fff;
+  margin-top: 4px; flex-wrap: wrap;
+}
+.anim-bar[hidden] { display: none; }
+.anim-onion { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; padding-left: 6px; }
+
+/* Modal */
+.modal {
+  position: fixed; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0, 0, 0, 0.45); z-index: 80;
+}
+.modal[hidden] { display: none; }
+.modal-card {
+  background: #c0c0c0; padding: 12px 14px;
+  border: 2px solid; border-color: #fff #404040 #404040 #fff;
+  min-width: 260px; max-width: 92vw; max-height: 80vh; overflow: auto;
+  font-family: Tahoma, sans-serif; color: #000;
+}
+.modal-title { font-weight: bold; margin-bottom: 8px; }
+.modal-body { font-size: 12px; line-height: 1.4; }
+.modal-actions { display: flex; gap: 6px; justify-content: flex-end; margin-top: 12px; }
+
+/* Themed modals follow body theme via inheritance */
+body.mode-mariopaint .modal-card { background: #ffe55c; border: 4px solid #2a1a4a; border-radius: 12px; }
+body.mode-kidpix     .modal-card { background: #fff; border: 4px solid #000; box-shadow: 6px 6px 0 #000; }
+
+/* Background patterns on the canvas stage (visible behind canvas only when zoomed/panned) */
+.canvas-stage.bg-grid       { background-image: linear-gradient(to right, #999 1px, transparent 1px), linear-gradient(to bottom, #999 1px, transparent 1px); background-size: 20px 20px; }
+.canvas-stage.bg-dots       { background-image: radial-gradient(circle, #888 1.5px, transparent 1.5px); background-size: 16px 16px; }
+.canvas-stage.bg-graph      { background-color: #f4f1d6; background-image: linear-gradient(#c8b8a0 1px, transparent 1px), linear-gradient(90deg, #c8b8a0 1px, transparent 1px); background-size: 20px 20px; }
+.canvas-stage.bg-lines      { background-image: linear-gradient(to bottom, #aac 1px, transparent 1px); background-size: 100% 24px; }
+.canvas-stage.bg-blueprint  { background-color: #1d4f8a; background-image: linear-gradient(rgba(255,255,255,0.18) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.18) 1px, transparent 1px); background-size: 20px 20px; }
+
+.canvas-area {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  padding: 6px;
+}
+.canvas-frame {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.canvas-titlebar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 2px 4px;
+  font-size: 11px;
+  font-weight: bold;
+}
+.titlebar-buttons { display: flex; gap: 2px; }
+.tb-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 16px; height: 14px; font-size: 10px;
+}
+.canvas-stage {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  position: relative;
+  padding: 4px;
+}
+.canvas-stage canvas {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  background: #fff;
+  touch-action: none;
+  object-fit: contain;
+}
+#overlay {
+  position: absolute;
+  pointer-events: none;
+}
+
+.status-bar {
+  display: flex;
+  gap: 12px;
+  padding: 2px 6px;
+  font-size: 11px;
+}
+.status-bar > * { flex: 1; }
+.status-bar > *:nth-child(2) { text-align: center; }
+.status-bar > *:last-child { text-align: right; }
+
+.palette-current {
+  display: block;
+  position: relative;
+  height: 44px;
+  width: 44px;
+  margin: 0 auto;
+}
+.palette-swatch {
+  width: 26px; height: 26px;
+  border: 1px solid #000;
+  cursor: pointer;
+  position: absolute;
+}
+.palette-swatch.primary { left: 6px; top: 4px; z-index: 2; background: #000; }
+.palette-swatch.secondary { left: 22px; top: 18px; z-index: 1; background: #fff; }
+.palette-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 22px);
+  gap: 2px;
+}
+.palette-swatch-item {
+  width: 22px; height: 22px;
+  border: 1px solid #555;
+  cursor: pointer;
+}
+
+/* ---- Mobile layout ---- */
+@media (max-width: 760px) {
+  .app-header {
+    gap: 3px;
+    padding: 4px 6px;
+  }
+  .brand-text { display: none; }      /* keep just the palette icon */
+  .brand { gap: 0; }
+  .mode-switch { gap: 2px; flex: 0 1 auto; }
+  .mode-btn { padding: 4px 8px !important; font-size: 11px !important; }
+  .header-actions { flex-wrap: wrap; gap: 3px; }
+  .header-actions button {
+    padding: 4px 6px !important;
+    font-size: 11px !important;
+    min-width: 0;
+  }
+  .zoom-group button { min-width: 28px; }
+
+  .workspace {
+    grid-template-columns: 1fr;
+    grid-template-areas: "canvas" "tools" "palette";
+    grid-template-rows: minmax(40vh, 1fr) auto auto;
+  }
+  .canvas-area  { grid-area: canvas; }
+  .tools-panel  { grid-area: tools; }
+  .palette-panel { grid-area: palette; }
+
+  .tools-panel {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    overflow: visible;
+    max-height: 32vh;
+    overflow-y: auto;
+  }
+  .tools-grid {
+    grid-template-columns: repeat(auto-fill, 44px);
+    grid-auto-rows: 44px;
+    gap: 4px;
+    width: 100%;
+  }
+  body.mode-mspaint button.tool-btn,
+  body.mode-mariopaint button.tool-btn,
+  body.mode-kidpix button.tool-btn { width: 44px; height: 44px; font-size: 24px; }
+
+  .size-picker, .symmetry-picker { flex-direction: row; gap: 4px; }
+  .size-picker input { width: 100px; }
+
+  .palette-panel { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 4px; }
+  .palette-current { margin-right: 6px; }
+  .palette-grid {
+    grid-template-columns: repeat(auto-fill, 24px);
+    gap: 2px;
+    flex: 1;
+  }
+  .palette-swatch-item { width: 24px; height: 24px; }
+  .recent-label { width: 100%; margin-top: 0; }
+
+  /* Anim bar inline on mobile so it doesn't cover the palette */
+  .anim-bar {
+    position: static;
+    transform: none;
+    margin: 4px auto;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  /* Hide the live brush cursor on touch — it lags under finger */
+  #brush-cursor { display: none !important; }
+
+  /* Status bar more compact */
+  .status-bar { font-size: 10px; padding: 2px 4px; }
+}
+
+/* Very narrow phones */
+@media (max-width: 380px) {
+  .mode-btn { font-size: 10px !important; padding: 3px 6px !important; }
+  .header-actions button { font-size: 10px !important; padding: 3px 5px !important; }
+}
+
+/* ---- Splash overlay (Kid Pix "Oh no!" / Mario Paint flourish) ---- */
+.splash {
+  position: fixed; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  pointer-events: none;
+  z-index: 1000;
+}
+.splash[hidden] { display: none; }
+.splash-content {
+  font-size: 64px;
+  font-weight: 900;
+  text-shadow: 4px 4px 0 #000;
+  animation: splashPop 1s ease-out forwards;
+}
+@keyframes splashPop {
+  0% { transform: scale(0); opacity: 0; }
+  30% { transform: scale(1.4); opacity: 1; }
+  70% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+
+/* =========================================================
+   THEME 1 — MS Paint 95 (Windows 95 chrome)
+   ========================================================= */
+body.mode-mspaint {
+  background: #008080;
+  color: #000;
+  font-family: "Tahoma", "MS Sans Serif", sans-serif;
+}
+body.mode-mspaint .app-header {
+  background: #c0c0c0;
+  border-bottom: 1px solid #808080;
+  box-shadow: inset 0 -1px 0 #fff, 0 1px 0 #404040;
+}
+body.mode-mspaint .brand-text { color: #000; }
+body.mode-mspaint button.tool-btn,
+body.mode-mariopaint button.tool-btn,
+body.mode-kidpix button.tool-btn {
+  font-size: 22px;
+  padding: 0;
+}
+
+body.mode-mspaint button,
+body.mode-mspaint .mode-btn,
+body.mode-mspaint .tool-btn {
+  background: #c0c0c0;
+  color: #000;
+  border: 1px solid;
+  border-color: #fff #404040 #404040 #fff;
+  box-shadow: inset -1px -1px 0 #808080, inset 1px 1px 0 #dfdfdf;
+  padding: 3px 8px;
+  font-size: 11px;
+  border-radius: 0;
+}
+body.mode-mspaint button:active,
+body.mode-mspaint .tool-btn[data-active="true"] {
+  border-color: #404040 #fff #fff #404040;
+  box-shadow: inset 1px 1px 0 #808080, inset -1px -1px 0 #dfdfdf;
+}
+body.mode-mspaint .mode-btn.is-active {
+  border-color: #404040 #fff #fff #404040;
+  box-shadow: inset 1px 1px 0 #808080;
+  font-weight: bold;
+}
+body.mode-mspaint .tools-panel,
+body.mode-mspaint .palette-panel {
+  background: #c0c0c0;
+  border-right: 1px solid #808080;
+  box-shadow: inset -1px 0 0 #404040;
+}
+body.mode-mspaint .palette-panel {
+  border-right: none;
+  border-left: 1px solid #808080;
+  box-shadow: inset 1px 0 0 #fff;
+}
+body.mode-mspaint .canvas-area { background: #c0c0c0; }
+body.mode-mspaint .canvas-frame {
+  background: #c0c0c0;
+}
+body.mode-mspaint .canvas-titlebar {
+  background: linear-gradient(to right, #000080, #1084d0);
+  color: #fff;
+  padding: 2px 4px;
+  border-top: 1px solid #fff;
+  border-left: 1px solid #fff;
+}
+body.mode-mspaint .tb-btn {
+  background: #c0c0c0;
+  color: #000;
+  border: 1px solid;
+  border-color: #fff #404040 #404040 #fff;
+}
+body.mode-mspaint .canvas-stage {
+  background: #808080;
+  border: 2px solid;
+  border-color: #404040 #fff #fff #404040;
+}
+body.mode-mspaint .canvas-stage canvas {
+  border: 1px solid #000;
+  background: #fff;
+  image-rendering: auto;
+}
+body.mode-mspaint .status-bar {
+  background: #c0c0c0;
+  border-top: 1px solid #fff;
+  box-shadow: inset 0 1px 0 #808080;
+}
+body.mode-mspaint .status-bar > * {
+  border: 1px inset #808080;
+  padding: 1px 6px;
+  background: #c0c0c0;
+}
+body.mode-mspaint .palette-swatch,
+body.mode-mspaint .palette-swatch-item {
+  border: 1px solid;
+  border-color: #404040 #fff #fff #404040;
+}
+
+/* =========================================================
+   THEME 2 — Mario Paint (SNES, candy colors, pixel UI)
+   ========================================================= */
+body.mode-mariopaint {
+  background: linear-gradient(180deg, #6ec1ff 0%, #a3e1ff 60%, #ffd1e8 100%);
+  color: #2a1a4a;
+  font-family: "Comic Sans MS", "Chalkboard SE", system-ui, sans-serif;
+  image-rendering: pixelated;
+}
+body.mode-mariopaint .app-header {
+  background: #ff4d8a;
+  background-image:
+    linear-gradient(180deg, #ff7aa9 0%, #ff4d8a 50%, #d62b6c 100%);
+  border-bottom: 4px solid #2a1a4a;
+  color: #fff;
+  text-shadow: 1px 1px 0 #2a1a4a;
+}
+body.mode-mariopaint .brand-text { color: #fff; font-size: 16px; letter-spacing: 1px; }
+body.mode-mariopaint button,
+body.mode-mariopaint .tool-btn,
+body.mode-mariopaint .mode-btn {
+  background: #fff;
+  color: #2a1a4a;
+  border: 3px solid #2a1a4a;
+  border-radius: 8px;
+  box-shadow: 0 3px 0 #2a1a4a;
+  padding: 4px 10px;
+  font-weight: bold;
+  font-size: 12px;
+}
+body.mode-mariopaint button:active,
+body.mode-mariopaint .tool-btn[data-active="true"],
+body.mode-mariopaint .mode-btn.is-active {
+  background: #ffe55c;
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 #2a1a4a;
+}
+body.mode-mariopaint .tools-panel,
+body.mode-mariopaint .palette-panel {
+  background: rgba(255,255,255,0.4);
+  backdrop-filter: blur(4px);
+  border: 4px solid #2a1a4a;
+  border-radius: 12px;
+  margin: 8px;
+}
+body.mode-mariopaint .canvas-frame {
+  background: #fff;
+  border: 6px solid #2a1a4a;
+  border-radius: 14px;
+  box-shadow: 0 6px 0 #2a1a4a, 0 0 0 4px #ff4d8a inset;
+  padding: 4px;
+}
+body.mode-mariopaint .canvas-titlebar {
+  background: #ffe55c;
+  color: #2a1a4a;
+  border: 3px solid #2a1a4a;
+  border-radius: 8px;
+  margin-bottom: 4px;
+  padding: 4px 8px;
+  font-family: monospace;
+}
+body.mode-mariopaint .tb-btn {
+  background: #fff;
+  border: 2px solid #2a1a4a;
+  border-radius: 4px;
+}
+body.mode-mariopaint .canvas-stage canvas {
+  background: #fff;
+  border: 2px dashed #ff4d8a;
+  image-rendering: pixelated;
+}
+body.mode-mariopaint .status-bar {
+  background: #ffe55c;
+  border: 3px solid #2a1a4a;
+  border-radius: 8px;
+  margin-top: 6px;
+  font-family: monospace;
+  font-weight: bold;
+}
+body.mode-mariopaint .palette-swatch,
+body.mode-mariopaint .palette-swatch-item {
+  border: 2px solid #2a1a4a;
+  border-radius: 4px;
+}
+
+/* =========================================================
+   THEME 3 — Kid Pix (90s Mac, chunky black-bordered)
+   ========================================================= */
+body.mode-kidpix {
+  background: #000;
+  color: #000;
+  font-family: "Comic Sans MS", "Marker Felt", system-ui, sans-serif;
+}
+body.mode-kidpix .app-header {
+  background: #ffcb05;
+  background-image: repeating-linear-gradient(
+    -45deg,
+    #ffcb05 0 14px,
+    #ffd633 14px 28px
+  );
+  border-bottom: 4px solid #000;
+  color: #000;
+}
+body.mode-kidpix .brand-text {
+  color: #ff3366;
+  text-shadow: 2px 2px 0 #000;
+  font-size: 18px;
+  font-weight: 900;
+  font-style: italic;
+}
+body.mode-kidpix button,
+body.mode-kidpix .tool-btn,
+body.mode-kidpix .mode-btn {
+  background: #fff;
+  color: #000;
+  border: 3px solid #000;
+  border-radius: 0;
+  font-weight: bold;
+  padding: 4px 8px;
+  font-size: 12px;
+  box-shadow: 3px 3px 0 #000;
+}
+body.mode-kidpix button:active,
+body.mode-kidpix .tool-btn[data-active="true"],
+body.mode-kidpix .mode-btn.is-active {
+  background: #ff3366;
+  color: #fff;
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 #000;
+}
+body.mode-kidpix .tools-panel {
+  background: #00b3e6;
+  border-right: 4px solid #000;
+}
+body.mode-kidpix .palette-panel {
+  background: #ff3366;
+  border-left: 4px solid #000;
+}
+body.mode-kidpix .canvas-area {
+  background: repeating-linear-gradient(
+    45deg,
+    #1a1a1a 0 8px,
+    #2a2a2a 8px 16px
+  );
+}
+body.mode-kidpix .canvas-frame {
+  background: #fff;
+  border: 6px solid #000;
+  padding: 0;
+}
+body.mode-kidpix .canvas-titlebar {
+  background: #00ff66;
+  border-bottom: 4px solid #000;
+  color: #000;
+  padding: 4px 8px;
+  font-weight: 900;
+}
+body.mode-kidpix .tb-btn {
+  background: #fff;
+  border: 2px solid #000;
+}
+body.mode-kidpix .canvas-stage canvas { background: #fff; }
+body.mode-kidpix .status-bar {
+  background: #ffcb05;
+  border-top: 4px solid #000;
+  color: #000;
+  font-weight: bold;
+}
+body.mode-kidpix .palette-swatch,
+body.mode-kidpix .palette-swatch-item {
+  border: 2px solid #000;
+  border-radius: 0;
+  box-shadow: 2px 2px 0 #000;
+}
+body.mode-kidpix .splash-content { color: #ff3366; }
+body.mode-mariopaint .splash-content { color: #ffe55c; }
+body.mode-mspaint .splash-content { color: #fff; }
+
+/* =========================================================
+   THEME 4 — MacPaint (1984, 1-bit B&W, System 1.0 chrome)
+   ========================================================= */
+body.mode-macpaint {
+  background: #888888;
+  color: #000;
+  font-family: "Geneva", "Chicago", "Lucida Grande", monospace;
+}
+body.mode-macpaint .app-header {
+  background: #ffffff;
+  color: #000;
+  border-bottom: 2px solid #000;
+}
+body.mode-macpaint .brand-text { color: #000; font-weight: bold; }
+body.mode-macpaint button,
+body.mode-macpaint .mode-btn,
+body.mode-macpaint .tool-btn {
+  background: #ffffff;
+  color: #000;
+  border: 1.5px solid #000;
+  border-radius: 0;
+  font-family: "Geneva", "Chicago", monospace;
+  font-size: 11px;
+  padding: 3px 8px;
+  box-shadow: 1px 1px 0 #000;
+}
+body.mode-macpaint button:active,
+body.mode-macpaint .tool-btn[data-active="true"],
+body.mode-macpaint .mode-btn.is-active {
+  background: #000000;
+  color: #ffffff;
+  box-shadow: none;
+  transform: translate(1px, 1px);
+}
+body.mode-macpaint .tools-panel {
+  background: #ffffff;
+  border-right: 2px solid #000;
+}
+body.mode-macpaint .palette-panel {
+  background: #ffffff;
+  border-left: 2px solid #000;
+}
+body.mode-macpaint .canvas-area { background: #888888; }
+body.mode-macpaint .canvas-frame {
+  background: #ffffff;
+  border: 2px solid #000;
+}
+body.mode-macpaint .canvas-titlebar {
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      #000 0 1px,
+      #fff 1px 3px
+    );
+  color: #000;
+  border-bottom: 2px solid #000;
+  padding: 3px 8px;
+  position: relative;
+  font-family: "Chicago", "Geneva", monospace;
+  font-size: 11px;
+  text-align: center;
+}
+body.mode-macpaint #canvas-title {
+  background: #fff;
+  padding: 0 8px;
+  border: 1px solid #000;
+}
+body.mode-macpaint .tb-btn {
+  background: #fff;
+  color: #000;
+  border: 1.5px solid #000;
+  width: 12px; height: 12px;
+  font-size: 0;
+  border-radius: 0;
+}
+body.mode-macpaint .canvas-stage canvas {
+  background: #ffffff;
+  border: 1px solid #000;
+  image-rendering: pixelated;
+}
+body.mode-macpaint .status-bar {
+  background: #fff;
+  color: #000;
+  border-top: 2px solid #000;
+  font-family: "Geneva", monospace;
+  font-size: 10px;
+}
+body.mode-macpaint .palette-swatch,
+body.mode-macpaint .palette-swatch-item {
+  border: 1.5px solid #000;
+  border-radius: 0;
+}
+body.mode-macpaint .splash-content { color: #000; text-shadow: 2px 2px 0 #fff; }
+
+/* =========================================================
+   THEME 5 — Tux Paint (kids, chunky candy UI)
+   ========================================================= */
+body.mode-tuxpaint {
+  background: linear-gradient(180deg, #fff5b3 0%, #ffd1e8 100%);
+  color: #2a1a4a;
+  font-family: "Comic Sans MS", "Marker Felt", "Chalkboard SE", sans-serif;
+}
+body.mode-tuxpaint .app-header {
+  background: linear-gradient(180deg, #ed1c24 0%, #c1121f 100%);
+  border-bottom: 4px solid #2a1a4a;
+  color: #fff;
+}
+body.mode-tuxpaint .brand-text { color: #fff; text-shadow: 2px 2px 0 #2a1a4a; font-size: 16px; }
+body.mode-tuxpaint button,
+body.mode-tuxpaint .tool-btn,
+body.mode-tuxpaint .mode-btn {
+  background: #fff;
+  color: #2a1a4a;
+  border: 4px solid #2a1a4a;
+  border-radius: 14px;
+  box-shadow: 0 4px 0 #2a1a4a;
+  padding: 6px 12px;
+  font-weight: bold;
+  font-size: 13px;
+  font-family: inherit;
+}
+body.mode-tuxpaint button:active,
+body.mode-tuxpaint .tool-btn[data-active="true"],
+body.mode-tuxpaint .mode-btn.is-active {
+  background: #ffe55c;
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 #2a1a4a;
+}
+body.mode-tuxpaint .tools-panel {
+  background: #22b14c;
+  border-right: 4px solid #2a1a4a;
+}
+body.mode-tuxpaint .palette-panel {
+  background: #ed1c24;
+  border-left: 4px solid #2a1a4a;
+}
+body.mode-tuxpaint .canvas-area {
+  background: #fff5b3;
+}
+body.mode-tuxpaint .canvas-frame {
+  background: #fff;
+  border: 6px solid #2a1a4a;
+  border-radius: 16px;
+  padding: 4px;
+}
+body.mode-tuxpaint .canvas-titlebar {
+  background: #00a2e8;
+  color: #fff;
+  border: 3px solid #2a1a4a;
+  border-radius: 10px;
+  padding: 6px 10px;
+  margin-bottom: 4px;
+  font-weight: bold;
+  text-shadow: 1px 1px 0 #2a1a4a;
+}
+body.mode-tuxpaint .tb-btn {
+  background: #fff; border: 2px solid #2a1a4a; border-radius: 4px;
+}
+body.mode-tuxpaint .canvas-stage canvas {
+  background: #fff;
+  border: 3px solid #2a1a4a;
+  border-radius: 8px;
+}
+body.mode-tuxpaint .status-bar {
+  background: #fff200;
+  color: #2a1a4a;
+  border: 3px solid #2a1a4a;
+  border-radius: 8px;
+  margin-top: 4px;
+  font-weight: bold;
+  font-family: inherit;
+}
+body.mode-tuxpaint .palette-swatch,
+body.mode-tuxpaint .palette-swatch-item {
+  border: 3px solid #2a1a4a;
+  border-radius: 6px;
+}
+body.mode-tuxpaint .splash-content { color: #fff200; text-shadow: 4px 4px 0 #2a1a4a; }
+body.mode-tuxpaint button.tool-btn,
+body.mode-tuxpaint button.tool-btn { width: 56px; height: 56px; font-size: 28px; border-radius: 12px; }
+
+/* Tux mascot bubble */
+.tux-mascot {
+  position: fixed; bottom: 8px; left: 8px;
+  display: flex; align-items: flex-end; gap: 6px;
+  z-index: 70; pointer-events: none;
+  font-family: "Comic Sans MS", sans-serif;
+}
+.tux-mascot[hidden] { display: none; }
+.tux-bubble {
+  background: #fff; color: #2a1a4a; padding: 8px 12px;
+  border: 3px solid #2a1a4a; border-radius: 12px;
+  max-width: 200px; font-size: 12px; font-weight: bold;
+  position: relative;
+}
+.tux-bubble::after {
+  content: ''; position: absolute; bottom: -10px; left: 18px;
+  border-width: 10px 10px 0 0; border-style: solid;
+  border-color: #2a1a4a transparent transparent transparent;
+}
+.tux-icon { font-size: 48px; }
+
+/* =========================================================
+   THEME 6 — Paint Shop Pro (90s prosumer, gray-pro)
+   ========================================================= */
+body.mode-psp {
+  background: #d4d0c8;
+  color: #000;
+  font-family: "MS Sans Serif", "Tahoma", sans-serif;
+  font-size: 11px;
+}
+body.mode-psp .app-header {
+  background: linear-gradient(180deg, #ece9d8 0%, #d4d0c8 100%);
+  color: #000;
+  border-bottom: 2px solid #808080;
+  box-shadow: inset 0 -1px 0 #fff, 0 2px 0 #404040;
+}
+body.mode-psp .brand-text { color: #000; font-weight: bold; }
+body.mode-psp button,
+body.mode-psp .mode-btn,
+body.mode-psp .tool-btn {
+  background: #ece9d8;
+  color: #000;
+  border: 1px solid;
+  border-color: #fff #5a5a5a #5a5a5a #fff;
+  box-shadow: inset -1px -1px 0 #aca899, inset 1px 1px 0 #fff;
+  border-radius: 0;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-family: inherit;
+}
+body.mode-psp button:active,
+body.mode-psp .tool-btn[data-active="true"],
+body.mode-psp .mode-btn.is-active {
+  border-color: #5a5a5a #fff #fff #5a5a5a;
+  box-shadow: inset 1px 1px 0 #aca899;
+  background: #d4d0c8;
+}
+body.mode-psp .tools-panel {
+  background: #d4d0c8;
+  border-right: 2px solid #5a5a5a;
+  box-shadow: inset -1px 0 0 #fff;
+}
+body.mode-psp .palette-panel {
+  background: #d4d0c8;
+  border-left: 2px solid #5a5a5a;
+  box-shadow: inset 1px 0 0 #fff;
+}
+body.mode-psp .canvas-area { background: #808080; }
+body.mode-psp .canvas-frame {
+  background: #d4d0c8;
+  border: 2px solid;
+  border-color: #5a5a5a #fff #fff #5a5a5a;
+  padding: 1px;
+}
+body.mode-psp .canvas-titlebar {
+  background: linear-gradient(to right, #0054e3 0%, #2a8aff 100%);
+  color: #fff;
+  padding: 2px 6px;
+  font-size: 11px;
+  font-weight: bold;
+}
+body.mode-psp .tb-btn {
+  background: #ece9d8; color: #000; border: 1px solid;
+  border-color: #fff #5a5a5a #5a5a5a #fff;
+  width: 16px; height: 14px;
+}
+body.mode-psp .canvas-stage canvas {
+  background: #fff;
+  border: 2px inset #808080;
+}
+body.mode-psp .status-bar {
+  background: #d4d0c8;
+  color: #000;
+  border-top: 2px solid #fff;
+  box-shadow: inset 0 1px 0 #5a5a5a;
+}
+body.mode-psp .status-bar > * {
+  border: 1px inset #aca899;
+  padding: 1px 6px;
+}
+body.mode-psp .palette-swatch,
+body.mode-psp .palette-swatch-item {
+  border: 1px solid;
+  border-color: #5a5a5a #fff #fff #5a5a5a;
+  border-radius: 0;
+}
+body.mode-psp .splash-content { color: #0054e3; text-shadow: 2px 2px 0 #fff; }
+body.mode-psp .palette-grid { grid-template-columns: repeat(2, 22px); }
+
+/* PSP layers panel */
+.psp-layers-panel {
+  margin-top: 8px;
+  padding: 4px;
+  border: 2px inset #aca899;
+  background: #d4d0c8;
+  font-size: 11px;
+}
+.psp-layers-panel[hidden] { display: none; }
+.psp-layers-title { font-weight: bold; margin-bottom: 4px; }
+.psp-layer-row {
+  display: flex; gap: 4px; align-items: center;
+  padding: 2px;
+  border: 1px solid transparent;
+}
+.psp-layer-row.is-active { background: #316ac5; color: #fff; border: 1px solid #000; }
+.psp-layer-thumb { width: 24px; height: 18px; border: 1px solid #5a5a5a; background: #fff; image-rendering: pixelated; }
+.psp-layer-name { flex: 1; padding: 0 2px; font-size: 11px; min-width: 0; }
+.psp-layer-row input[type=range] { width: 50px; }
+.psp-layer-row select { font-size: 10px; padding: 0; }
+.psp-layers-actions { display: flex; gap: 2px; margin-top: 4px; }
+.psp-layers-actions button { padding: 2px 6px; font-size: 11px; }
+
+/* PSP doc tabs */
+.psp-tabs {
+  display: flex; gap: 2px; padding: 2px 4px; background: #d4d0c8;
+  border-bottom: 2px solid #5a5a5a; align-items: center;
+}
+.psp-tabs[hidden] { display: none; }
+.psp-tab {
+  background: #ece9d8; padding: 3px 10px; border: 1px solid;
+  border-color: #fff #5a5a5a #5a5a5a #fff; font-size: 11px;
+  font-family: inherit; cursor: pointer;
+}
+.psp-tab.is-active { background: #fff; font-weight: bold; }
+.psp-tab-close { margin-left: 6px; opacity: 0.6; }
+.psp-tab-add { margin-left: 4px; padding: 3px 8px; }
+
+/* =========================================================
+   THEME 7 — Procreate (iPad pro-paint, modern warm)
+   ========================================================= */
+body.mode-procreate {
+  background: #1a1a1a;
+  color: #f4a261;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+}
+body.mode-procreate .app-header {
+  background: linear-gradient(180deg, #2a2a2a 0%, #1f1f1f 100%);
+  color: #fff;
+  border-bottom: 1px solid #444;
+}
+body.mode-procreate .brand-text { color: #fff; }
+body.mode-procreate button,
+body.mode-procreate .mode-btn,
+body.mode-procreate .tool-btn {
+  background: #3a3a3a;
+  color: #f4a261;
+  border: 1px solid #555;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-family: inherit;
+}
+body.mode-procreate button:active,
+body.mode-procreate .tool-btn[data-active="true"],
+body.mode-procreate .mode-btn.is-active { background: #f4a261; color: #1a1a1a; }
+body.mode-procreate .tools-panel,
+body.mode-procreate .palette-panel { background: #222; border-color: #444; }
+body.mode-procreate .canvas-area { background: #2a2a2a; }
+body.mode-procreate .canvas-frame { background: #1a1a1a; border: 1px solid #444; border-radius: 8px; padding: 4px; }
+body.mode-procreate .canvas-titlebar { background: #2a2a2a; color: #fff; border-bottom: 1px solid #444; padding: 6px 10px; }
+body.mode-procreate .tb-btn { background: #3a3a3a; color: #f4a261; border: 1px solid #555; border-radius: 50%; }
+body.mode-procreate .canvas-stage canvas { background: #fff; border-radius: 4px; }
+body.mode-procreate .status-bar { background: #2a2a2a; color: #fff; border-color: #444; }
+body.mode-procreate .palette-swatch,
+body.mode-procreate .palette-swatch-item { border: 1px solid #555; border-radius: 4px; }
+body.mode-procreate button.tool-btn { width: 56px; height: 56px; font-size: 24px; }
+
+/* =========================================================
+   THEME 8 — Aseprite (pixel-art, dark dev tool)
+   ========================================================= */
+body.mode-aseprite {
+  background: #1c1c1c;
+  color: #c2c3c7;
+  font-family: "Consolas", "Monaco", monospace;
+  image-rendering: pixelated;
+}
+body.mode-aseprite .app-header {
+  background: #2c2c2c;
+  color: #c2c3c7;
+  border-bottom: 1px solid #444;
+}
+body.mode-aseprite .brand-text { color: #ff77a8; }
+body.mode-aseprite button,
+body.mode-aseprite .mode-btn,
+body.mode-aseprite .tool-btn {
+  background: #3c3c3c;
+  color: #c2c3c7;
+  border: 1px solid #555;
+  border-radius: 0;
+  padding: 4px 8px;
+  font-family: inherit;
+  font-size: 11px;
+}
+body.mode-aseprite button:active,
+body.mode-aseprite .tool-btn[data-active="true"],
+body.mode-aseprite .mode-btn.is-active { background: #ff77a8; color: #1c1c1c; }
+body.mode-aseprite .tools-panel,
+body.mode-aseprite .palette-panel { background: #2c2c2c; border-color: #444; }
+body.mode-aseprite .canvas-area { background: #1c1c1c; }
+body.mode-aseprite .canvas-frame { background: #2c2c2c; border: 1px solid #444; }
+body.mode-aseprite .canvas-titlebar { background: #3c3c3c; color: #c2c3c7; padding: 3px 8px; font-size: 11px; }
+body.mode-aseprite .canvas-stage canvas { background: #fff; image-rendering: pixelated; }
+body.mode-aseprite .status-bar { background: #2c2c2c; color: #c2c3c7; border-color: #444; font-size: 10px; }
+body.mode-aseprite .palette-swatch,
+body.mode-aseprite .palette-swatch-item { border: 1px solid #555; border-radius: 0; }
+
+/* =========================================================
+   THEME 9 — GIMP (FOSS Photoshop, neutral gray)
+   ========================================================= */
+body.mode-gimp {
+  background: #5b5b5b;
+  color: #e0e0e0;
+  font-family: "Sans", "DejaVu Sans", sans-serif;
+}
+body.mode-gimp .app-header { background: #4a4a4a; color: #fff; border-bottom: 1px solid #2a2a2a; }
+body.mode-gimp .brand-text { color: #fff; }
+body.mode-gimp button,
+body.mode-gimp .mode-btn,
+body.mode-gimp .tool-btn {
+  background: #6a6a6a; color: #fff; border: 1px solid #2a2a2a;
+  border-radius: 3px; padding: 3px 8px; font-family: inherit;
+}
+body.mode-gimp button:active,
+body.mode-gimp .tool-btn[data-active="true"],
+body.mode-gimp .mode-btn.is-active { background: #c0c0c0; color: #000; }
+body.mode-gimp .tools-panel,
+body.mode-gimp .palette-panel { background: #4a4a4a; border-color: #2a2a2a; }
+body.mode-gimp .canvas-area { background: #5b5b5b; }
+body.mode-gimp .canvas-frame { background: #4a4a4a; border: 2px inset #2a2a2a; }
+body.mode-gimp .canvas-titlebar { background: linear-gradient(to bottom, #2a2a2a, #5b5b5b); color: #fff; padding: 3px 8px; }
+body.mode-gimp .canvas-stage canvas { background: #fff; }
+body.mode-gimp .status-bar { background: #4a4a4a; color: #fff; border-color: #2a2a2a; font-size: 11px; }
+body.mode-gimp .palette-swatch,
+body.mode-gimp .palette-swatch-item { border: 1px solid #2a2a2a; border-radius: 3px; }
+
+/* =========================================================
+   New UX widgets: navigator, reference panel, guides, rulers,
+   color-blind sim overlay, HUD picker.
+   ========================================================= */
+.navigator-panel {
+  position: fixed; right: 8px; top: 50%; transform: translateY(-50%);
+  width: 140px; height: 110px;
+  background: rgba(0,0,0,0.8); border: 2px solid #fff; padding: 4px;
+  z-index: 60; cursor: move;
+}
+.navigator-panel canvas { display: block; width: 100%; height: 100%; }
+.navigator-panel .nav-rect {
+  position: absolute; border: 1.5px solid #ff3; pointer-events: none;
+}
+.reference-panel {
+  position: fixed; bottom: 8px; right: 8px; width: 200px; height: 160px;
+  background: rgba(0,0,0,0.85); border: 2px solid #fff; z-index: 60;
+  display: flex; flex-direction: column;
+}
+.reference-panel img { flex: 1; min-height: 0; object-fit: contain; }
+.reference-panel button { margin: 2px; }
+
+.cbsim-overlay {
+  position: fixed; inset: 0; pointer-events: none; z-index: 90;
+  mix-blend-mode: normal;
+}
+
+.hud-picker {
+  position: fixed; width: 180px; height: 180px; border-radius: 50%;
+  background:
+    conic-gradient(red, yellow, lime, cyan, blue, magenta, red);
+  border: 4px solid #fff; box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+  z-index: 200; cursor: crosshair; pointer-events: auto;
+  transform: translate(-50%, -50%);
+}
+
+/* Rulers (top + left) */
+.rulers-on .canvas-stage { padding-top: 18px; padding-left: 18px; position: relative; }
+.rulers-on .canvas-stage::before, .rulers-on .canvas-stage::after {
+  content: ''; position: absolute; background: #ddd;
+  background-image: repeating-linear-gradient(to right, #444 0 1px, transparent 1px 10px);
+}
+.rulers-on .canvas-stage::before { top: 0; left: 18px; right: 0; height: 18px; }
+.rulers-on .canvas-stage::after {
+  top: 18px; left: 0; bottom: 0; width: 18px;
+  background-image: repeating-linear-gradient(to bottom, #444 0 1px, transparent 1px 10px);
+}
+
+body.theme-light { filter: none; }
+body.theme-dark .canvas-area { background: #111; }
+body.theme-dark .app-header { filter: brightness(0.85); }

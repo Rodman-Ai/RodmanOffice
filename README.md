@@ -9,7 +9,7 @@ A complete office suite that runs free in your browser.
 | Word Processor | [`word/`](./word/) | Live (vendored from [RodmanWord](https://github.com/Rodman-Ai/RodmanWord)) |
 | Spreadsheets | [`sheets/`](./sheets/) | Live (vendored from [AiCell](https://github.com/Rodman-Ai/AiCell), built in CI) |
 | Slideshows | [`slides/`](./slides/) | Coming soon |
-| Image Editor | [`image/`](./image/) | Coming soon |
+| Image Editor | [`image/`](./image/) | Live (vendored from [Retro-paint](https://github.com/Rodman-Ai/Retro-paint)) |
 | Accounting | [`accounting/`](./accounting/) | Live (vendored from [RodBooks](https://github.com/Rodman-Ai/RodBooks)) |
 | CRM | [`crm/`](./crm/) | Live (vendored from [LeoCRM](https://github.com/Rodman-Ai/LeoCRM), built in CI) |
 
@@ -43,7 +43,7 @@ RodmanOffice/
 ├─ word/        ← RodmanWord (vendored)
 ├─ sheets/      ← AiCell (vendored, pnpm + Vite — built in CI)
 ├─ slides/      ← stub
-├─ image/       ← stub
+├─ image/       ← Retro-paint (vendored)
 ├─ accounting/  ← RodBooks (vendored)
 └─ crm/         ← LeoCRM (vendored, Next.js — built in CI)
 ```
@@ -82,6 +82,7 @@ patch each — a "← Apps" button that links to `../`:
 
 - `word/` ← [RodmanWord](https://github.com/Rodman-Ai/RodmanWord). Patched in `word/index.html` (title bar) and `word/styles.css` (`.rodmanoffice-back`).
 - `accounting/` ← [RodBooks](https://github.com/Rodman-Ai/RodBooks). Patched in `accounting/index.html` (top of sidebar) and `accounting/styles.css` (`.rodmanoffice-back`).
+- `image/` ← [Retro-paint](https://github.com/Rodman-Ai/Retro-paint). Patched in `image/index.html` (head of `.app-header`) and `image/styles.css` (`.rodmanoffice-back`).
 - `sheets/` ← [AiCell](https://github.com/Rodman-Ai/AiCell) (pnpm + Vite + React 19, built in CI). Patched in `sheets/apps/web/src/App.tsx` (back-to-launcher anchor at the top-left of the toolbar) and `sheets/apps/web/src/styles.css` (`.rodmanoffice-back`).
 - `crm/` ← [LeoCRM](https://github.com/Rodman-Ai/LeoCRM) (Next.js, built in CI). Patched in `crm/src/components/AppShell.tsx` — a back-to-launcher anchor in the desktop sidebar and another in the mobile header, both linking to absolute path `/RodmanOffice/` (not Next's `<Link>`, since basePath rewriting would otherwise scope the URL under `/RodmanOffice/crm/`).
 
