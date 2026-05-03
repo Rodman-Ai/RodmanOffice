@@ -1,18 +1,103 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="theme-color" content="#1e293b" />
-  <title>RodmanOffice — Accounting</title>
-  <link rel="icon" href="../icon.svg" type="image/svg+xml" />
-  <link rel="stylesheet" href="../launcher.css" />
-</head>
-<body>
-  <main class="stub">
-    <h1>Accounting — coming soon</h1>
-    <p>Track income, expenses and invoices. We'll let you know when this app is ready.</p>
-    <a class="back" href="../">← Back to apps</a>
-  </main>
-</body>
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1"
+    />
+    <meta name="theme-color" content="#0b0d10" />
+    <title>RodBooks — AI-first books for creators</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2322c55e'/%3E%3Cpath d='M18 44V20h6c7 0 11 4 11 12s-4 12-11 12h-6zm6-5h0c4 0 6-2 6-7s-2-7-6-7' fill='%230b0d10'/%3E%3Cpath d='M40 44V20h6c5 0 8 2 8 6 0 3-2 5-4 6 3 1 5 3 5 6 0 4-3 6-9 6h-6zm6-15h0c2 0 3-1 3-2 0-2-1-3-3-3m0 11h0c3 0 4-1 4-3s-1-3-4-3' fill='%230b0d10'/%3E%3C/svg%3E" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="stylesheet" href="styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js" defer></script>
+  </head>
+  <body>
+    <div id="app">
+      <aside class="sidebar" aria-label="Primary">
+        <a class="rodmanoffice-back" href="../" title="Back to RodmanOffice apps" aria-label="Back to RodmanOffice apps">
+          <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M14 7l-5 5 5 5V7z"/></svg>
+          <span>Apps</span>
+        </a>
+        <div class="brand">
+          <div class="logo" aria-hidden="true">RB</div>
+          <div>
+            <div class="brand-title">RodBooks</div>
+            <div class="brand-sub">AI-first creator books</div>
+          </div>
+        </div>
+        <nav class="nav" id="primary-nav">
+          <a href="#/" data-route="dashboard"><span class="i">▦</span><span>Dashboard</span></a>
+
+          <div class="nav-group">AI</div>
+          <a href="#/connect" data-route="connect"><span class="i">◇</span><span>Connect AI</span></a>
+          <a href="#/contracts" data-route="contracts"><span class="i">⚠</span><span>Contract redline</span></a>
+          <a href="#/inbox" data-route="inbox"><span class="i">✉</span><span>Sponsorship inbox</span></a>
+          <a href="#/automations" data-route="automations"><span class="i">⚡</span><span>Automations</span></a>
+
+          <div class="nav-group">Books</div>
+          <a href="#/deals" data-route="deals"><span class="i">★</span><span>Brand Deals</span></a>
+          <a href="#/pipeline" data-route="pipeline"><span class="i">▤</span><span>Pipeline</span></a>
+          <a href="#/timeline" data-route="timeline"><span class="i">◷</span><span>Timeline</span></a>
+          <a href="#/invoices" data-route="invoices"><span class="i">⎈</span><span>Invoices</span></a>
+          <a href="#/bills" data-route="bills"><span class="i">↧</span><span>Bills</span></a>
+          <a href="#/banking" data-route="banking"><span class="i">$</span><span>Banking</span></a>
+          <a href="#/income" data-route="income"><span class="i">♡</span><span>Other income</span></a>
+          <a href="#/mileage" data-route="mileage"><span class="i">↗</span><span>Mileage</span></a>
+          <a href="#/contacts" data-route="contacts"><span class="i">☺</span><span>Contacts</span></a>
+          <a href="#/booking" data-route="booking"><span class="i">▥</span><span>Booking</span></a>
+          <a href="#/templates" data-route="templates"><span class="i">≡</span><span>Templates</span></a>
+          <a href="#/mediakit" data-route="mediakit"><span class="i">★</span><span>Media kit</span></a>
+
+          <div class="nav-group">Reports</div>
+          <a href="#/reports" data-route="reports"><span class="i">∑</span><span>Reports</span></a>
+          <a href="#/tax" data-route="tax"><span class="i">§</span><span>Tax</span></a>
+          <a href="#/activity" data-route="activity"><span class="i">↻</span><span>Activity</span></a>
+
+          <div class="nav-group">System</div>
+          <a href="#/settings" data-route="settings"><span class="i">⚙</span><span>Settings</span></a>
+        </nav>
+        <div class="sidebar-foot">
+          <div class="muted small">v1 · local-first</div>
+        </div>
+      </aside>
+
+      <header class="topbar">
+        <button class="icon-btn" id="menuBtn" aria-label="Menu">☰</button>
+        <div class="topbar-title" id="pageTitle">Dashboard</div>
+        <div class="topbar-actions">
+          <select class="select" id="profileSwitcher" aria-label="Active profile" title="Switch profile" style="height:32px;padding:2px 8px;font-size:12px;width:auto;min-width:0"></select>
+          <button class="icon-btn" id="searchBtn" aria-label="Search (⌘K)" title="Search & commands (⌘K)">⌕</button>
+          <button class="icon-btn" id="densityBtn" aria-label="Toggle density" title="Toggle density">☰☰</button>
+          <button class="icon-btn" id="helpBtn" aria-label="Keyboard shortcuts (?)" title="Keyboard shortcuts (?)">?</button>
+          <button class="icon-btn" id="quickAddBtn" aria-label="Quick add (n)" title="Quick add (n)">＋</button>
+        </div>
+      </header>
+
+      <main id="view" class="view" role="main"></main>
+
+      <nav class="tabbar" aria-label="Sections">
+        <a href="#/" data-route="dashboard" aria-label="Dashboard"><span class="i" aria-hidden="true">▦</span><span>Home</span></a>
+        <a href="#/deals" data-route="deals" aria-label="Brand deals"><span class="i" aria-hidden="true">★</span><span>Deals</span></a>
+        <a href="#/pipeline" data-route="pipeline" aria-label="Pipeline kanban"><span class="i" aria-hidden="true">▤</span><span>Pipeline</span></a>
+        <a href="#/timeline" data-route="timeline" aria-label="Timeline calendar"><span class="i" aria-hidden="true">◷</span><span>Timeline</span></a>
+        <a href="#/booking" data-route="booking" aria-label="Booking calendar"><span class="i" aria-hidden="true">▥</span><span>Booking</span></a>
+        <a href="#/invoices" data-route="invoices" aria-label="Invoices"><span class="i" aria-hidden="true">⎈</span><span>Invoices</span></a>
+        <a href="#/bills" data-route="bills" aria-label="Bills and expenses"><span class="i" aria-hidden="true">↧</span><span>Bills</span></a>
+        <a href="#/banking" data-route="banking" aria-label="Banking"><span class="i" aria-hidden="true">$</span><span>Banking</span></a>
+        <a href="#/automations" data-route="automations" aria-label="Automations"><span class="i" aria-hidden="true">⚡</span><span>Auto</span></a>
+        <a href="#/reports" data-route="reports" aria-label="Reports"><span class="i" aria-hidden="true">∑</span><span>Reports</span></a>
+        <a href="#/tax" data-route="tax" aria-label="Tax workbench"><span class="i" aria-hidden="true">§</span><span>Tax</span></a>
+        <a href="#/settings" data-route="settings" aria-label="Settings"><span class="i" aria-hidden="true">⚙</span><span>Settings</span></a>
+      </nav>
+    </div>
+
+    <div id="modal-root"></div>
+    <div id="toast-root" aria-live="polite"></div>
+
+    <script type="module" src="js/app.js"></script>
+  </body>
 </html>

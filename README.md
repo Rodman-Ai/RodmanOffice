@@ -10,7 +10,7 @@ A complete office suite that runs free in your browser.
 | Spreadsheets | [`sheets/`](./sheets/) | Coming soon |
 | Slideshows | [`slides/`](./slides/) | Coming soon |
 | Image Editor | [`image/`](./image/) | Coming soon |
-| Accounting | [`accounting/`](./accounting/) | Coming soon |
+| Accounting | [`accounting/`](./accounting/) | Live (vendored from [RodBooks](https://github.com/Rodman-Ai/RodBooks)) |
 | CRM | [`crm/`](./crm/) | Coming soon |
 
 ## How it works
@@ -30,7 +30,7 @@ RodmanOffice/
 ├─ sheets/      ← stub
 ├─ slides/      ← stub
 ├─ image/       ← stub
-├─ accounting/  ← stub
+├─ accounting/  ← RodBooks (vendored)
 └─ crm/         ← stub
 ```
 
@@ -51,7 +51,11 @@ publish the whole tree as-is. No build step.
 
 ## Vendor sync
 
-`word/` is a vendored copy of RodmanWord with one local patch:
-a "← Apps" button in the title bar (see `word/index.html` and the
-`.rodmanoffice-back` rule in `word/styles.css`). To pull updates,
-re-copy the upstream repo over `word/` and re-apply the patch.
+Live apps are vendored copies of upstream repos with a single local
+patch each — a "← Apps" button that links to `../`:
+
+- `word/` ← [RodmanWord](https://github.com/Rodman-Ai/RodmanWord). Patched in `word/index.html` (title bar) and `word/styles.css` (`.rodmanoffice-back`).
+- `accounting/` ← [RodBooks](https://github.com/Rodman-Ai/RodBooks). Patched in `accounting/index.html` (top of sidebar) and `accounting/styles.css` (`.rodmanoffice-back`).
+
+To pull updates, re-copy the upstream repo over the folder and
+re-apply the patch.
