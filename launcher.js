@@ -18,11 +18,11 @@
     }
   });
 
-  // Keyboard shortcut: 1-6 jumps to the corresponding app tile.
+  // Keyboard shortcut: 1-7 jumps to the corresponding app tile.
   document.addEventListener('keydown', (e) => {
     if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
     const idx = Number(e.key) - 1;
-    if (!Number.isInteger(idx) || idx < 0 || idx > 5) return;
+    if (!Number.isInteger(idx) || idx < 0 || idx > 6) return;
     const tiles = grid.querySelectorAll('.tile');
     const tile = tiles[idx];
     if (!tile || tile.classList.contains('is-disabled')) return;
