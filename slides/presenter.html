@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>RodmanSlides — Presenter View</title>
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    html, body { background: #0f172a; color: #e2e8f0; height: 100%; margin: 0; font-family: -apple-system, "Segoe UI", Roboto, sans-serif; }
+    .pv-grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      grid-template-rows: 1fr 1fr;
+      grid-template-areas: "current next" "current notes";
+      gap: 14px;
+      padding: 14px;
+      height: 100vh;
+      box-sizing: border-box;
+    }
+    .pv-pane { background: #1e293b; border: 1px solid #334155; border-radius: 8px; overflow: hidden; position: relative; padding: 10px; display: flex; flex-direction: column; }
+    .pv-pane h2 { margin: 0 0 8px; font-size: 11px; letter-spacing: 0.6px; text-transform: uppercase; color: #94a3b8; font-weight: 700; }
+    .pv-stage-wrap { flex: 1; position: relative; overflow: hidden; }
+    .pv-stage {
+      position: absolute; top: 0; left: 0;
+      width: 1280px; height: 720px;
+      transform-origin: top left;
+    }
+    #pv-current { grid-area: current; }
+    #pv-next    { grid-area: next; }
+    #pv-notes   { grid-area: notes; }
+    #pv-notes pre { white-space: pre-wrap; font-family: inherit; font-size: 14px; line-height: 1.45; margin: 0; color: #cbd5e1; }
+    .pv-bar {
+      grid-column: 1 / -1; padding: 0 14px 12px; display: flex; gap: 16px; align-items: center;
+      font-variant-numeric: tabular-nums; color: #cbd5e1; font-size: 14px;
+    }
+    .pv-bar .pv-counter { color: #94a3b8; }
+    .pv-bar .pv-spacer { flex: 1; }
+    .pv-bar button { background: #1e293b; color: #e2e8f0; border: 1px solid #334155; padding: 6px 14px; border-radius: 6px; cursor: pointer; font: inherit; }
+    .pv-bar button:hover { border-color: #64748b; }
+    .pv-bar .pv-timer { font-size: 22px; font-weight: 600; color: #e2e8f0; }
+    .pv-bar .pv-timer-controls { display: flex; gap: 4px; margin-left: 4px; }
+    .pv-bar .pv-timer-controls button { padding: 3px 8px; font-size: 11px; }
+  </style>
+</head>
+<body>
+  <div class="pv-grid">
+    <section class="pv-pane" id="pv-current">
+      <h2>Current</h2>
+      <div class="pv-stage-wrap"><div class="pv-stage" id="pv-current-stage"></div></div>
+    </section>
+    <section class="pv-pane" id="pv-next">
+      <h2>Next</h2>
+      <div class="pv-stage-wrap"><div class="pv-stage" id="pv-next-stage"></div></div>
+    </section>
+    <section class="pv-pane" id="pv-notes">
+      <h2>Speaker notes</h2>
+      <pre id="pv-notes-text"></pre>
+    </section>
+    <div class="pv-bar">
+      <span class="pv-counter" id="pv-counter">— / —</span>
+      <span class="pv-spacer"></span>
+      <span class="pv-timer" id="pv-timer">00:00</span>
+      <span class="pv-timer-controls">
+        <button id="pv-timer-toggle">Pause</button>
+        <button id="pv-timer-reset">Reset</button>
+      </span>
+      <button id="pv-prev">‹ Prev</button>
+      <button id="pv-next-btn">Next ›</button>
+    </div>
+  </div>
+
+  <script src="deck.js" defer></script>
+  <script src="themes.js" defer></script>
+  <script src="render.js" defer></script>
+  <script defer>
+    // Wait for the deferred scripts to populate window globals.
+    window.addEventListener('load', () => {
+      const channel = new BroadcastChannel('rodmanslides-present');
+      let lastDeck = null;
+      let lastIdx = 0;
+
+      function fitStage(stageEl) {
+        const wrap = stageEl.parentElement;
+        const w = wrap.clientWidth, h = wrap.clientHeight;
+        const scale = Math.min(w / 1280, h / 720);
+        stageEl.style.transform = `scale(${scale})`;
+        stageEl.style.width = '1280px';
+        stageEl.style.height = '720px';
+      }
+
+      function paint() {
+        if (!lastDeck) return;
+        const cur = lastDeck.slides[lastIdx];
+        const next = lastDeck.slides[lastIdx + 1] || null;
+        document.getElementById('pv-counter').textContent = `${lastIdx + 1} / ${lastDeck.slides.length}`;
+        document.getElementById('pv-notes-text').textContent = (cur && cur.notes) || '';
+
+        const curStage = document.getElementById('pv-current-stage');
+        const nextStage = document.getElementById('pv-next-stage');
+        window.RodmanThemes.applyToStage(curStage, lastDeck.theme);
+        window.RodmanRender.renderSlide(curStage, cur, { editable: false });
+        fitStage(curStage);
+
+        if (next) {
+          window.RodmanThemes.applyToStage(nextStage, lastDeck.theme);
+          window.RodmanRender.renderSlide(nextStage, next, { editable: false });
+        } else {
+          nextStage.innerHTML = '<div style="display:grid;place-items:center;width:100%;height:100%;color:#64748b;font-style:italic;">— end —</div>';
+        }
+        fitStage(nextStage);
+      }
+
+      window.addEventListener('resize', paint);
+
+      channel.addEventListener('message', (ev) => {
+        const msg = ev.data;
+        if (msg.type === 'sync') {
+          lastDeck = msg.deck;
+          lastIdx = msg.idx;
+          paint();
+        } else if (msg.type === 'goto') {
+          lastIdx = msg.idx;
+          paint();
+        }
+      });
+
+      // Ask the main window for an initial sync.
+      channel.postMessage({ type: 'request-sync' });
+
+      document.getElementById('pv-prev').addEventListener('click', () => channel.postMessage({ type: 'go', delta: -1 }));
+      document.getElementById('pv-next-btn').addEventListener('click', () => channel.postMessage({ type: 'go', delta: 1 }));
+
+      // ----- Speaker timer -----
+      let elapsedMs = 0;
+      let timerStartedAt = Date.now();
+      let paused = false;
+      function formatT(ms) {
+        const total = Math.floor(ms / 1000);
+        const m = String(Math.floor(total / 60)).padStart(2, '0');
+        const s = String(total % 60).padStart(2, '0');
+        return `${m}:${s}`;
+      }
+      setInterval(() => {
+        if (paused) return;
+        elapsedMs += Date.now() - timerStartedAt;
+        timerStartedAt = Date.now();
+        document.getElementById('pv-timer').textContent = formatT(elapsedMs);
+      }, 250);
+      document.getElementById('pv-timer-toggle').addEventListener('click', (e) => {
+        paused = !paused;
+        e.target.textContent = paused ? 'Resume' : 'Pause';
+        if (!paused) timerStartedAt = Date.now();
+      });
+      document.getElementById('pv-timer-reset').addEventListener('click', () => {
+        elapsedMs = 0; timerStartedAt = Date.now();
+        document.getElementById('pv-timer').textContent = '00:00';
+      });
+    });
+  </script>
+</body>
+</html>

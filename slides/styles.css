@@ -366,6 +366,41 @@ body {
 .slide-list-item.is-dragging { opacity: 0.4; }
 .slide-list-item.is-drop-before { box-shadow: inset 0 3px 0 0 var(--primary); }
 .slide-list-item.is-drop-after  { box-shadow: inset 0 -3px 0 0 var(--primary); }
+
+/* Image-format sliders in the Home ribbon. Compact two-up layout. */
+.image-adjust-row { gap: 10px; }
+.image-adjust-row label.adjust {
+  display: flex; flex-direction: column; gap: 2px;
+  font-size: 10px; color: var(--muted);
+}
+.image-adjust-row label.adjust input[type=range] {
+  width: 92px; height: 16px; accent-color: var(--primary);
+}
+
+/* Theme palette swatches next to the shape fill picker. */
+.theme-swatches {
+  display: grid;
+  grid-template-columns: repeat(4, 14px);
+  grid-auto-rows: 14px;
+  gap: 3px;
+}
+.theme-swatch {
+  width: 14px; height: 14px;
+  border: 1px solid rgba(0,0,0,0.4);
+  border-radius: 2px;
+  cursor: pointer;
+  padding: 0;
+}
+.theme-swatch:hover { transform: scale(1.15); }
+
+/* Per-element animations played by present.js. Keep these as global
+   keyframes so any rendering surface (editor preview, present mode,
+   thumbs) can use them. */
+@keyframes fadeIn       { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fadeOut      { from { opacity: 1; } to { opacity: 0; } }
+@keyframes slideInLeft  { from { opacity: 0; transform: translateX(-60px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes zoomIn       { from { opacity: 0; transform: scale(0.6); } to { opacity: 1; transform: scale(1); } }
+@keyframes pulse        { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.08); } }
 .slide-element[data-kind="text"] .slide-text { cursor: text; }
 .slide-element[data-kind="text"][contenteditable="true"] { cursor: text; }
 

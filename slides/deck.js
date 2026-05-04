@@ -46,6 +46,35 @@
     };
   }
 
+  function newVideoElement({ x, y, w, h, src, kind: subKind }) {
+    // src may be: a YouTube/Vimeo URL (rendered as an <iframe> embed)
+    // or a direct video file URL / data URL (rendered as <video controls>)
+    return {
+      id: newId('el'),
+      kind: 'video',
+      x, y, w, h,
+      src,
+      subKind: subKind || 'auto',
+    };
+  }
+
+  function newTableElement({ x, y, w, h, rows, cols, cells }) {
+    const r = rows || 3;
+    const c = cols || 3;
+    const initial = cells || Array.from({ length: r }, (_, i) =>
+      Array.from({ length: c }, (_, j) => i === 0 ? `H${j + 1}` : '')
+    );
+    return {
+      id: newId('el'),
+      kind: 'table',
+      x, y, w, h,
+      rows: r,
+      cols: c,
+      cells: initial,
+      headerRow: true,
+    };
+  }
+
   // Layouts return an array of elements positioned for a 1280x720 stage.
   const LAYOUTS = {
     title(theme) {
@@ -254,5 +283,6 @@
     findSlide, findElement, removeElement,
     bringForward, sendBackward,
     cloneElement,
+    newVideoElement, newTableElement,
   };
 })();

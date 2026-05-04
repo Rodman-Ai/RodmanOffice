@@ -91,6 +91,67 @@
       .filter(Boolean);
   }
 
+  // ---------- Image format panel (visible only when an image is selected) ----------
+  function syncImageFormatPanel() {
+    const group = $('#imageFormatGroup');
+    if (!group) return;
+    const el = selectedElement();
+    if (el && el.kind === 'image') {
+      group.hidden = false;
+      const adj = el.adjust || {};
+      $('#adjBrightness').value = adj.brightness != null ? adj.brightness : 100;
+      $('#adjContrast').value   = adj.contrast   != null ? adj.contrast   : 100;
+      $('#adjOpacity').value    = adj.opacity    != null ? adj.opacity    : 100;
+      $('#adjRadius').value     = adj.radius     != null ? adj.radius     : 0;
+    } else {
+      group.hidden = true;
+    }
+  }
+  let _animBound = false;
+  function bindAnimationControls() {
+    if (_animBound) return;
+    _animBound = true;
+    ['#animTrigger', '#animDuration'].forEach((sel) => {
+      const inp = $(sel);
+      if (!inp) return;
+      inp.addEventListener('input', () => {
+        const els = selectedElements();
+        els.forEach((el) => {
+          if (!el.animation) return;
+          el.animation.trigger = $('#animTrigger').value;
+          el.animation.durationMs = parseInt($('#animDuration').value, 10);
+        });
+        scheduleSave();
+      });
+    });
+  }
+
+  let _imageSlidersBound = false;
+  function bindImageAdjustSliders() {
+    if (_imageSlidersBound) return;
+    _imageSlidersBound = true;
+    const ids = [['adjBrightness', 'brightness'], ['adjContrast', 'contrast'], ['adjOpacity', 'opacity'], ['adjRadius', 'radius']];
+    ids.forEach(([elId, key]) => {
+      const inp = $('#' + elId);
+      if (!inp) return;
+      inp.addEventListener('input', () => {
+        const el = selectedElement();
+        if (!el || el.kind !== 'image') return;
+        if (!el.adjust) el.adjust = {};
+        el.adjust[key] = parseInt(inp.value, 10);
+        // Live update: tweak the rendered <img> directly, no full re-render.
+        const node = stageEl && stageEl.querySelector(`[data-element-id="${el.id}"] img`);
+        if (node) {
+          const a = el.adjust;
+          node.style.filter = `brightness(${a.brightness != null ? a.brightness : 100}%) contrast(${a.contrast != null ? a.contrast : 100}%)`;
+          node.style.opacity = String((a.opacity != null ? a.opacity : 100) / 100);
+          node.style.borderRadius = (a.radius || 0) + 'px';
+        }
+        scheduleSave();
+      });
+    });
+  }
+
   // ---------- Initial render ----------
   function bootstrap() {
     // Ensure selected slide still exists (e.g., after deck reset)
@@ -99,11 +160,14 @@
     }
     setDeckTitleInput();
     paintThemeStrip();
+    paintThemeSwatches();
     paintTransitionStrip();
     renderSlideList();
     renderEditor();
     updateStatusBar();
     setSaveIndicator('saved');
+    bindImageAdjustSliders();
+    bindAnimationControls();
   }
 
   // ---------- Deck title ----------
@@ -150,10 +214,34 @@
   function applyTheme(name) {
     deck.theme = name;
     paintThemeStrip();
+    paintThemeSwatches();
     renderEditor();
     renderSlideList();
     updateStatusBar();
     scheduleSave();
+  }
+
+  function paintThemeSwatches() {
+    const host = $('#themeSwatches');
+    if (!host) return;
+    host.innerHTML = '';
+    T.getPalette(deck.theme).forEach((hex) => {
+      const sw = document.createElement('button');
+      sw.type = 'button';
+      sw.className = 'theme-swatch';
+      sw.title = hex;
+      sw.style.background = hex;
+      sw.addEventListener('click', () => {
+        $('#shapeFill').value = hex;
+        // If a shape is selected, recolor it immediately.
+        const el = selectedElement();
+        if (el && el.kind === 'shape') {
+          el.fill = hex;
+          renderEditor(); scheduleSave();
+        }
+      });
+      host.appendChild(sw);
+    });
   }
 
   // ---------- Transition strip ----------
@@ -298,6 +386,7 @@
     if (state.showNotes) {
       $('#notesArea').value = slide.notes || '';
     }
+    syncImageFormatPanel();
   }
 
   function layoutEditor() {
@@ -528,13 +617,47 @@
     const elNode = e.target.closest('.slide-element');
     if (!elNode) return;
     const el = D.findElement(activeSlide(), elNode.dataset.elementId);
-    if (!el || el.kind !== 'text') return;
+    if (!el) return;
+
+    // Table cells: dblclick the cell to edit its text.
+    if (el.kind === 'table') {
+      const cell = e.target.closest('td, th');
+      if (!cell) return;
+      const r = parseInt(cell.dataset.r, 10);
+      const c = parseInt(cell.dataset.c, 10);
+      cell.contentEditable = 'true';
+      cell.focus();
+      state.isEditingText = true;
+      const range = document.createRange();
+      range.selectNodeContents(cell);
+      range.collapse(false);
+      const sel = window.getSelection();
+      sel.removeAllRanges(); sel.addRange(range);
+      cell.addEventListener('blur', () => {
+        if (!el.cells[r]) el.cells[r] = [];
+        el.cells[r][c] = cell.textContent;
+        cell.contentEditable = 'false';
+        state.isEditingText = false;
+        scheduleSave();
+      }, { once: true });
+      return;
+    }
+
+    // Video placeholder: dblclick re-prompts for URL.
+    if (el.kind === 'video') {
+      const url = window.prompt('Video URL:', el.src || '');
+      if (url === null) return;
+      el.src = url;
+      renderEditor(); scheduleSave();
+      return;
+    }
+
+    if (el.kind !== 'text') return;
     const inner = elNode.querySelector('.slide-text');
     if (!inner) return;
     state.isEditingText = true;
     inner.contentEditable = 'true';
     inner.focus();
-    // Place caret at end
     const range = document.createRange();
     range.selectNodeContents(inner);
     range.collapse(false);
@@ -732,6 +855,49 @@
       renderEditor(); scheduleSave();
     },
     insertImage() { $('#imageFileInput').click(); },
+    insertVideo() {
+      const url = window.prompt('Video URL — YouTube, Vimeo, or a direct .mp4 link:', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ');
+      if (!url) return;
+      const slide = activeSlide();
+      slide.elements.push(D.newVideoElement({
+        x: 240, y: 160, w: 800, h: 450, src: url,
+      }));
+      const elId = slide.elements[slide.elements.length - 1].id;
+      setSelection([elId], elId);
+      renderEditor(); scheduleSave();
+    },
+    setAnim(btn) {
+      const kind = btn.dataset.animKind;
+      const els = selectedElements();
+      if (!els.length) {
+        alert('Select an element first, then choose an animation.');
+        return;
+      }
+      const trigger = $('#animTrigger') ? $('#animTrigger').value : 'onEnter';
+      const durationMs = $('#animDuration') ? parseInt($('#animDuration').value, 10) : 500;
+      els.forEach((el) => {
+        if (kind === 'none') {
+          delete el.animation;
+        } else {
+          el.animation = { kind, trigger, durationMs };
+        }
+      });
+      scheduleSave();
+    },
+    insertTable() {
+      const dim = window.prompt('Table size (rows × cols):', '3 × 3');
+      if (!dim) return;
+      const m = dim.match(/(\d+)\s*[xX×]\s*(\d+)/);
+      const rows = m ? Math.max(1, Math.min(20, parseInt(m[1], 10))) : 3;
+      const cols = m ? Math.max(1, Math.min(12, parseInt(m[2], 10))) : 3;
+      const slide = activeSlide();
+      slide.elements.push(D.newTableElement({
+        x: 240, y: 200, w: 800, h: 60 + rows * 40, rows, cols,
+      }));
+      const elId = slide.elements[slide.elements.length - 1].id;
+      setSelection([elId], elId);
+      renderEditor(); scheduleSave();
+    },
     insertShape(btn) {
       const shape = btn.dataset.shape || 'rect';
       const slide = activeSlide();
