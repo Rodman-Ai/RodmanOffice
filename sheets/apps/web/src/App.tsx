@@ -5,9 +5,8 @@ import { Grid } from "./Grid";
 import { SidePanel } from "./SidePanel";
 import { SheetTabs } from "./SheetTabs";
 import { ChartStrip } from "./ChartStrip";
-import { MenuBar, type MenuSpec } from "./MenuBar";
+import { Ribbon, type RibbonActions } from "./Ribbon";
 import { FunctionPicker } from "./FunctionPicker";
-import { FormatToolbar } from "./FormatToolbar";
 import { FindReplace } from "./FindReplace";
 import { ConditionalFormatModal } from "./ConditionalFormatModal";
 import { CommentModal } from "./CommentModal";
@@ -315,139 +314,6 @@ export function App() {
 
   const triggerImport = () => fileInputRef.current?.click();
 
-  const menus: MenuSpec[] = [
-    {
-      label: "File",
-      items: [
-        {
-          kind: "item",
-          label: "New workbook",
-          onClick: () => {
-            api.replaceWorkbook(newBlankWorkbook(`wb-${Date.now()}`));
-            setSelection(ORIGIN_RANGE);
-          },
-        },
-        { kind: "item", label: "Import…", onClick: triggerImport },
-        { kind: "separator" },
-        {
-          kind: "item",
-          label: "Export as CSV",
-          onClick: () => exportSheetAsCSV(api.activeSheet),
-        },
-        {
-          kind: "item",
-          label: "Export as XLSX",
-          onClick: () => exportWorkbookAsXLSX(api.workbook),
-        },
-      ],
-    },
-    {
-      label: "Edit",
-      items: [
-        {
-          kind: "item",
-          label: "Undo",
-          shortcut: `${modKey}Z`,
-          onClick: api.undo,
-          disabled: !api.canUndo,
-        },
-        {
-          kind: "item",
-          label: "Redo",
-          shortcut: `${modKey}⇧Z`,
-          onClick: api.redo,
-          disabled: !api.canRedo,
-        },
-        { kind: "separator" },
-        { kind: "item", label: "Cut", shortcut: `${modKey}X`, onClick: () => void onCut() },
-        { kind: "item", label: "Copy", shortcut: `${modKey}C`, onClick: () => void onCopy() },
-        { kind: "item", label: "Paste", shortcut: `${modKey}V`, onClick: () => void onPaste() },
-        { kind: "separator" },
-        { kind: "item", label: "Clear contents", shortcut: "Del", onClick: onClearSelection },
-        { kind: "separator" },
-        {
-          kind: "item",
-          label: "Find & replace…",
-          shortcut: `${modKey}F`,
-          onClick: () => setFindOpen(true),
-        },
-      ],
-    },
-    {
-      label: "View",
-      items: [
-        {
-          kind: "item",
-          label: panelOpen ? "Hide Ask Claude panel" : "Show Ask Claude panel",
-          onClick: () => setPanelOpen((v) => !v),
-        },
-      ],
-    },
-    {
-      label: "Format",
-      items: [
-        { kind: "item", label: "Bold", shortcut: `${modKey}B`, onClick: () => applyFormatPatch({ bold: !anchorFormat?.bold }) },
-        { kind: "item", label: "Italic", shortcut: `${modKey}I`, onClick: () => applyFormatPatch({ italic: !anchorFormat?.italic }) },
-        { kind: "item", label: "Underline", shortcut: `${modKey}U`, onClick: () => applyFormatPatch({ underline: !anchorFormat?.underline }) },
-        { kind: "separator" },
-        { kind: "item", label: "Number → General", onClick: () => applyFormatPatch({ numberFmt: "general" }) },
-        { kind: "item", label: "Number → Number", onClick: () => applyFormatPatch({ numberFmt: "number" }) },
-        { kind: "item", label: "Number → Currency", onClick: () => applyFormatPatch({ numberFmt: "currency" }) },
-        { kind: "item", label: "Number → Percent", onClick: () => applyFormatPatch({ numberFmt: "percent" }) },
-        { kind: "item", label: "Number → Date", onClick: () => applyFormatPatch({ numberFmt: "date" }) },
-        { kind: "separator" },
-        { kind: "item", label: "Align left", onClick: () => applyFormatPatch({ align: "left" }) },
-        { kind: "item", label: "Align center", onClick: () => applyFormatPatch({ align: "center" }) },
-        { kind: "item", label: "Align right", onClick: () => applyFormatPatch({ align: "right" }) },
-        { kind: "separator" },
-        { kind: "item", label: "Conditional formatting…", onClick: () => setCfOpen(true) },
-        { kind: "item", label: "Clear formatting", onClick: clearFormatRange },
-      ],
-    },
-    {
-      label: "Insert",
-      items: [
-        { kind: "item", label: "Sheet", onClick: api.addSheet },
-        { kind: "item", label: "Comment on selected cell…", onClick: () => setCommentOpen(true) },
-        { kind: "separator" },
-        {
-          kind: "item",
-          label: "Function…",
-          shortcut: "⇧F3",
-          onClick: () => setPickerOpen(true),
-        },
-      ],
-    },
-    {
-      label: "Data",
-      items: [
-        {
-          kind: "item",
-          label: "Sort sheet by selected column ↑",
-          onClick: () => sortActiveSheetByColumn(anchor.col, true),
-        },
-        {
-          kind: "item",
-          label: "Sort sheet by selected column ↓",
-          onClick: () => sortActiveSheetByColumn(anchor.col, false),
-        },
-        { kind: "separator" },
-        {
-          kind: "item",
-          label: "Remove duplicates in selected column",
-          onClick: () => removeDuplicatesInColumn(anchor.col),
-        },
-      ],
-    },
-    {
-      label: "Help",
-      items: [
-        { kind: "item", label: "Function reference…", onClick: () => setPickerOpen(true) },
-        { kind: "item", label: "Audit formulas…", onClick: () => setAuditOpen(true) },
-        { kind: "item", label: "About RodmanSheets", onClick: () => alert("RodmanSheets — AI-native spreadsheet. Ask Claude what you'd normally click for.") },
-      ],
-    },
-  ];
 
   function sortActiveSheetByColumn(col: number, ascending: boolean): void {
     const sheet = api.activeSheet;
@@ -531,9 +397,63 @@ export function App() {
         ? `Demo mode (no backend) · ${baseStatus}`
         : baseStatus;
 
+  // Insert SUM at the active cell. Picks a sensible default range
+  // from the current selection: a single cell becomes =SUM(<col-above>),
+  // a range becomes =SUM(<range>).
+  const insertSum = useCallback(() => {
+    const norm = normalizeRange(selection);
+    let formula: string;
+    if (norm.startRow === norm.endRow && norm.startCol === norm.endCol) {
+      // Single cell — sum the column above the cell, if any rows above exist.
+      if (norm.startRow > 0) {
+        formula = `=SUM(${a1(0, norm.startCol)}:${a1(norm.startRow - 1, norm.startCol)})`;
+      } else {
+        formula = `=SUM(`;
+      }
+    } else {
+      formula = `=SUM(${a1(norm.startRow, norm.startCol)}:${a1(norm.endRow, norm.endCol)})`;
+    }
+    api.setCell(anchor.row, anchor.col, formula);
+    setTimeout(() => formulaInputRef.current?.focus(), 0);
+  }, [api, anchor.row, anchor.col, selection]);
+
+  const ribbonActions: RibbonActions = {
+    newWorkbook: () => {
+      api.replaceWorkbook(newBlankWorkbook(`wb-${Date.now()}`));
+      setSelection(ORIGIN_RANGE);
+    },
+    importFile: triggerImport,
+    exportCsv: () => exportSheetAsCSV(api.activeSheet),
+    exportXlsx: () => exportWorkbookAsXLSX(api.workbook),
+    undo: api.undo,
+    redo: api.redo,
+    canUndo: api.canUndo,
+    canRedo: api.canRedo,
+    cut: () => void onCut(),
+    copy: () => void onCopy(),
+    paste: () => void onPaste(),
+    clearSelection: onClearSelection,
+    openFindReplace: () => setFindOpen(true),
+    format: anchorFormat,
+    patchFormat: applyFormatPatch,
+    clearFormat: clearFormatRange,
+    openConditionalFormat: () => setCfOpen(true),
+    addSheet: api.addSheet,
+    openCommentModal: () => setCommentOpen(true),
+    openFunctionPicker: () => setPickerOpen(true),
+    insertSum,
+    sortAsc: () => sortActiveSheetByColumn(anchor.col, true),
+    sortDesc: () => sortActiveSheetByColumn(anchor.col, false),
+    removeDuplicates: () => removeDuplicatesInColumn(anchor.col),
+    panelOpen,
+    togglePanel: () => setPanelOpen((v) => !v),
+    openAudit: () => setAuditOpen(true),
+    about: () => alert("RodmanSheets — AI-native spreadsheet. Ask Claude what you'd normally click for."),
+  };
+
   return (
     <div className={`app${panelOpen ? " with-panel" : ""}`}>
-      <div className="toolbar">
+      <header className="title-bar">
         <a
           className="rodmanoffice-back"
           href="/RodmanOffice/"
@@ -543,35 +463,46 @@ export function App() {
           <span aria-hidden>←</span>
           <span>Apps</span>
         </a>
-        <h1>RodmanSheets</h1>
-        <label>
-          Import
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".csv,.tsv,.xlsx,.xls,text/csv,text/tab-separated-values,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            onChange={onPickFile}
-          />
-        </label>
-        <button
-          className="ask-claude"
-          onClick={() => setPanelOpen((v) => !v)}
-          title={aiEnabled ? "Ask Claude" : "AI is not configured"}
-        >
-          {panelOpen ? "Close panel" : "Ask Claude"}
-        </button>
-        <SaveIndicator state={saveState} />
-        <span className="status">{status}</span>
-      </div>
-      <MenuBar menus={menus} />
-      <FormatToolbar
-        current={anchorFormat}
-        onPatch={applyFormatPatch}
-        onClear={clearFormatRange}
-      />
+        <div className="brand">
+          <div className="brand-logo" aria-hidden>X</div>
+          <div className="brand-text">
+            <div className="doc-title">{api.workbook.name || "Workbook1"}</div>
+            <div className="brand-subtitle">RodmanSheets</div>
+          </div>
+        </div>
+        <div className="title-actions">
+          <button
+            className="ask-claude"
+            onClick={() => setPanelOpen((v) => !v)}
+            title={aiEnabled ? "Ask Claude" : "AI is not configured"}
+          >
+            {panelOpen ? "Close panel" : "🤖 Ask Claude"}
+          </button>
+          <SaveIndicator state={saveState} />
+          <span className="status">{status}</span>
+        </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".csv,.tsv,.xlsx,.xls,text/csv,text/tab-separated-values,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          onChange={onPickFile}
+          hidden
+        />
+      </header>
+
+      <Ribbon a={ribbonActions} />
+
       <div className="formula-bar">
-        <span className="addr" title={cellCount > 1 ? rangeLabel : undefined}>
-          {rangeLabel}
+        <span className="name-box" title="Active cell / range">{rangeLabel}</span>
+        <span className="fx-cluster">
+          <button type="button" className="fx-btn cancel" title="Cancel edit (Esc)">×</button>
+          <button type="button" className="fx-btn commit" title="Commit edit (Enter)">✓</button>
+          <button
+            type="button"
+            className="fx-btn fx"
+            title="Insert function (⇧F3)"
+            onClick={() => setPickerOpen(true)}
+          ><i>fx</i></button>
         </span>
         <input
           ref={formulaInputRef}
