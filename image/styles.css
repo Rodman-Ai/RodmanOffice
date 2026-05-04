@@ -1345,3 +1345,288 @@ body.mode-photoshop .psp-layers-panel {
   color: #d6d6d6;
   border-color: #1a1a1a;
 }
+
+/* =============================================================
+   mode-photoshop2026 — refined visual layer for the Photoshop
+   experience. Reuses photoshop's tool layout and palette via the
+   alias in modes.js; only the chrome differs.
+
+   Design language:
+     - very dark cool grays (#1a1a1a / #232323 / #2d2d2d / #393939)
+     - Adobe-style blue accent (#2563eb / #3b82f6)
+     - flat panels, 1px black separators, no gradients
+     - tighter typography, system font stack
+     - minimal hover/active states with the accent
+   ============================================================= */
+body.mode-photoshop2026 {
+  --p26-bg: #1a1a1a;
+  --p26-canvas-bg: #232323;
+  --p26-panel: #2d2d2d;
+  --p26-panel-2: #393939;
+  --p26-border: #000;
+  --p26-border-soft: #111;
+  --p26-text: #e6e6e6;
+  --p26-text-dim: #a3a3a3;
+  --p26-accent: #3b82f6;
+  --p26-accent-strong: #2563eb;
+  --p26-accent-faint: rgba(59, 130, 246, 0.18);
+  background: var(--p26-bg);
+  color: var(--p26-text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 12.5px;
+  letter-spacing: 0.1px;
+}
+
+body.mode-photoshop2026 .app-header {
+  background: var(--p26-panel);
+  border-bottom: 1px solid var(--p26-border);
+  color: var(--p26-text);
+  padding: 6px 10px;
+  gap: 12px;
+}
+
+body.mode-photoshop2026 .brand { gap: 8px; }
+body.mode-photoshop2026 .brand-icon {
+  width: 24px; height: 24px;
+  display: grid; place-items: center;
+  background: var(--p26-accent-strong);
+  border-radius: 5px;
+  color: #fff;
+}
+body.mode-photoshop2026 .brand-icon svg { display: block; }
+body.mode-photoshop2026 .brand-text {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--p26-text);
+  letter-spacing: 0.2px;
+}
+
+body.mode-photoshop2026 .rodmanoffice-back {
+  background: transparent;
+  color: var(--p26-text-dim);
+  border: 1px solid var(--p26-border-soft);
+  border-radius: 4px;
+  padding: 3px 9px 3px 6px;
+  font-size: 12px;
+}
+body.mode-photoshop2026 .rodmanoffice-back:hover {
+  background: var(--p26-panel-2);
+  color: var(--p26-text);
+  border-color: var(--p26-border);
+}
+
+/* Menu bar */
+body.mode-photoshop2026 .menubar { gap: 0; }
+body.mode-photoshop2026 .menu-trigger {
+  color: var(--p26-text-dim);
+  background: transparent;
+  border: 0;
+  border-radius: 3px;
+  padding: 4px 9px;
+  font-size: 12px;
+  font-weight: 500;
+}
+body.mode-photoshop2026 .menu-trigger:hover,
+body.mode-photoshop2026 .menu.is-open .menu-trigger {
+  background: var(--p26-panel-2);
+  color: var(--p26-text);
+}
+body.mode-photoshop2026 .menu-dropdown {
+  background: var(--p26-panel-2);
+  border: 1px solid var(--p26-border);
+  border-radius: 4px;
+  color: var(--p26-text);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
+  padding: 4px;
+  font-size: 12.5px;
+}
+body.mode-photoshop2026 .menu-item {
+  border-radius: 3px;
+  padding: 5px 10px;
+}
+body.mode-photoshop2026 .menu-item:hover {
+  background: var(--p26-accent-strong);
+  color: #fff;
+}
+body.mode-photoshop2026 .menu-item.is-active {
+  background: var(--p26-accent-faint);
+  color: var(--p26-text);
+}
+body.mode-photoshop2026 .menu-section-label {
+  color: var(--p26-text-dim);
+  text-transform: uppercase;
+  font-size: 9.5px;
+  letter-spacing: 0.7px;
+  padding: 8px 10px 4px;
+}
+body.mode-photoshop2026 .menu-empty { color: var(--p26-text-dim); font-style: italic; padding: 8px 10px; }
+body.mode-photoshop2026 .menu-sep { background: var(--p26-border); }
+body.mode-photoshop2026 .menu-item-shortcut { color: var(--p26-text-dim); }
+body.mode-photoshop2026 .menu-item:hover .menu-item-shortcut { color: rgba(255, 255, 255, 0.85); }
+
+/* Header action buttons */
+body.mode-photoshop2026 .header-actions { gap: 4px; }
+body.mode-photoshop2026 .header-actions button {
+  background: transparent;
+  color: var(--p26-text-dim);
+  border: 1px solid transparent;
+  padding: 4px 9px;
+  border-radius: 4px;
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+  transition: background 80ms ease, color 80ms ease, border-color 80ms ease;
+}
+body.mode-photoshop2026 .header-actions button:hover {
+  background: var(--p26-panel-2);
+  color: var(--p26-text);
+  border-color: var(--p26-border-soft);
+}
+body.mode-photoshop2026 .header-actions button:active,
+body.mode-photoshop2026 .header-actions button:focus-visible {
+  background: var(--p26-accent-faint);
+  color: var(--p26-text);
+  border-color: var(--p26-accent);
+  outline: none;
+}
+body.mode-photoshop2026 .header-actions button:disabled {
+  opacity: 0.45; cursor: not-allowed;
+}
+body.mode-photoshop2026 .header-actions .zoom-group {
+  background: var(--p26-bg);
+  border: 1px solid var(--p26-border-soft);
+  border-radius: 4px;
+  padding: 2px;
+  gap: 0;
+}
+body.mode-photoshop2026 .header-actions .zoom-group button {
+  border-radius: 2px;
+  padding: 2px 8px;
+  font-size: 11px;
+}
+
+/* Tools panel */
+body.mode-photoshop2026 .tools-panel,
+body.mode-photoshop2026 .palette-panel {
+  background: var(--p26-panel);
+  border-right: 1px solid var(--p26-border);
+  padding: 8px 6px;
+}
+body.mode-photoshop2026 .palette-panel {
+  border-right: 0;
+  border-left: 1px solid var(--p26-border);
+}
+body.mode-photoshop2026 .tools-grid { gap: 3px; }
+body.mode-photoshop2026 .tool-btn {
+  background: transparent;
+  color: var(--p26-text);
+  border: 1px solid transparent;
+  border-radius: 4px;
+  width: 32px;
+  height: 32px;
+  font-size: 16px;
+}
+body.mode-photoshop2026 .tool-btn:hover {
+  background: var(--p26-panel-2);
+  border-color: var(--p26-border-soft);
+}
+body.mode-photoshop2026 .tool-btn[data-active="true"] {
+  background: var(--p26-accent-strong);
+  color: #fff;
+  outline: 0;
+  border-color: var(--p26-accent);
+  box-shadow: 0 0 0 1px var(--p26-accent) inset;
+}
+body.mode-photoshop2026 .tool-btn .tool-label {
+  font-size: 9.5px;
+  color: var(--p26-text-dim);
+}
+
+body.mode-photoshop2026 .size-picker label,
+body.mode-photoshop2026 .symmetry-picker label {
+  color: var(--p26-text-dim);
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+body.mode-photoshop2026 .symmetry-picker button {
+  background: var(--p26-panel-2);
+  color: var(--p26-text);
+  border: 1px solid var(--p26-border-soft);
+  border-radius: 3px;
+  padding: 3px 8px;
+  font-size: 11px;
+}
+body.mode-photoshop2026 input[type="range"] {
+  accent-color: var(--p26-accent);
+}
+
+/* Canvas area */
+body.mode-photoshop2026 .canvas-area { background: var(--p26-canvas-bg); }
+body.mode-photoshop2026 .canvas-frame { background: var(--p26-canvas-bg); }
+body.mode-photoshop2026 .canvas-titlebar {
+  background: var(--p26-panel);
+  color: var(--p26-text-dim);
+  border-bottom: 1px solid var(--p26-border);
+  font-size: 11.5px;
+  padding: 4px 10px;
+}
+body.mode-photoshop2026 .tb-btn { color: var(--p26-text-dim); }
+body.mode-photoshop2026 .tb-btn:hover { color: var(--p26-text); }
+body.mode-photoshop2026 .canvas-stage canvas {
+  background: #fff;
+  box-shadow: 0 0 0 1px #000, 0 4px 22px rgba(0, 0, 0, 0.6);
+}
+
+/* Status bar */
+body.mode-photoshop2026 .status-bar {
+  background: var(--p26-panel);
+  color: var(--p26-text-dim);
+  border-top: 1px solid var(--p26-border);
+  font-size: 11px;
+  letter-spacing: 0.2px;
+}
+
+/* Palette panel — color swatches */
+body.mode-photoshop2026 .palette-swatch,
+body.mode-photoshop2026 .palette-swatch-item {
+  border: 1px solid var(--p26-border);
+  border-radius: 2px;
+}
+body.mode-photoshop2026 .recent-label {
+  color: var(--p26-text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  font-size: 10px;
+}
+
+/* Layers panel & doc tabs */
+body.mode-photoshop2026 .psp-tabs,
+body.mode-photoshop2026 .psp-layers-panel {
+  background: var(--p26-panel);
+  color: var(--p26-text);
+  border-color: var(--p26-border);
+}
+body.mode-photoshop2026 .psp-layers-panel { border: 1px solid var(--p26-border); border-radius: 4px; }
+
+/* Modals */
+body.mode-photoshop2026 .modal-card {
+  background: var(--p26-panel-2);
+  color: var(--p26-text);
+  border: 1px solid var(--p26-border);
+  border-radius: 6px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.7);
+}
+body.mode-photoshop2026 .modal-actions button {
+  background: var(--p26-panel);
+  color: var(--p26-text);
+  border: 1px solid var(--p26-border-soft);
+  padding: 5px 14px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+body.mode-photoshop2026 .modal-actions button:hover {
+  background: var(--p26-accent-strong);
+  border-color: var(--p26-accent);
+  color: #fff;
+}
