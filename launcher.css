@@ -141,13 +141,6 @@ html, body {
   gap: 8px;
 }
 
-.tile-desc {
-  font-size: 13px;
-  color: var(--text-dim);
-  margin-top: 4px;
-  line-height: 1.4;
-}
-
 .tile-features {
   list-style: none;
   margin: 12px 0 0;
