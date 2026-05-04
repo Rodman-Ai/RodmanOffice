@@ -82,7 +82,7 @@
   const RW_BUILD = {
     version: '2.1.0',
     date: '2026-05-02',
-    cache: 'rwd-v9',
+    cache: 'rwd-v10',
     label: 'RodmanWord 2.1',
   };
   window.RW_BUILD = RW_BUILD;

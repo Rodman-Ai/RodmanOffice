@@ -110,16 +110,17 @@ Then visit http://localhost:8000/.
 
 1. Push to GitHub.
 2. **Settings → Pages → Source = GitHub Actions**.
-3. The included `.github/workflows/deploy.yml` publishes the repo
-   root on every push to `main` (and the active feature branch).
+3. In RodmanOffice, `.github/workflows/pages.yml` publishes the suite
+   on every push to `main`.
 
 ## PWA / offline
 
 - A web manifest (`manifest.webmanifest`) makes RodmanWord installable.
 - A service worker (`sw.js`) runs **network-first** for every same-
-  origin GET, with the cache as an offline fallback. After the first
-  visit the editor works fully offline. Cache version is bumped in
-  lock-step with `RW_BUILD.cache` in `app.js`.
+  origin GET, with the cache as an offline fallback. The editor shell
+  works offline after first load; shared `/lib/docs` import/export
+  engines must also be available from browser cache or the network.
+  Cache version is bumped in lock-step with `RW_BUILD.cache` in `app.js`.
 
 ## Browser support
 
@@ -149,7 +150,7 @@ API (Save to file…), Web Speech API (read-aloud + dictation).
 ├── FEATURES.md
 ├── CHANGELOG.md
 ├── CONTRIBUTING.md
-└── .github/workflows/deploy.yml
+└── ../.github/workflows/pages.yml
 ```
 
 ## License

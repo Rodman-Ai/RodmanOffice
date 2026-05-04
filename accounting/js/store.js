@@ -35,7 +35,7 @@ const defaults = () => ({
     theme: "auto", // auto | dark | light
     monthlyGoal: 0,
     annualGoal: 0,
-    mileageRate: 0.67, // IRS standard 2024
+    mileageRate: 0.725, // IRS business standard mileage rate for tax year 2026
     lockHash: "", // sha-256 of passcode (empty = no lock)
     state: "", // optional state code for tax estimator
     stateRate: 0.05, // approx state effective rate

@@ -34,6 +34,16 @@ let worker = null;
 let jobSeq = 0;
 const pending = new Map();
 
+function rejectWorkerJobs(error) {
+  const err = error instanceof Error ? error : new Error(String(error || 'Spreadsheet worker failed'));
+  pending.forEach((slot) => slot.reject(err));
+  pending.clear();
+  if (worker) {
+    worker.terminate();
+    worker = null;
+  }
+}
+
 function ensureWorker() {
   if (worker) return worker;
   worker = new Worker(new URL('./worker.js', import.meta.url), { type: 'module' });
@@ -45,6 +55,12 @@ function ensureWorker() {
     if (ok) slot.resolve(output);
     else slot.reject(new Error(error));
   });
+  worker.addEventListener('error', (e) => {
+    rejectWorkerJobs(new Error(e.message || 'Spreadsheet worker failed to load'));
+  });
+  worker.addEventListener('messageerror', () => {
+    rejectWorkerJobs(new Error('Spreadsheet worker returned an unreadable response'));
+  });
   return worker;
 }
 
@@ -53,7 +69,12 @@ function runOnWorker(source, target) {
   const id = ++jobSeq;
   return new Promise((resolve, reject) => {
     pending.set(id, { resolve, reject });
-    worker.postMessage({ id, source, target }, [source.bytes]);
+    try {
+      worker.postMessage({ id, source, target }, [source.bytes]);
+    } catch (err) {
+      pending.delete(id);
+      reject(err);
+    }
   });
 }
 

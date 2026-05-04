@@ -84,9 +84,14 @@ You can verify in `/settings`, which links straight to both.
 
 ### 5. Deploy
 
+> **RodmanOffice note:** this vendored copy is exported as a static demo by
+> the suite workflow at `../.github/workflows/pages.yml` via
+> `scripts/build-demo.sh`. The server-backed deployment notes below apply to
+> a standalone LeoCRM production install.
+
 Two paths, both via GitHub Actions:
 
-**A) One-click via the bundled Vercel workflow** (`.github/workflows/deploy.yml`).
+**A) One-click via a standalone Vercel workflow** (not included in RodmanOffice).
 Configure once, then every push to `main` ships to production and every other
 branch ships to a preview URL.
 
@@ -121,13 +126,12 @@ push.
 
 ### Why not GitHub Pages?
 
-GitHub Pages serves static files only. LeoCRM needs a server to (a) handle
+GitHub Pages serves static files only. Production LeoCRM needs a server to (a) handle
 NextAuth's OAuth callback and refresh tokens, (b) call Google Sheets/Drive/
 Gmail with the user's access token, and (c) call Claude with the
 server-side `ANTHROPIC_API_KEY` (which must never ship to the browser). The
-bundled `.github/workflows/pages.yml` publishes a marketing/landing page to
-GitHub Pages that links to your real, server-hosted app — useful as a free
-public URL that says what LeoCRM is.
+RodmanOffice workflow publishes a static demo to GitHub Pages; it is a tour,
+not the production server-backed CRM.
 
 ## Mobile
 

@@ -410,7 +410,7 @@ DevTools → Network → Offline. Open Bills → Capture receipt → save image.
 
 - **Run locally:** `python3 -m http.server 8765` from the repo root, then visit `http://localhost:8765/`.
 - **Build:** there is no build. Edit a file → reload.
-- **Deploy:** push to `main`. `.github/workflows/deploy.yml` publishes `main` to GitHub Pages.
+- **Deploy:** push to `main`. In RodmanOffice, `.github/workflows/pages.yml` publishes the suite to GitHub Pages.
 - **Live:** `https://rodman-ai.github.io/RodBooks/` — Pages source must be set to **GitHub Actions** in repo Settings → Pages.
 
 ---

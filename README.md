@@ -12,13 +12,16 @@ A complete office suite that runs free in your browser.
 | Image Editor | [`image/`](./image/) | Live (vendored from [Retro-paint](https://github.com/Rodman-Ai/Retro-paint)) |
 | Accounting | [`accounting/`](./accounting/) | Live (vendored from [RodBooks](https://github.com/Rodman-Ai/RodBooks)) |
 | CRM | [`crm/`](./crm/) | Live (vendored from [LeoCRM](https://github.com/Rodman-Ai/LeoCRM), built in CI) |
+| File Converter | [`converter/`](./converter/) | Live (built in-suite, uses shared `/lib` engines) |
 
 ## How it works
 
 Open `/` to see the launcher. Each tile is a regular link to the
 sub-app's folder, so the browser only fetches the picked app's assets
-— no bundler, no shared runtime. Most sub-apps are self-contained
+and any shared engines that app imports from `/lib`. Most sub-apps are
 static sites with their own service worker scoped to their own folder.
+Offline support is app-shell first; shared import/export engines may
+need network or a prior browser cache hit unless a feature says otherwise.
 
 Two apps are exceptions and are built at deploy time:
 
@@ -45,6 +48,8 @@ RodmanOffice/
 ├─ slides/      ← RodmanSlides (built in-suite, vanilla static)
 ├─ image/       ← Retro-paint (vendored)
 ├─ accounting/  ← RodBooks (vendored)
+├─ converter/   ← RodmanConvert (built in-suite, vanilla static)
+├─ lib/         ← shared document / sheet / slide / image engines
 └─ crm/         ← LeoCRM (vendored, Next.js — built in CI)
 ```
 
@@ -67,13 +72,16 @@ All other apps are static drop-ins with no build step.
 
 ## Adding an app
 
-1. Create a folder at the suite root (`sheets/`, `slides/`, `image/`, `accounting/`, `crm/`).
+1. Create a folder at the suite root (`word/`, `sheets/`, `slides/`, `image/`, `accounting/`, `crm/`, `converter/`).
 2. Put a self-contained static site inside (`index.html` + assets).
 3. Add an "← Apps" link back to `../` somewhere in the chrome.
 4. Use `localStorage` keys prefixed with the app slug
    (`sheets.*`, `slides.*`, `image.*`, `accounting.*`, `crm.*`) so co-pinned PWAs don't collide.
 5. Register the app's service worker with `scope: './'` so it stays
    confined to its own folder.
+6. If the app depends on `/lib`, document which workflows need those
+   shared engines and do not claim full offline support unless those
+   assets are controlled by that app's service worker.
 
 ## Vendor sync
 
@@ -85,6 +93,8 @@ patch each — a "← Apps" button that links to `../`:
 - `image/` ← [Retro-paint](https://github.com/Rodman-Ai/Retro-paint). Patched in `image/index.html` (head of `.app-header`) and `image/styles.css` (`.rodmanoffice-back`).
 - `sheets/` ← [AiCell](https://github.com/Rodman-Ai/AiCell) (pnpm + Vite + React 19, built in CI). Patched in `sheets/apps/web/src/App.tsx` (back-to-launcher anchor at the top-left of the toolbar) and `sheets/apps/web/src/styles.css` (`.rodmanoffice-back`).
 - `crm/` ← [LeoCRM](https://github.com/Rodman-Ai/LeoCRM) (Next.js, built in CI). Patched in `crm/src/components/AppShell.tsx` — a back-to-launcher anchor in the desktop sidebar and another in the mobile header, both linking to absolute path `/RodmanOffice/` (not Next's `<Link>`, since basePath rewriting would otherwise scope the URL under `/RodmanOffice/crm/`).
+- `converter/` is built in-suite and intentionally consumes shared `/lib` engines.
+- `lib/` contains shared document, spreadsheet, slide, and image engines used by multiple apps. Treat changes there as cross-app changes.
 
 To pull updates for `word/` or `accounting/`, re-copy the upstream
 repo over the folder and re-apply the one-line patch. For `sheets/`

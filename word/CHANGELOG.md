@@ -4,7 +4,7 @@ All meaningful releases on `claude/build-word-clone-cXSXu`. Versions
 follow `RW_BUILD.version` in `app.js`. Cache key in
 `sw.js VERSION` is in lock-step.
 
-## [2.1.0] — 2026-05-02 · cache `rwd-v9`
+## [2.1.0] — 2026-05-02 · cache `rwd-v10`
 
 UI polish + plumbing.
 

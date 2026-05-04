@@ -1721,14 +1721,22 @@
 
   // ---- Autosave + restore ----
   let saveTimer = null;
+  let autosaveWarned = false;
   function scheduleAutosave() {
     if (saveTimer) clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
       // Autosave still uses dataURL for localStorage persistence (Blobs
       // can't be stored in localStorage). Encode-to-PNG-as-string is the
       // one place where the editor diverges from the IO module's Blob path.
-      try { localStorage.setItem('retropaint:canvas', canvas.toDataURL('image/png')); }
-      catch (e) { /* quota or security */ }
+      try {
+        localStorage.setItem('retropaint:canvas', canvas.toDataURL('image/png'));
+        autosaveWarned = false;
+      } catch (e) {
+        if (!autosaveWarned) {
+          autosaveWarned = true;
+          alert('Autosave could not store this drawing. Save a file manually to avoid losing changes.');
+        }
+      }
     }, 1500);
   }
   async function tryRestore() {
@@ -4986,7 +4994,7 @@
   // ---- GIMP Quick Mask (already added in Phase 2) ----
   Tools.gimpQuickMask = Tools.quickMask;
 
-  // ---- GIMP Script-Fu console (sandboxed JS REPL) ----
+  // ---- GIMP Script-Fu console (trusted JS REPL; not sandboxed) ----
   Tools.gimpScriptFu = {
     async down() {
       const html = `

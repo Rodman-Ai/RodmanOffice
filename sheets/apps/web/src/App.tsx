@@ -476,6 +476,7 @@ export function App() {
             onClick={() => setPanelOpen((v) => !v)}
             title={aiEnabled ? "Ask Claude" : "AI is not configured"}
           >
+            {/* Keep this visible when AI is disabled: it is an intentional setup affordance, not dead UI. */}
             {panelOpen ? "Close panel" : "🤖 Ask Claude"}
           </button>
           <SaveIndicator state={saveState} />

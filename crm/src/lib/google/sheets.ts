@@ -14,9 +14,10 @@ export function rowsToObjects<T extends Record<string, string>>(
   });
 }
 
-export function objectToRow(headers: string[], obj: Record<string, unknown>) {
+export function objectToRow<T extends object>(headers: string[], obj: T) {
+  const rowObj = obj as Record<string, unknown>;
   return headers.map((h) => {
-    const v = obj[h];
+    const v = rowObj[h];
     if (v === undefined || v === null) return "";
     return String(v);
   });
@@ -47,11 +48,11 @@ function rowsToObjectsAny<T>(headers: string[], rows: string[][]): T[] {
   });
 }
 
-export async function appendRow(
+export async function appendRow<T extends object>(
   clients: GoogleClients,
   spreadsheetId: string,
   schema: SheetSchema,
-  obj: Record<string, unknown>,
+  obj: T,
 ) {
   const row = objectToRow(schema.headers, obj);
   await clients.sheets.spreadsheets.values.append({
@@ -63,11 +64,11 @@ export async function appendRow(
   return obj;
 }
 
-export async function appendRows(
+export async function appendRows<T extends object>(
   clients: GoogleClients,
   spreadsheetId: string,
   schema: SheetSchema,
-  objects: Record<string, unknown>[],
+  objects: T[],
 ) {
   if (objects.length === 0) return [];
   const values = objects.map((o) => objectToRow(schema.headers, o));

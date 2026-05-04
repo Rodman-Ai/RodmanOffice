@@ -8,7 +8,7 @@ export default function mileageView() {
 
   const render = () => {
     const all = Mileage.all();
-    const rate = Settings.get().mileageRate || 0.67;
+    const rate = Settings.get().mileageRate || 0.725;
     const years = Array.from(new Set(all.map((m) => (m.date || "").slice(0, 4)).filter(Boolean))).sort().reverse();
 
     const filtered = all.filter((m) => {

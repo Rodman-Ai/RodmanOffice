@@ -54,7 +54,7 @@ python3 -m http.server 8000
 
 ## Deploy to GitHub Pages
 
-The included workflow (`.github/workflows/deploy.yml`) deploys `main` automatically. Once it has run successfully:
+In RodmanOffice, `.github/workflows/pages.yml` deploys the full suite automatically from `main`. Once it has run successfully:
 
 1. Repo → Settings → Pages
 2. Source: **GitHub Actions**

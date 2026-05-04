@@ -23,7 +23,7 @@ export default function settings() {
     const invNext = inp(s.nextInvoiceNumber, "1001", "number");
     const monthlyGoal = inp(s.monthlyGoal || "", "5000", "number");
     const annualGoal = inp(s.annualGoal || "", "120000", "number");
-    const mileageRate = inp(s.mileageRate ?? 0.67, "0.67", "number");
+    const mileageRate = inp(s.mileageRate ?? 0.725, "0.725", "number");
     const stateRate = inp(Math.round((s.stateRate || 0.05) * 100), "5", "number");
     const cashOnHand = inp(s.cashOnHand || "", "10000", "number");
     const lateFeePct = inp(s.lateFeePct || "", "1.5", "number");
@@ -48,7 +48,7 @@ export default function settings() {
         nextInvoiceNumber: +invNext.value || 1001,
         monthlyGoal: +monthlyGoal.value || 0,
         annualGoal: +annualGoal.value || 0,
-        mileageRate: +mileageRate.value || 0.67,
+        mileageRate: +mileageRate.value || 0.725,
         stateRate: (+stateRate.value || 5) / 100,
         cashOnHand: +cashOnHand.value || 0,
         lateFeePct: +lateFeePct.value || 0,
@@ -161,6 +161,7 @@ export default function settings() {
 
       el("div", { class: "card" },
         el("h3", {}, "Mileage"),
+        el("p", { class: "sub" }, "Default is the IRS 2026 business standard mileage rate. Update it if you are filing another tax year."),
         el("div", { class: "form-grid" },
           field("Deduction rate ($/mile)", mileageRate),
         ),
