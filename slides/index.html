@@ -160,6 +160,19 @@
         </div>
         <div class="group-label">Arrange</div>
       </div>
+
+      <!-- Image format — only meaningful when an image is selected -->
+      <div class="group" id="imageFormatGroup" hidden>
+        <div class="group-row image-adjust-row">
+          <label class="adjust">Brightness <input type="range" min="0" max="200" value="100" id="adjBrightness"></label>
+          <label class="adjust">Contrast <input type="range" min="0" max="200" value="100" id="adjContrast"></label>
+        </div>
+        <div class="group-row image-adjust-row">
+          <label class="adjust">Opacity <input type="range" min="0" max="100" value="100" id="adjOpacity"></label>
+          <label class="adjust">Radius <input type="range" min="0" max="200" value="0" id="adjRadius"></label>
+        </div>
+        <div class="group-label">Image</div>
+      </div>
     </div>
 
     <!-- Insert -->
@@ -173,13 +186,17 @@
       <div class="group">
         <div class="group-row">
           <button class="ribbon-btn wide" data-cmd="insertImage">Picture…</button>
+          <button class="ribbon-btn wide" data-cmd="insertVideo">Video…</button>
+          <button class="ribbon-btn wide" data-cmd="insertTable">Table</button>
         </div>
-        <div class="group-label">Images</div>
+        <div class="group-label">Media</div>
       </div>
       <div class="group">
         <div class="group-row">
           <button class="ribbon-btn" data-cmd="insertShape" data-shape="rect" title="Rectangle">▭</button>
           <button class="ribbon-btn" data-cmd="insertShape" data-shape="ellipse" title="Ellipse">○</button>
+          <button class="ribbon-btn" data-cmd="insertShape" data-shape="triangle" title="Triangle">△</button>
+          <button class="ribbon-btn" data-cmd="insertShape" data-shape="star" title="Star">★</button>
           <button class="ribbon-btn" data-cmd="insertShape" data-shape="line" title="Line">─</button>
           <button class="ribbon-btn" data-cmd="insertShape" data-shape="arrow" title="Arrow">→</button>
           <button class="ribbon-btn" data-cmd="insertShape" data-shape="callout" title="Callout">💬</button>
@@ -189,6 +206,7 @@
       <div class="group">
         <div class="group-row">
           <input class="color-input" type="color" id="shapeFill" title="Shape fill" value="#b7472a" />
+          <div class="theme-swatches" id="themeSwatches" title="Theme colors — click to set as the active fill"></div>
         </div>
         <div class="group-label">Fill</div>
       </div>
@@ -229,9 +247,43 @@
     <div class="ribbon-panel" data-panel="animations">
       <div class="group">
         <div class="group-row">
-          <span class="ribbon-empty">In-slide animations are coming in a later release.</span>
+          <button class="ribbon-btn" data-cmd="setAnim" data-anim-kind="none" title="No animation">None</button>
         </div>
-        <div class="group-label">Coming soon</div>
+        <div class="group-label">Off</div>
+      </div>
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn" data-cmd="setAnim" data-anim-kind="fadeIn" title="Fade in">Fade in</button>
+          <button class="ribbon-btn" data-cmd="setAnim" data-anim-kind="slideInLeft" title="Slide in from left">⇒ Slide in</button>
+          <button class="ribbon-btn" data-cmd="setAnim" data-anim-kind="zoomIn" title="Zoom in">⊕ Zoom in</button>
+        </div>
+        <div class="group-label">Entrance</div>
+      </div>
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn" data-cmd="setAnim" data-anim-kind="pulse" title="Emphasis pulse">↺ Pulse</button>
+        </div>
+        <div class="group-label">Emphasis</div>
+      </div>
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn" data-cmd="setAnim" data-anim-kind="fadeOut" title="Fade out">Fade out</button>
+        </div>
+        <div class="group-label">Exit</div>
+      </div>
+      <div class="group">
+        <div class="group-row">
+          <label class="adjust">Trigger
+            <select id="animTrigger">
+              <option value="onEnter">On slide enter</option>
+              <option value="onClick">On click</option>
+            </select>
+          </label>
+          <label class="adjust">Duration
+            <input type="range" id="animDuration" min="100" max="2000" step="50" value="500">
+          </label>
+        </div>
+        <div class="group-label">Timing</div>
       </div>
     </div>
 

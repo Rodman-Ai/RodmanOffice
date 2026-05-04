@@ -56,6 +56,10 @@
       renderShapeInto(wrap, el);
     } else if (el.kind === 'image') {
       renderImageInto(wrap, el);
+    } else if (el.kind === 'video') {
+      renderVideoInto(wrap, el);
+    } else if (el.kind === 'table') {
+      renderTableInto(wrap, el);
     }
 
     if (opts.editable && isPrimary) {
@@ -150,6 +154,22 @@
       svg.appendChild(line);
       wrap.appendChild(svg);
       return;
+    } else if (el.shape === 'triangle') {
+      shape = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+      shape.setAttribute('points', `${el.w / 2},0 ${el.w},${el.h} 0,${el.h}`);
+    } else if (el.shape === 'star') {
+      // 5-point star inscribed in the bounding box
+      shape = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+      const cx = el.w / 2, cy = el.h / 2;
+      const ro = Math.min(el.w, el.h) / 2;
+      const ri = ro * 0.5;
+      const pts = [];
+      for (let i = 0; i < 10; i++) {
+        const a = -Math.PI / 2 + (i * Math.PI / 5);
+        const r = i % 2 === 0 ? ro : ri;
+        pts.push(`${cx + Math.cos(a) * r},${cy + Math.sin(a) * r}`);
+      }
+      shape.setAttribute('points', pts.join(' '));
     } else if (el.shape === 'callout') {
       shape = document.createElementNS('http://www.w3.org/2000/svg', 'path');
       const r = 12;
@@ -190,6 +210,11 @@
     img.src = el.src;
     img.alt = '';
     img.draggable = false;
+    const adj = el.adjust || {};
+    const brightness = adj.brightness != null ? adj.brightness : 100;
+    const contrast = adj.contrast != null ? adj.contrast : 100;
+    const opacity = adj.opacity != null ? adj.opacity : 100;
+    const radius = adj.radius || 0;
     Object.assign(img.style, {
       width: '100%',
       height: '100%',
@@ -197,8 +222,100 @@
       pointerEvents: 'none',
       userSelect: 'none',
       display: 'block',
+      filter: `brightness(${brightness}%) contrast(${contrast}%)`,
+      opacity: String(opacity / 100),
+      borderRadius: radius + 'px',
     });
     wrap.appendChild(img);
+  }
+
+  function ytEmbedFromUrl(url) {
+    // Returns an embed URL for YouTube / Vimeo / null if not recognised.
+    try {
+      const u = new URL(url);
+      const host = u.hostname.replace(/^www\./, '');
+      if (host === 'youtube.com' || host === 'm.youtube.com') {
+        const id = u.searchParams.get('v');
+        if (id) return `https://www.youtube.com/embed/${id}`;
+      }
+      if (host === 'youtu.be') {
+        const id = u.pathname.slice(1);
+        if (id) return `https://www.youtube.com/embed/${id}`;
+      }
+      if (host === 'vimeo.com') {
+        const id = u.pathname.slice(1).split('/')[0];
+        if (/^\d+$/.test(id)) return `https://player.vimeo.com/video/${id}`;
+      }
+    } catch (e) { /* fall through */ }
+    return null;
+  }
+
+  function renderVideoInto(wrap, el) {
+    const src = el.src || '';
+    const embed = ytEmbedFromUrl(src);
+    if (embed) {
+      const f = document.createElement('iframe');
+      f.src = embed;
+      f.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
+      f.allowFullscreen = true;
+      f.loading = 'lazy';
+      Object.assign(f.style, { width: '100%', height: '100%', border: '0', display: 'block' });
+      wrap.appendChild(f);
+      return;
+    }
+    if (/^(https?:|data:|blob:)/.test(src)) {
+      const v = document.createElement('video');
+      v.src = src;
+      v.controls = true;
+      v.preload = 'metadata';
+      Object.assign(v.style, { width: '100%', height: '100%', display: 'block' });
+      wrap.appendChild(v);
+      return;
+    }
+    // No usable src — show a placeholder.
+    const ph = document.createElement('div');
+    ph.className = 'video-placeholder';
+    ph.textContent = 'Click to set a video URL';
+    Object.assign(ph.style, {
+      width: '100%', height: '100%',
+      display: 'grid', placeItems: 'center',
+      background: '#0f172a', color: '#94a3b8',
+      border: '1px dashed #334155', boxSizing: 'border-box',
+      fontSize: '14px', fontFamily: 'system-ui, sans-serif',
+    });
+    wrap.appendChild(ph);
+  }
+
+  function renderTableInto(wrap, el) {
+    const t = document.createElement('table');
+    t.className = 'slide-table';
+    Object.assign(t.style, {
+      width: '100%', height: '100%', borderCollapse: 'collapse',
+      tableLayout: 'fixed', background: 'rgba(255,255,255,0.95)',
+      color: '#1f2937', fontSize: '14px',
+    });
+    for (let r = 0; r < el.rows; r++) {
+      const tr = document.createElement('tr');
+      for (let c = 0; c < el.cols; c++) {
+        const isHeader = el.headerRow && r === 0;
+        const cell = document.createElement(isHeader ? 'th' : 'td');
+        cell.dataset.r = String(r);
+        cell.dataset.c = String(c);
+        cell.contentEditable = 'false';
+        cell.textContent = (el.cells[r] && el.cells[r][c]) != null ? el.cells[r][c] : '';
+        Object.assign(cell.style, {
+          border: '1px solid #cbd5e1',
+          padding: '6px 8px',
+          textAlign: 'left',
+          verticalAlign: 'top',
+          background: isHeader ? '#f1f5f9' : 'transparent',
+          fontWeight: isHeader ? '600' : '400',
+        });
+        tr.appendChild(cell);
+      }
+      t.appendChild(tr);
+    }
+    wrap.appendChild(t);
   }
 
   function addResizeHandles(wrap) {

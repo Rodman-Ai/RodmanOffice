@@ -21,9 +21,40 @@
       <button class="pc-btn" data-act="prev" aria-label="Previous">‹</button>
       <span class="pc-counter"></span>
       <button class="pc-btn" data-act="next" aria-label="Next">›</button>
+      <button class="pc-btn" data-act="presenter" title="Open presenter view (notes + next + timer)" aria-label="Presenter view">👁</button>
       <button class="pc-btn" data-act="exit" aria-label="Exit">✕</button>
     `;
     overlay.appendChild(controls);
+
+    // BroadcastChannel for the presenter-view popup.
+    let presenterChannel = null;
+    let presenterWindow = null;
+    function ensurePresenterChannel() {
+      if (presenterChannel) return presenterChannel;
+      presenterChannel = new BroadcastChannel('rodmanslides-present');
+      presenterChannel.addEventListener('message', (ev) => {
+        const msg = ev.data;
+        if (msg.type === 'request-sync') {
+          presenterChannel.postMessage({ type: 'sync', deck, idx });
+        } else if (msg.type === 'go') {
+          go(msg.delta);
+        } else if (msg.type === 'goto-idx') {
+          idx = Math.max(0, Math.min(msg.idx, deck.slides.length - 1));
+          showSlide(idx, 'none');
+        }
+      });
+      return presenterChannel;
+    }
+    function broadcastSync() {
+      if (presenterChannel) presenterChannel.postMessage({ type: 'sync', deck, idx });
+    }
+    function openPresenterView() {
+      ensurePresenterChannel();
+      presenterWindow = window.open('./presenter.html', 'rodman-presenter',
+        'width=1280,height=720,toolbar=no,menubar=no,location=no');
+      // Wait a beat then push initial state (presenter requests on its own too).
+      setTimeout(broadcastSync, 400);
+    }
 
     let idx = Math.max(0, Math.min(startIndex, deck.slides.length - 1));
     let prevStage = null;
@@ -43,16 +74,50 @@
 
       window.RodmanRender.renderSlide(stage, slide, { editable: false });
 
-      // In present mode, clicks on elements with an `href` open the URL.
-      // (Authored via the Insert → Link button or Ctrl+K in the editor.)
-      stage.addEventListener('click', (ev) => {
-        const node = ev.target.closest('.slide-element');
+      // ----- Per-element animations -----
+      // Elements with `el.animation = { kind, trigger, durationMs }`:
+      //   - trigger 'onEnter' fires immediately when the slide is shown
+      //   - trigger 'onClick' fires once per click on the slide (in
+      //     authoring order)
+      // Element nodes are hidden until their animation runs (so a
+      // click-triggered element doesn't "pop in" before the click).
+      const onClickQueue = [];
+      slide.elements.forEach((el) => {
+        if (!el.animation || el.animation.kind === 'none') return;
+        const node = stage.querySelector(`[data-element-id="${el.id}"]`);
         if (!node) return;
-        const el = slide.elements.find((e) => e.id === node.dataset.elementId);
-        if (!el || !el.href) return;
-        ev.preventDefault();
-        window.open(el.href, '_blank', 'noopener');
+        const a = el.animation;
+        if (a.trigger === 'onClick') {
+          node.style.opacity = '0';
+          onClickQueue.push({ node, anim: a });
+        } else {
+          requestAnimationFrame(() => playAnim(node, a));
+        }
       });
+
+      stage.addEventListener('click', (ev) => {
+        // Hyperlink takes priority over animation queue
+        const linkNode = ev.target.closest('.slide-element');
+        if (linkNode) {
+          const el = slide.elements.find((e) => e.id === linkNode.dataset.elementId);
+          if (el && el.href) {
+            ev.preventDefault();
+            window.open(el.href, '_blank', 'noopener');
+            return;
+          }
+        }
+        // Otherwise, advance the click-triggered animation queue.
+        const next = onClickQueue.shift();
+        if (next) {
+          next.node.style.opacity = '';
+          playAnim(next.node, next.anim);
+        }
+      });
+
+      function playAnim(node, a) {
+        const dur = (a.durationMs || 500) + 'ms';
+        node.style.animation = `${a.kind} ${dur} cubic-bezier(0.16, 1, 0.3, 1) both`;
+      }
 
       if (prevStage) {
         // Animate transition; remove prev after animation completes
@@ -73,6 +138,7 @@
       prevStage = stage;
       controls.querySelector('.pc-counter').textContent =
         `${targetIdx + 1} / ${deck.slides.length}`;
+      broadcastSync();
     }
 
     function go(delta) {
@@ -88,6 +154,8 @@
       window.removeEventListener('keydown', onKey);
       controls.removeEventListener('click', onCtrlClick);
       overlay.removeEventListener('click', onOverlayClick);
+      if (presenterChannel) { try { presenterChannel.close(); } catch (e) {} presenterChannel = null; }
+      if (presenterWindow && !presenterWindow.closed) { try { presenterWindow.close(); } catch (e) {} }
       if (document.fullscreenElement) {
         document.exitFullscreen().catch(() => {});
       }
@@ -114,6 +182,7 @@
       const act = btn.dataset.act;
       if (act === 'next') go(1);
       else if (act === 'prev') go(-1);
+      else if (act === 'presenter') openPresenterView();
       else if (act === 'exit') exit();
     }
 
