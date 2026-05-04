@@ -1535,6 +1535,7 @@
     $('canvas-title').textContent = PaintModes.titles[mode];
     const MODE_LABELS = {
       photoshop: 'Photoshop',
+      photoshop2026: 'Photoshop 2026',
       mspaint: 'MS Paint 95',
       mariopaint: 'Mario Paint',
       kidpix: 'Kid Pix',
@@ -1549,9 +1550,9 @@
     const mascot = $('tux-mascot');
     if (mascot) mascot.hidden = mode !== 'tuxpaint';
   }
-  const VALID_MODES = ['photoshop','mspaint','mariopaint','kidpix','macpaint','tuxpaint','psp','procreate','aseprite','gimp'];
+  const VALID_MODES = ['photoshop2026','photoshop','mspaint','mariopaint','kidpix','macpaint','tuxpaint','psp','procreate','aseprite','gimp'];
   // Modes that should show the Photoshop-style layers panel + doc tabs.
-  const LAYERS_MODES = new Set(['photoshop', 'psp']);
+  const LAYERS_MODES = new Set(['photoshop', 'photoshop2026', 'psp']);
   function modeHasLayers(m) { return LAYERS_MODES.has(m); }
 
   function updateStatusPos(p) {

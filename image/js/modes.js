@@ -894,6 +894,12 @@
     ]
   };
 
+  // photoshop2026 reuses photoshop's data (tools, palette, title) and
+  // differs only in CSS chrome. Aliased here so every consumer that
+  // looks up by mode key just works.
+  TOOLS.photoshop2026 = TOOLS.photoshop;
+  PALETTES.photoshop2026 = PALETTES.photoshop;
+
   global.PaintModes = {
     palettes: PALETTES,
     tools: TOOLS,
@@ -901,6 +907,7 @@
     drawStamp,
     titles: {
       photoshop: 'Untitled-1 @ 100% (RGB/8)',
+      photoshop2026: 'Untitled-1 @ 100% (RGB/8)',
       mspaint: 'untitled — Paint',
       mariopaint: '* Mario Paint *',
       kidpix: 'KID PIX !',
