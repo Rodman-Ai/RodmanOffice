@@ -28,7 +28,9 @@ export function createQueue() {
       if (it) Object.assign(it, { status }, extra);
     },
     pendingWithTargets() {
-      return [...items.values()].filter((it) => it.target && it.status !== 'done');
+      return [...items.values()].filter((it) => (
+        it.target && (it.status === 'pending' || it.status === 'error')
+      ));
     },
   };
 }

@@ -139,7 +139,23 @@ body {
 
 .app-subtitle { font-size: 11px; opacity: 0.85; padding-left: 6px; }
 
-.title-actions { display: flex; gap: 6px; }
+.title-actions { display: flex; align-items: center; gap: 6px; }
+
+.title-bar .ask-claude {
+  padding: 4px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  border-radius: 3px;
+  font-size: 12.5px;
+  font-weight: 500;
+  font-family: inherit;
+  white-space: nowrap;
+}
+.title-bar .ask-claude:disabled {
+  cursor: not-allowed;
+  opacity: 0.82;
+}
 
 .icon-btn {
   background: transparent;

@@ -30,6 +30,14 @@
       </div>
     </div>
     <div class="title-actions">
+      <!-- Keep this visible while AI is disabled: it is an intentional setup affordance, not dead UI. -->
+      <button
+        class="ask-claude"
+        type="button"
+        title="AI is not configured"
+        aria-label="Ask Claude is not configured"
+        disabled
+      >&#129302; Ask Claude</button>
       <span id="saveIndicator" class="save-indicator">Saved</span>
       <button class="icon-btn" id="presentBtn" title="Start presentation (F5)" aria-label="Present">▶</button>
       <button class="icon-btn" id="helpBtn" title="Help" aria-label="Help">?</button>

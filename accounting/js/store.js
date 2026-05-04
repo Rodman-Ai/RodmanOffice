@@ -82,6 +82,7 @@ const subscribers = new Set();
 // "enc:v1:..." and we keep the in-memory state plain; writes re-encrypt.
 let _encrypted = false;
 let _encryptCb = null; // async function(jsonStr) -> ciphertext
+let _writeSeq = 0;
 export function isVaultEncrypted() { return _encrypted; }
 export function enableVaultEncryption(encryptFn) { _encrypted = true; _encryptCb = encryptFn; write(); }
 export function disableVaultEncryption() { _encrypted = false; _encryptCb = null; write(); }
@@ -139,6 +140,7 @@ export async function enableEncryptionWithPassphrase(passphrase) {
   const { enableWithPassphrase } = await import("./cryptoVault.js");
   const plaintext = JSON.stringify(cache);
   const blob = await enableWithPassphrase(passphrase, plaintext);
+  _writeSeq++;
   localStorage.setItem(KEY(), blob);
   _encrypted = true;
   const { encryptCurrent } = await import("./cryptoVault.js");
@@ -155,6 +157,7 @@ export async function disableEncryption() {
   const { disable } = await import("./cryptoVault.js");
   disable();
   // Re-write as plaintext.
+  _writeSeq++;
   localStorage.setItem(KEY(), JSON.stringify(cache));
 }
 
@@ -192,13 +195,19 @@ function migrate(data) {
 
 function write() {
   const plain = JSON.stringify(cache);
+  const seq = ++_writeSeq;
   // Capture the target storage key at dispatch time so an in-flight async
   // encrypt from the previous profile can't write into the new profile's
   // blob during a profile switch. (Audit defect #7.)
   const targetKey = KEY();
   if (_encrypted && _encryptCb) {
-    // Encrypt asynchronously; UI is already updated from in-memory cache.
-    _encryptCb(plain).then((blob) => localStorage.setItem(targetKey, blob)).catch((e) => console.warn("encrypt write failed:", e));
+    // Encrypt asynchronously; only the latest write may persist. Without
+    // this guard, a slower older encryption can overwrite newer state.
+    _encryptCb(plain).then((blob) => {
+      if (seq === _writeSeq) localStorage.setItem(targetKey, blob);
+    }).catch((e) => {
+      if (seq === _writeSeq) console.warn("encrypt write failed:", e);
+    });
   } else {
     localStorage.setItem(targetKey, plain);
   }

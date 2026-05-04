@@ -24,6 +24,7 @@ const clearBtn   = document.getElementById('clearBtn');
 const zipToggle  = document.getElementById('zipToggle');
 
 const queue = createQueue();
+let isConverting = false;
 
 const TXT_DEC = new TextDecoder('utf-8');
 const TXT_ENC = new TextEncoder();
@@ -285,10 +286,16 @@ function wrapHtml(body, title) {
 
 function render() {
   queueList.innerHTML = '';
-  if (queue.items.size === 0) { queueSec.hidden = true; return; }
+  if (queue.items.size === 0) {
+    queueSec.hidden = true;
+    convertBtn.disabled = true;
+    clearBtn.disabled = isConverting;
+    return;
+  }
   queueSec.hidden = false;
   for (const item of queue.items.values()) queueList.appendChild(renderRow(item));
-  convertBtn.disabled = queue.pendingWithTargets().length === 0;
+  convertBtn.disabled = isConverting || queue.pendingWithTargets().length === 0;
+  clearBtn.disabled = isConverting;
 }
 
 function renderRow(item) {
@@ -335,14 +342,28 @@ function renderRow(item) {
     select.addEventListener('change', () => {
       const t = options.find((x) => x.ext === select.value);
       queue.setTarget(item.id, t);
-      convertBtn.disabled = queue.pendingWithTargets().length === 0;
+      convertBtn.disabled = isConverting || queue.pendingWithTargets().length === 0;
     });
   }
-  if (item.status === 'converting' || item.status === 'done') select.disabled = true;
+  if (isConverting || item.status === 'converting' || item.status === 'done') select.disabled = true;
 
   const status = document.createElement('div');
   status.className = 'queue-status';
-  status.textContent = item.status === 'converting' ? 'Converting…' : '';
+  if (item.status === 'converting') {
+    status.textContent = 'Converting...';
+  } else if (item.status === 'error') {
+    const retry = document.createElement('button');
+    retry.className = 'queue-retry';
+    retry.type = 'button';
+    retry.title = 'Retry conversion';
+    retry.setAttribute('aria-label', `Retry ${item.file.name}`);
+    retry.textContent = 'Retry';
+    retry.addEventListener('click', () => {
+      queue.setStatus(item.id, 'pending', { error: null });
+      render();
+    });
+    status.appendChild(retry);
+  }
 
   const remove = document.createElement('button');
   remove.className = 'queue-remove';
@@ -383,15 +404,16 @@ async function addFiles(fileList) {
 // ---------- Conversion runner ----------
 
 async function convertAll() {
+  if (isConverting) return;
   const bundleZip = zipToggle.checked;
   const collected = [];
   const jobs = queue.pendingWithTargets();
   if (jobs.length === 0) return;
-  convertBtn.disabled = true;
-  clearBtn.disabled = true;
+  isConverting = true;
+  render();
 
   for (const item of jobs) {
-    queue.setStatus(item.id, 'converting');
+    queue.setStatus(item.id, 'converting', { error: null });
     render();
     try {
       const source = {
@@ -422,15 +444,22 @@ async function convertAll() {
       }
       queue.setStatus(item.id, 'done');
     } catch (err) {
-      queue.setStatus(item.id, 'error', { error: err.message });
+      queue.setStatus(item.id, 'error', {
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
     render();
   }
 
   if (bundleZip && collected.length > 0) {
-    emitZip(collected, `converted-${timestamp()}.zip`);
+    try {
+      emitZip(collected, `converted-${timestamp()}.zip`);
+    } catch (err) {
+      console.warn('zip export failed:', err);
+    }
   }
-  clearBtn.disabled = false;
+  isConverting = false;
+  render();
 }
 
 function renameWithExt(name, ext) {

@@ -91,6 +91,17 @@ export default function PublicFormPage() {
         ) : (
           <form onSubmit={submit} className="space-y-3">
             <h1 className="text-xl font-semibold">{form.name}</h1>
+            <input
+              type="text"
+              name="_website"
+              className="hidden"
+              tabIndex={-1}
+              autoComplete="off"
+              value={values._website ?? ""}
+              onChange={(e) =>
+                setValues({ ...values, _website: e.target.value })
+              }
+            />
             {form.fields.map((f) => (
               <label key={f} className="block">
                 <span className="label">

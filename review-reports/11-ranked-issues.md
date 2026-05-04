@@ -27,7 +27,9 @@ Resolution progress:
 - Done: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12.
 - Adjusted by preference: 14. The Sheets disabled AI button stays visible as an intentional setup affordance, with an inline code comment so future cleanup does not remove it.
 - Done in the second pass: 13, 15, 16, 17, 18, 19, 20, and 24.
-- Verified: CRM `npm run typecheck`, CRM `npm run build`, Sheets `corepack pnpm -r typecheck`, and focused static JavaScript syntax checks.
+- Done in the third pass: 22, 23, 25, 26, and 27.
+- Partially addressed in the third pass: 21. CRM was upgraded to `next@14.2.35` and `googleapis@171.4.0`, clearing the critical Next advisory and the Google API `uuid` chain. Remaining high Next/ESLint advisories require a framework-major migration.
+- Verified: CRM `npm run typecheck`, CRM `npm run build`, Sheets `corepack pnpm audit --json`, Sheets `corepack pnpm -r typecheck`, Sheets `corepack pnpm -r test`, Sheets `corepack pnpm -r build`, focused static JavaScript syntax checks, and a shared ZIP round-trip check.
 
 ## Do First
 
