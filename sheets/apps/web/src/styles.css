@@ -63,47 +63,61 @@ body,
   min-width: 0;
 }
 
-.toolbar {
+/* ======================================================================
+   Excel-style header chrome — title bar + tabs + ribbon + formula bar.
+   Mirrors the .tabs / .ribbon / .ribbon-panel / .group / .group-row /
+   .group-label class names used by /word/ and /slides/ so the visual
+   language stays consistent across the suite.
+   ====================================================================== */
+
+/* Title bar — Excel green strip with brand + document title + actions. */
+.title-bar {
   display: flex;
-  gap: 8px;
   align-items: center;
-  padding: 6px 12px;
+  gap: 12px;
+  padding: 5px 12px;
   background: var(--primary);
   color: #fff;
   flex-shrink: 0;
+  height: 36px;
 }
-
-.toolbar h1 {
-  font-size: 14px;
-  font-weight: 600;
-  margin: 0;
-  margin-right: 12px;
-  color: #fff;
-  letter-spacing: 0.2px;
+.title-bar .brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
-
-.toolbar h1::before {
-  content: "X";
+.title-bar .brand-logo {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
-  margin-right: 8px;
+  width: 22px; height: 22px;
   background: #fff;
   color: var(--primary);
   border-radius: 4px;
   font-weight: 800;
-  font-size: 14px;
-  vertical-align: middle;
+  font-size: 13px;
+}
+.title-bar .brand-text { line-height: 1.1; }
+.title-bar .doc-title { font-size: 13px; font-weight: 600; color: #fff; }
+.title-bar .brand-subtitle { font-size: 10.5px; color: rgba(255,255,255,0.78); }
+
+.title-bar .title-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.title-bar .title-actions .status {
+  font-size: 11.5px;
+  color: rgba(255, 255, 255, 0.85);
 }
 
-/* RodmanOffice — back-to-launcher button injected into the toolbar. */
+/* Apps back link in the title bar. Mirrors the /word/ / /slides/ pattern. */
 .rodmanoffice-back {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 10px;
+  padding: 3px 9px;
   border: 1px solid rgba(255, 255, 255, 0.3);
   background: rgba(255, 255, 255, 0.15);
   border-radius: 3px;
@@ -115,55 +129,225 @@ body,
 }
 .rodmanoffice-back:hover { background: rgba(255, 255, 255, 0.25); }
 
-.toolbar button,
-.toolbar label {
+.title-bar .ask-claude {
   padding: 4px 10px;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.18);
   color: #fff;
   border-radius: 3px;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.title-bar .ask-claude:hover { background: rgba(255, 255, 255, 0.28); }
+
+/* Tabs strip — plain text labels with a 2 px green underline on the
+   active tab. Matches Excel 2024 (no boxes / no fills). */
+.tabs {
+  display: flex;
+  background: #fff;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--ribbon-border);
+}
+.tab {
+  background: transparent;
+  border: none;
+  color: #444;
   font-size: 13px;
+  padding: 7px 14px;
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: inherit;
+  border-bottom: 2px solid transparent;
+}
+.tab:hover { background: rgba(16, 124, 65, 0.06); color: #222; }
+.tab.active {
+  color: #0b5a2f;
+  font-weight: 600;
+  border-bottom-color: var(--primary);
+}
+
+/* Ribbon body — off-white, fixed-ish height, group label band at bottom. */
+.ribbon {
+  background: var(--ribbon-bg);
+  border-bottom: 1px solid var(--ribbon-border);
+  flex-shrink: 0;
+  width: 100%;
+  overflow-x: hidden;
+  overflow-y: visible;
+  box-sizing: border-box;
+}
+.ribbon-panel {
+  display: none;
+  flex-wrap: wrap;
+  align-items: stretch;
+  align-content: flex-start;
+  row-gap: 4px;
+  padding: 4px 6px 0;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 96px;
+}
+.ribbon-panel.active { display: flex; }
+
+.group {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 2px 8px 0;
+  border-right: 1px solid var(--ribbon-border);
+  flex-shrink: 0;
+}
+.group-row {
+  display: flex; align-items: center; gap: 3px;
+  flex-wrap: wrap; margin-bottom: 2px;
+}
+.group-label {
+  font-size: 11px;
+  color: #605e5c;
+  text-align: center;
+  padding: 4px 4px 3px;
+}
+
+/* Buttons — Fluent-style hover, 22 px icon-only or icon+label rows. */
+.ribbon-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text);
+  padding: 2px 6px;
+  min-width: 24px; min-height: 22px;
+  border-radius: 2px;
+  cursor: pointer;
+  font-size: 12.5px;
+  font-family: inherit;
+  display: inline-flex; align-items: center; justify-content: center;
+  gap: 5px; white-space: nowrap;
+}
+.ribbon-btn:hover { background: #e5f1fb; border-color: #cce4f7; }
+.ribbon-btn.active {
+  background: rgba(16, 124, 65, 0.18);
+  border-color: rgba(16, 124, 65, 0.45);
+}
+.ribbon-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.ribbon-btn-icon { font-size: 13px; }
+.ribbon-btn-text { font-size: 12px; }
+
+/* Big button — icon over label, 32-px-ish, the canonical Clipboard /
+   Cells / Editing / Styles left column. */
+.ribbon-bigbtn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text);
+  padding: 4px 8px;
+  border-radius: 2px;
+  cursor: pointer;
+  font: inherit;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 52px;
+  min-height: 56px;
+}
+.ribbon-bigbtn:hover { background: #e5f1fb; border-color: #cce4f7; }
+.ribbon-bigbtn-icon { font-size: 22px; line-height: 1; }
+.ribbon-bigbtn-text { font-size: 11px; color: #444; }
+
+/* Combo / select inputs in the ribbon. */
+.ribbon-combo {
+  font-family: inherit;
+  font-size: 12px;
+  border: 1px solid var(--ribbon-border);
+  border-radius: 2px;
+  padding: 2px 4px;
+  background: #fff;
+  color: var(--text);
+  height: 22px;
+}
+.ribbon-combo.sm { width: 48px; }
+
+/* Color pickers (font color, fill color). The visible character is
+   the affordance; the real <input type=color> sits invisibly on top. */
+.ribbon-color {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  width: 26px; height: 22px;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  cursor: pointer;
+  overflow: hidden;
+  font-weight: 700;
+  font-size: 13px;
+  line-height: 1;
+}
+.ribbon-color:hover { background: #e5f1fb; border-color: #cce4f7; }
+.ribbon-color input[type="color"] {
+  position: absolute; inset: 0;
+  opacity: 0;
+  width: 100%; height: 100%;
+  border: none;
   cursor: pointer;
 }
 
-.toolbar button:hover,
-.toolbar label:hover {
-  background: rgba(255, 255, 255, 0.25);
-}
-
-.toolbar input[type="file"] {
-  display: none;
-}
-
-.toolbar .status {
-  margin-left: auto;
+.ribbon-empty {
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.85);
+  font-style: italic;
+  color: var(--muted);
+  padding: 12px 6px;
 }
 
+/* Formula bar — Excel layout: Name Box | × ✓ fx | flex input. */
 .formula-bar {
   display: flex;
-  align-items: center;
-  padding: 4px 12px;
-  border-bottom: 1px solid var(--aicell-border);
+  align-items: stretch;
+  background: #fff;
+  border-bottom: 1px solid var(--ribbon-border);
+  height: 26px;
   font-size: 13px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: 'Segoe UI', system-ui, sans-serif;
   flex-shrink: 0;
-  gap: 8px;
 }
-
-.formula-bar .addr {
-  min-width: 64px;
-  font-weight: 600;
-  color: var(--aicell-header-fg);
+.formula-bar .name-box {
+  display: flex; align-items: center;
+  width: 120px;
+  padding: 0 8px;
+  border-right: 1px solid var(--ribbon-border);
+  font-size: 12px;
+  font-weight: 500;
+  color: #333;
 }
-
+.formula-bar .fx-cluster {
+  display: flex; align-items: center;
+  padding: 0 4px;
+  border-right: 1px solid var(--ribbon-border);
+  gap: 0;
+}
+.formula-bar .fx-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  width: 22px; height: 22px;
+  border-radius: 2px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  color: #666;
+  display: inline-grid; place-items: center;
+}
+.formula-bar .fx-btn:hover { background: #e5f1fb; border-color: #cce4f7; color: #222; }
+.formula-bar .fx-btn.cancel:hover { color: #b91c1c; }
+.formula-bar .fx-btn.commit:hover { color: var(--primary); }
+.formula-bar .fx-btn.fx { font-style: italic; font-weight: 600; }
 .formula-bar input {
   flex: 1;
-  border: 1px solid var(--aicell-border);
-  border-radius: 4px;
-  padding: 4px 8px;
+  border: none;
+  padding: 0 8px;
   font: inherit;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  background: transparent;
+  outline: none;
 }
 
 .grid-container {
@@ -544,16 +728,6 @@ body,
   cursor: not-allowed;
 }
 
-.toolbar .ask-claude {
-  background: #fff;
-  color: var(--primary);
-  border-color: #fff;
-  font-weight: 600;
-}
-
-.toolbar .ask-claude:hover {
-  background: rgba(255, 255, 255, 0.9);
-}
 
 /* Chart strip */
 .chart-strip {
@@ -687,180 +861,6 @@ body,
   cursor: not-allowed;
 }
 
-/* Menu bar */
-.menubar {
-  display: flex;
-  gap: 2px;
-  padding: 0 8px;
-  background: var(--ribbon-bg);
-  border-bottom: 1px solid var(--ribbon-border);
-  flex-shrink: 0;
-  font-size: 13px;
-  position: relative;
-  z-index: 10;
-}
-
-.menubar-menu {
-  position: relative;
-}
-
-.menubar-button {
-  background: none;
-  border: none;
-  padding: 6px 12px;
-  font: inherit;
-  font-size: 13px;
-  color: var(--text);
-  cursor: pointer;
-  border-radius: 3px;
-}
-
-.menubar-button:hover,
-.menubar-button.open {
-  background: var(--hover);
-}
-
-.menubar-button.open {
-  background: var(--active);
-}
-
-.menu-popup {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  margin: 2px 0 0;
-  padding: 4px 0;
-  min-width: 220px;
-  list-style: none;
-  background: white;
-  border: 1px solid var(--aicell-border);
-  border-radius: 4px;
-  box-shadow: 0 6px 24px rgba(15, 23, 42, 0.15);
-  z-index: 20;
-}
-
-.menu-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 5px 14px;
-  cursor: pointer;
-  color: var(--text);
-  white-space: nowrap;
-  gap: 24px;
-}
-
-.menu-item:hover {
-  background: var(--hover);
-}
-
-.menu-item.disabled {
-  color: #9ca3af;
-  cursor: default;
-}
-
-.menu-item.disabled:hover {
-  background: transparent;
-}
-
-.menu-shortcut {
-  font-size: 11px;
-  color: var(--aicell-header-fg);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-}
-
-.menu-sep {
-  height: 1px;
-  margin: 4px 0;
-  background: var(--aicell-border);
-}
-
-/* Format toolbar (ribbon-like) */
-.format-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 12px;
-  border-bottom: 1px solid var(--ribbon-border);
-  background: var(--ribbon-bg);
-  flex-shrink: 0;
-  font-size: 12px;
-  height: 32px;
-}
-
-.fmt-btn {
-  background: white;
-  border: 1px solid var(--ribbon-border);
-  border-radius: 3px;
-  padding: 2px 8px;
-  font-size: 12px;
-  cursor: pointer;
-  color: var(--text);
-  min-width: 26px;
-  height: 24px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.fmt-btn:hover {
-  background: var(--hover);
-}
-
-.fmt-btn.active {
-  background: var(--active);
-  border-color: var(--primary);
-  color: var(--primary-dark);
-}
-
-.fmt-clear {
-  margin-left: auto;
-  font-size: 11px;
-}
-
-.fmt-sep {
-  width: 1px;
-  height: 18px;
-  background: var(--aicell-border);
-  margin: 0 4px;
-}
-
-.fmt-color {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  background: white;
-  border: 1px solid var(--aicell-border);
-  border-radius: 4px;
-  padding: 2px 6px;
-  font-weight: 700;
-  cursor: pointer;
-  height: 24px;
-}
-
-.fmt-color input[type="color"] {
-  width: 18px;
-  height: 18px;
-  border: none;
-  padding: 0;
-  background: none;
-  cursor: pointer;
-}
-
-.fmt-bg {
-  font-weight: 400;
-}
-
-.fmt-select {
-  border: 1px solid var(--aicell-border);
-  border-radius: 4px;
-  padding: 2px 6px;
-  font: inherit;
-  font-size: 12px;
-  background: white;
-  height: 24px;
-  cursor: pointer;
-}
 
 /* Find & replace modal */
 .find-replace {
