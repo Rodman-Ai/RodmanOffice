@@ -67,12 +67,21 @@ html, body {
 
 .tile-grid {
   display: grid;
-  /* auto-fit + 400px minimum: 4 wider columns at desktop widths
-     (1920 → 4 cols ~466px each; 1500 → 3 cols ~480px). The
-     intermediate breakpoint below shrinks the minimum so
-     tablet widths still get 2–3 cols instead of dropping to 1. */
-  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  /* Explicit column counts per breakpoint — auto-fit was inconsistent
+     across browsers (Edge in particular sometimes capped at 2 cols
+     even on a 1920px viewport). Mobile-first: start at 1 col and
+     widen via min-width media queries below. */
+  grid-template-columns: 1fr;
   gap: 14px;
+}
+@media (min-width: 700px) {
+  .tile-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (min-width: 1100px) {
+  .tile-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (min-width: 1500px) {
+  .tile-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 
 .tile {
@@ -305,12 +314,10 @@ html, body {
 
 @media (max-width: 900px) {
   .about-grid { grid-template-columns: 1fr; gap: 14px; }
-  .tile-grid { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
 }
 
 @media (max-width: 520px) {
   .launcher { padding: 14px 18px 18px; }
-  .tile-grid { grid-template-columns: 1fr; }
   .about { margin-top: 36px; padding-top: 24px; }
   .about-heading { font-size: 19px; }
 }
