@@ -26,9 +26,9 @@ Open <http://localhost:8000/>.
 
 ```bash
 node -e "new Function(require('fs').readFileSync('app.js','utf8'))"
-node -e "new Function(require('fs').readFileSync('docx.js','utf8'))"
-node -e "new Function(require('fs').readFileSync('pdfio.js','utf8'))"
-node -e "new Function(require('fs').readFileSync('interop.js','utf8'))"
+node -e "new Function(require('fs').readFileSync('../lib/docs/docx.js','utf8'))"
+node -e "new Function(require('fs').readFileSync('../lib/docs/pdfio.js','utf8'))"
+node -e "new Function(require('fs').readFileSync('../lib/docs/interop.js','utf8'))"
 node -e "new Function(require('fs').readFileSync('sw.js','utf8'))"
 python3 -c "import html.parser; html.parser.HTMLParser().feed(open('index.html').read())"
 ```

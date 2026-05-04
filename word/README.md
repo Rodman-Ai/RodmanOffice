@@ -59,12 +59,13 @@ Full per-feature catalogue: [`FEATURES.md`](./FEATURES.md).
 | `.adoc` (AsciiDoc) | ✓ | — |
 | `.tex` (LaTeX) | ✓ | — |
 
-The DOCX writer + reader is in `docx.js`, the PDF writer + extractor
-in `pdfio.js`, every other format lives in `interop.js`. None of them
-have external dependencies — `docx.js` includes its own STORED-method
-ZIP writer (and a ZIP reader using the browser's `DecompressionStream`
-for DEFLATE), `pdfio.js` writes PDF 1.4 against the standard 14 Type-1
-fonts, and `interop.js` reuses `RodmanDocx`'s ZIP for ODT and EPUB.
+DOCX, PDF, RTF, ODT, EPUB, Markdown, AsciiDoc, LaTeX, HTML, and text
+import/export are bridged from the suite-level `../lib/docs/index.js`
+module. That shared module exposes the historical `window.RodmanDocx`,
+`window.RodmanPdf`, and `window.RodmanInterop` globals for the editor.
+Because those engines live outside the `word/` service-worker scope,
+offline import/export needs the shared `/lib/docs` assets to be available
+from browser cache or the network.
 
 ## Keyboard shortcuts
 
@@ -137,9 +138,6 @@ API (Save to file…), Web Speech API (read-aloud + dictation).
 .
 ├── index.html              # App shell, ribbon, modals, page
 ├── app.js                  # ~10.7k lines; section index at top
-├── docx.js                 # OOXML writer / reader + ZIP utils
-├── pdfio.js                # PDF 1.4 writer + text extractor
-├── interop.js              # ODT / RTF / EPUB / AsciiDoc / LaTeX
 ├── styles.css              # Themes, ribbon, modals, mobile, print
 ├── sw.js                   # Network-first service worker
 ├── manifest.webmanifest
@@ -150,6 +148,7 @@ API (Save to file…), Web Speech API (read-aloud + dictation).
 ├── FEATURES.md
 ├── CHANGELOG.md
 ├── CONTRIBUTING.md
+├── ../lib/docs/            # Shared document import/export engines
 └── ../.github/workflows/pages.yml
 ```
 

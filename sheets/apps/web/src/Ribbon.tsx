@@ -1,8 +1,8 @@
 // Excel-style ribbon for AiCell. Rebuilt to match the visual language of
 // /word/ and /slides/ (same .tabs / .ribbon / .ribbon-panel / .group /
 // .group-row / .group-label class names) but with Excel's green palette
-// and tab order (Home / Insert / Page Layout / Formulas / Data / Review /
-// View / Help). Per the design spec at
+// and tab order (Home / Insert / Formulas / Data / Review / View / Help).
+// Per the design spec at
 // /root/.claude/plans/ready-lets-go-for-dapper-nest-agent-ab4327fbd543327df.md.
 
 import { useState, type ReactNode } from "react";
@@ -55,12 +55,11 @@ const NUMBER_FORMATS: { key: NumberFormat; label: string }[] = [
   { key: "datetime", label: "Date & time" },
 ];
 
-type Tab = "home" | "insert" | "pageLayout" | "formulas" | "data" | "review" | "view" | "help";
+type Tab = "home" | "insert" | "formulas" | "data" | "review" | "view" | "help";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "home", label: "Home" },
   { id: "insert", label: "Insert" },
-  { id: "pageLayout", label: "Page Layout" },
   { id: "formulas", label: "Formulas" },
   { id: "data", label: "Data" },
   { id: "review", label: "Review" },
@@ -103,22 +102,6 @@ export function Ribbon({ a }: { a: RibbonActions }) {
             </Group>
 
             <Group label="Font">
-              <Row>
-                <select
-                  className="ribbon-combo"
-                  defaultValue=""
-                  title="Font family — coming soon"
-                  disabled
-                  style={{ width: 110 }}
-                >
-                  <option>Calibri</option>
-                </select>
-                <select className="ribbon-combo sm" defaultValue="11" title="Font size" disabled>
-                  {[8, 9, 10, 11, 12, 14, 16, 18, 24, 36].map((n) => (
-                    <option key={n} value={n}>{n}</option>
-                  ))}
-                </select>
-              </Row>
               <Row>
                 <Btn
                   active={!!fmt.bold}
@@ -262,17 +245,6 @@ export function Ribbon({ a }: { a: RibbonActions }) {
                 <Btn icon="↓" label="Export CSV" onClick={a.exportCsv} />
                 <Btn icon="↓" label="Export XLSX" onClick={a.exportXlsx} />
               </Row>
-            </Group>
-          </div>
-        )}
-
-        {tab === "pageLayout" && (
-          <div className="ribbon-panel active">
-            <Group label="Themes">
-              <Row><span className="ribbon-empty">Theme settings live in the View tab for v1.</span></Row>
-            </Group>
-            <Group label="Page setup">
-              <Row><span className="ribbon-empty">Page setup options coming soon.</span></Row>
             </Group>
           </div>
         )}

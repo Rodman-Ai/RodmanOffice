@@ -11,6 +11,7 @@ import { FindReplace } from "./FindReplace";
 import { ConditionalFormatModal } from "./ConditionalFormatModal";
 import { CommentModal } from "./CommentModal";
 import { AuditPanel } from "./AuditPanel";
+import { useReturnFocusOnClose } from "./useReturnFocusOnClose";
 import type { CellFormat } from "@aicell/shared";
 import {
   importSpreadsheetFile,
@@ -60,6 +61,7 @@ export function App() {
   const [cfOpen, setCfOpen] = useState(false);
   const [commentOpen, setCommentOpen] = useState(false);
   const [auditOpen, setAuditOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const formulaInputRef = useRef<HTMLInputElement>(null);
 
@@ -448,7 +450,7 @@ export function App() {
     panelOpen,
     togglePanel: () => setPanelOpen((v) => !v),
     openAudit: () => setAuditOpen(true),
-    about: () => alert("RodmanSheets — AI-native spreadsheet. Ask Claude what you'd normally click for."),
+    about: () => setAboutOpen(true),
   };
 
   return (
@@ -601,6 +603,69 @@ export function App() {
           onClose={() => setAuditOpen(false)}
         />
       )}
+      {aboutOpen && (
+        <AboutDialog
+          aiEnabled={aiEnabled}
+          offline={isOffline}
+          onClose={() => setAboutOpen(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+function AboutDialog({
+  aiEnabled,
+  offline,
+  onClose,
+}: {
+  aiEnabled: boolean;
+  offline: boolean;
+  onClose: () => void;
+}) {
+  useReturnFocusOnClose();
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div
+        className="modal about-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="aboutTitle"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <header className="modal-header">
+          <span id="aboutTitle">About RodmanSheets</span>
+          <button type="button" onClick={onClose} aria-label="Close">×</button>
+        </header>
+        <div className="about-modal-body">
+          <div className="about-modal-logo" aria-hidden>X</div>
+          <div>
+            <h2>RodmanSheets</h2>
+            <p>Spreadsheet editor for local workbook drafts, formulas, charts, comments, and CSV/XLSX handoff.</p>
+          </div>
+          <dl>
+            <div>
+              <dt>Storage</dt>
+              <dd>{offline ? "Browser demo mode" : "API autosave when connected"}</dd>
+            </div>
+            <div>
+              <dt>AI</dt>
+              <dd>{aiEnabled ? "Configured" : "Disabled until the API key is configured"}</dd>
+            </div>
+          </dl>
+        </div>
+        <footer className="modal-footer">
+          <span className="modal-hint">Esc closes this dialog.</span>
+        </footer>
+      </div>
     </div>
   );
 }

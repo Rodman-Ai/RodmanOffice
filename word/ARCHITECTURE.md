@@ -14,9 +14,9 @@ catalogue see [`FEATURES.md`](./FEATURES.md).
                   loads in order:
                            │
   ┌────────────┬───────────┴──────────┬────────────┐
-  │  docx.js   │       pdfio.js       │ interop.js │
-  │ window.    │  window.RodmanPdf    │ window.    │
-  │ RodmanDocx │                      │ RodmanInterop
+  │         ../lib/docs/index.js       │
+  │  bridges RodmanDocx / RodmanPdf /  │
+  │  RodmanInterop onto window         │
   └────────────┴──────────┬───────────┴────────────┘
                           │
                           ▼
@@ -35,15 +35,16 @@ catalogue see [`FEATURES.md`](./FEATURES.md).
                 └───────────────────────┘
 ```
 
-Every script attaches its public surface to `window` before `app.js`
-calls into it:
+In RodmanOffice, `index.html` imports `../lib/docs/index.js` and bridges
+the shared document engines onto the historical globals before `app.js`
+calls into them:
 
 | Global | Source | Public methods |
 |---|---|---|
 | `window.RW_BUILD`     | `app.js`     | `version`, `date`, `cache`, `label`. Single source of truth for the About dialog and the SW cache key. |
-| `window.RodmanDocx`   | `docx.js`    | `saveDocx(html, opts)`, `loadDocx(buffer)`, `__buildZip` and `__readZip` (reused by `interop.js` for ODT and EPUB). |
-| `window.RodmanPdf`    | `pdfio.js`   | `savePdf(html, opts)`, `loadPdf(buffer)`. |
-| `window.RodmanInterop`| `interop.js` | `rtfExport / odtExport / epubExport / mdExport / asciidocExport / latexExport / rtfImport / odtImport / epubImport`. |
+| `window.RodmanDocx`   | `../lib/docs/index.js` | `saveDocx(html, opts)`, `loadDocx(buffer)`, `__buildZip` and `__readZip` (reused for ODT and EPUB). |
+| `window.RodmanPdf`    | `../lib/docs/index.js` | `savePdf(html, opts)`, `loadPdf(buffer)`. |
+| `window.RodmanInterop`| `../lib/docs/index.js` | `rtfExport / odtExport / epubExport / mdExport / asciidocExport / latexExport / rtfImport / odtImport / epubImport`. |
 
 `app.js` is a single IIFE under `'use strict'`. Its top contains a
 **section index** describing every major region by line range.
@@ -77,9 +78,9 @@ calls into it:
                      │  user clicks Export …
                      ▼
    ┌────────────────────────────────────┐
-   │ Tier 3:  on-demand modules         │
-   │          docx.js / pdfio.js /      │
-   │          interop.js                │
+   │ Tier 3:  on-demand shared engines  │
+   │          ../lib/docs/index.js      │
+   │          (Docx/Pdf/Interop globals)│
    └────────────────────────────────────┘
 ```
 
@@ -228,9 +229,9 @@ only.
 ```bash
 # Syntax checks
 node -e "new Function(require('fs').readFileSync('app.js','utf8'))"
-node -e "new Function(require('fs').readFileSync('docx.js','utf8'))"
-node -e "new Function(require('fs').readFileSync('pdfio.js','utf8'))"
-node -e "new Function(require('fs').readFileSync('interop.js','utf8'))"
+node -e "new Function(require('fs').readFileSync('../lib/docs/docx.js','utf8'))"
+node -e "new Function(require('fs').readFileSync('../lib/docs/pdfio.js','utf8'))"
+node -e "new Function(require('fs').readFileSync('../lib/docs/interop.js','utf8'))"
 node -e "new Function(require('fs').readFileSync('sw.js','utf8'))"
 python3 -c "import html.parser; html.parser.HTMLParser().feed(open('index.html').read())"
 

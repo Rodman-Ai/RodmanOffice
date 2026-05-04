@@ -562,7 +562,6 @@ function ColChevronPopup({
       <button type="button" onClick={onSortDesc}>Sort Z → A</button>
       <hr />
       <button type="button" onClick={onDedupe}>Remove duplicates</button>
-      <button type="button" disabled title="Coming in a follow-up">Filter…</button>
     </div>
   );
 }

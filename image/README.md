@@ -6,8 +6,10 @@ snapshots — that ships **nine retro paint emulators as bonus modes**:
 MS Paint 95, Mario Paint, Kid Pix, MacPaint, Tux Paint, Paint Shop Pro,
 Procreate, Aseprite, and GIMP.
 
-No build step. No dependencies. Just static HTML, CSS, and vanilla JavaScript
-talking to the HTML5 Canvas and Web Audio APIs.
+No build step. The app shell is static HTML, CSS, and vanilla JavaScript
+talking to the HTML5 Canvas and Web Audio APIs. PSD and PDF workflows use
+the suite-level `../lib/images/` engines, including vendored `ag-psd` and
+PDF.js.
 
 | Mode               | Inspiration                | Where           |
 | ------------------ | -------------------------- | --------------- |
@@ -142,7 +144,9 @@ Highlights:
   add / delete / play and onion-skin preview.
 - **Sound mute** toggle (`Shift+M`), persisted.
 - **Autosave** — debounced 1.5 s after every stroke; reloads offer to restore.
-- **Installable PWA** with offline support (manifest + service worker).
+- **Installable PWA** with an offline app shell. Shared PSD/PDF engines
+  under `../lib/images/` must also be available from browser cache or the
+  network for those import/export paths.
 - **Last-used mode**, brush size, opacity, recent colors all persist.
 - **Reset all** — Shift-click ✕ Clear (or *File → Reset All Settings*).
 
@@ -242,6 +246,21 @@ image/
 - Helpers for tones, noise bursts, and frequency sweeps. All effects
   (`stampPlop`, `eraseSwoosh`, `wackyBoing`, `sprayHiss`, `pop`,
   `rainbow`, `explosion`, `ohNo`, `noteForColor`) are composed from those.
+
+### Shared image engines
+
+`image/index.html` bridges `../lib/images/index.js` onto `window.RodmanImageIO`.
+The app shell still owns drawing, layers, tools, and UI state; shared engines
+only cover file import/export helpers for PSD, PSB, PDF rasterization, and
+single-image PDF export.
+
+Vendored dependency inventory lives in [`../lib/images/README.md`](../lib/images/README.md).
+
+### Script-Fu trust boundary
+
+GIMP mode includes a Script-Fu console for trusted local JavaScript snippets.
+It is not a sandbox: snippets run in the page context and can access same-origin
+page state. Do not paste code from an untrusted source.
 
 ---
 

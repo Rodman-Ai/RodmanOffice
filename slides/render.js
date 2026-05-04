@@ -5,6 +5,51 @@
 
   const HANDLE_SIZE = 10;
   const RESIZE_DIRS = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
+  const TEXT_TAGS = new Set([
+    'A', 'B', 'BLOCKQUOTE', 'BR', 'CODE', 'DIV', 'EM', 'I', 'LI', 'OL',
+    'P', 'PRE', 'S', 'SPAN', 'STRONG', 'SUB', 'SUP', 'U', 'UL',
+  ]);
+  const DROP_TAGS = new Set([
+    'SCRIPT', 'STYLE', 'IFRAME', 'OBJECT', 'EMBED', 'SVG', 'MATH',
+    'LINK', 'META',
+  ]);
+
+  function sanitizeTextHtml(html) {
+    const template = document.createElement('template');
+    template.innerHTML = String(html || '');
+    for (const node of Array.from(template.content.querySelectorAll('*'))) {
+      if (DROP_TAGS.has(node.tagName)) {
+        node.remove();
+        continue;
+      }
+      if (!TEXT_TAGS.has(node.tagName)) {
+        const parent = node.parentNode;
+        while (node.firstChild) parent.insertBefore(node.firstChild, node);
+        node.remove();
+        continue;
+      }
+      for (const attr of Array.from(node.attributes)) {
+        const name = attr.name.toLowerCase();
+        const keepHref = node.tagName === 'A' && name === 'href' && isSafeUrl(attr.value);
+        const keepTarget = node.tagName === 'A' && name === 'target' && attr.value === '_blank';
+        if (!keepHref && !keepTarget) node.removeAttribute(attr.name);
+      }
+      if (node.tagName === 'A') {
+        node.rel = 'noopener noreferrer';
+      }
+    }
+    return template.innerHTML;
+  }
+
+  function isSafeUrl(value) {
+    if (String(value || '').trim().startsWith('#')) return true;
+    try {
+      const url = new URL(value, window.location.href);
+      return ['http:', 'https:', 'mailto:', 'tel:'].includes(url.protocol);
+    } catch (e) {
+      return false;
+    }
+  }
 
   // Render a slide into a container element. Container should be the
   // 1280x720 stage; this function clears it and re-creates element nodes.
@@ -74,7 +119,7 @@
     inner.className = 'slide-text';
     inner.dataset.role = el.role || 'free';
     inner.contentEditable = 'false'; // toggled to true on dblclick
-    inner.innerHTML = el.html || '';
+    inner.innerHTML = sanitizeTextHtml(el.html);
 
     const isTitle = el.role === 'title';
     const themeColor = isTitle ? 'var(--slide-title)' : 'var(--slide-body)';
@@ -404,7 +449,7 @@
   }
 
   window.RodmanRender = {
-    renderSlide, renderThumb, hitTest, clientToStage, applyResize,
+    renderSlide, renderThumb, hitTest, clientToStage, applyResize, sanitizeTextHtml,
     HANDLE_SIZE, RESIZE_DIRS,
   };
 })();

@@ -28,6 +28,7 @@
 
   // ---------- State ----------
   let deck = D.load() || D.newDeck();
+  sanitizeDeck(deck);
   let state = {
     selectedSlideId: deck.slides[0].id,
     selectedElementId: null,
@@ -89,6 +90,16 @@
     return [...state.selectedElementIds]
       .map((id) => D.findElement(slide, id))
       .filter(Boolean);
+  }
+
+  function sanitizeDeck(targetDeck) {
+    if (!targetDeck || !Array.isArray(targetDeck.slides)) return targetDeck;
+    targetDeck.slides.forEach((slide) => {
+      (slide.elements || []).forEach((el) => {
+        if (el.kind === 'text') el.html = R.sanitizeTextHtml(el.html);
+      });
+    });
+    return targetDeck;
   }
 
   // ---------- Image format panel (visible only when an image is selected) ----------
@@ -665,7 +676,7 @@
     sel.removeAllRanges(); sel.addRange(range);
 
     inner.addEventListener('blur', () => {
-      el.html = inner.innerHTML;
+      el.html = R.sanitizeTextHtml(inner.innerHTML);
       state.isEditingText = false;
       inner.contentEditable = 'false';
       scheduleSave();
@@ -1004,7 +1015,7 @@
     const wrap = inner.closest('.slide-element');
     if (!wrap) return;
     const el = D.findElement(activeSlide(), wrap.dataset.elementId);
-    if (el) el.html = inner.innerHTML;
+    if (el) el.html = R.sanitizeTextHtml(inner.innerHTML);
     scheduleSave();
   }
 
@@ -1040,7 +1051,7 @@
       try {
         const obj = JSON.parse(reader.result);
         if (!D.validate(obj)) { alert('That file does not look like a RodmanSlides deck.'); return; }
-        deck = obj;
+        deck = sanitizeDeck(obj);
         state.selectedSlideId = deck.slides[0].id;
         clearSelection();
         bootstrap();
@@ -1069,7 +1080,7 @@
       const fresh = D.newDeck();
       fresh.title = imported.title || f.name.replace(/\.pptx$/i, '');
       fresh.slides = imported.slides;
-      deck = fresh;
+      deck = sanitizeDeck(fresh);
       state.selectedSlideId = deck.slides[0] ? deck.slides[0].id : null;
       clearSelection();
       bootstrap();

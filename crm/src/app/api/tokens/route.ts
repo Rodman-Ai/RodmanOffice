@@ -1,14 +1,12 @@
 import { NextRequest } from "next/server";
+import { randomBytes } from "node:crypto";
 import { withAuth, ok, bad, newId, nowIso } from "@/lib/api";
 import { SHEETS } from "@/lib/google/schema";
 import { appendRow, readSheet } from "@/lib/google/sheets";
 import type { ApiToken } from "@/lib/types";
 
 function randomToken() {
-  const alpha = "abcdefghijklmnopqrstuvwxyz0123456789";
-  let out = "leo_pk_";
-  for (let i = 0; i < 24; i++) out += alpha[Math.floor(Math.random() * alpha.length)];
-  return out;
+  return `leo_pk_${randomBytes(24).toString("base64url")}`;
 }
 
 export async function GET() {

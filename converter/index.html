@@ -76,7 +76,7 @@
             <li>A <strong>Web Worker</strong> handles spreadsheet parsing off the main thread; document and image jobs run on the main thread (they need DOM canvas / DOMParser).</li>
             <li>Shared <code>/lib/</code> engines: hand-rolled DOCX, PDF (text + single-image), PPTX, RTF, ODT, EPUB, MD, HTML, AsciiDoc, LaTeX and CSV writers/readers.</li>
             <li>Vendored libraries: <code>@e965/xlsx</code> for XLSX, <code>ag-psd</code> for Photoshop files, <code>PDF.js</code> for "open any PDF as an image".</li>
-            <li>Installable PWA — works offline once loaded.</li>
+            <li>Installable PWA app shell; conversions need shared <code>/lib/</code> engines from network or browser cache.</li>
           </ul>
         </div>
         <div class="about-col">

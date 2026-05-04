@@ -22,10 +22,11 @@ Tag key:
 
 ## Progress
 
-First resolution pass completed:
+Resolution progress:
 
 - Done: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12.
 - Adjusted by preference: 14. The Sheets disabled AI button stays visible as an intentional setup affordance, with an inline code comment so future cleanup does not remove it.
+- Done in the second pass: 13, 15, 16, 17, 18, 19, 20, and 24.
 - Verified: CRM `npm run typecheck`, CRM `npm run build`, Sheets `corepack pnpm -r typecheck`, and focused static JavaScript syntax checks.
 
 ## Do First
