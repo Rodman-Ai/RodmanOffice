@@ -67,10 +67,11 @@ html, body {
 
 .tile-grid {
   display: grid;
-  /* auto-fit + 220px minimum: ~8 columns at 1920px wide
-     (7 tiles fit in one row), 6 cols at ~1500px, 5 cols at ~1100px,
-     gracefully down to 1 col on phones. */
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  /* auto-fit + 400px minimum: 4 wider columns at desktop widths
+     (1920 → 4 cols ~466px each; 1500 → 3 cols ~480px). The
+     intermediate breakpoint below shrinks the minimum so
+     tablet widths still get 2–3 cols instead of dropping to 1. */
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
   gap: 14px;
 }
 
@@ -311,6 +312,7 @@ html, body {
 
 @media (max-width: 900px) {
   .about-grid { grid-template-columns: 1fr; gap: 14px; }
+  .tile-grid { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
 }
 
 @media (max-width: 520px) {
