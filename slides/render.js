@@ -38,9 +38,17 @@
       boxSizing: 'border-box',
     });
 
-    if (opts.selectedId === el.id) {
-      wrap.classList.add('is-selected');
-    }
+    // selectedIds (set/array) marks all selected elements with a
+    // border; the primary (last-clicked) selectedId gets resize
+    // handles. Both are optional.
+    const selSet = opts.selectedIds
+      ? (opts.selectedIds instanceof Set ? opts.selectedIds : new Set(opts.selectedIds))
+      : (opts.selectedId ? new Set([opts.selectedId]) : new Set());
+    const isSelected = selSet.has(el.id);
+    const isPrimary = opts.selectedId === el.id;
+    if (isSelected) wrap.classList.add('is-selected');
+    if (isPrimary) wrap.classList.add('is-primary');
+    if (el.href) wrap.dataset.href = el.href;
 
     if (el.kind === 'text') {
       renderTextInto(wrap, el);
@@ -50,7 +58,7 @@
       renderImageInto(wrap, el);
     }
 
-    if (opts.editable && opts.selectedId === el.id) {
+    if (opts.editable && isPrimary) {
       addResizeHandles(wrap);
     }
 

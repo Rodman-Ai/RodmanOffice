@@ -70,6 +70,27 @@
     return D.findElement(activeSlide(), state.selectedElementId);
   }
 
+  // ---------- Multi-selection ----------
+  // state.selectedElementId holds the *primary* (last-clicked) selection
+  // for back-compat with single-element ops (formatting, properties).
+  // state.selectedElementIds is the full set; populated alongside.
+  state.selectedElementIds = new Set();
+
+  function setSelection(ids, primary) {
+    state.selectedElementIds = ids instanceof Set ? new Set(ids) : new Set(ids || []);
+    state.selectedElementId = primary != null
+      ? primary
+      : (state.selectedElementIds.size ? [...state.selectedElementIds].pop() : null);
+  }
+  function clearSelection() { setSelection([], null); }
+  function isSelected(id) { return state.selectedElementIds.has(id); }
+  function selectedElements() {
+    const slide = activeSlide();
+    return [...state.selectedElementIds]
+      .map((id) => D.findElement(slide, id))
+      .filter(Boolean);
+  }
+
   // ---------- Initial render ----------
   function bootstrap() {
     // Ensure selected slide still exists (e.g., after deck reset)
@@ -165,13 +186,12 @@
       item.className = 'slide-list-item';
       if (slide.id === state.selectedSlideId) item.classList.add('active');
       item.dataset.slideId = slide.id;
+      item.draggable = true;
       item.innerHTML = `
         <div class="sli-num">${i + 1}</div>
         <div class="sli-thumb"></div>
       `;
       const thumb = item.querySelector('.sli-thumb');
-      // Thumb wrapper is ~184px wide (16:9 aspect → ~104px tall),
-      // so scale 1280→184 = 0.144. Apply theme to the thumb stage.
       const scale = 184 / 1280;
       requestAnimationFrame(() => {
         const stageEl = document.createElement('div');
@@ -186,12 +206,9 @@
         T.applyToStage(stageEl, deck.theme);
         R.renderSlide(stageEl, slide, { editable: false, selectedId: null });
       });
-      item.addEventListener('click', (e) => {
-        if (e.shiftKey) {
-          // Reserved for future multi-select
-        }
+      item.addEventListener('click', () => {
         state.selectedSlideId = slide.id;
-        state.selectedElementId = null;
+        clearSelection();
         renderSlideList();
         renderEditor();
         paintTransitionStrip();
@@ -199,7 +216,6 @@
       });
       item.addEventListener('contextmenu', (e) => {
         e.preventDefault();
-        // Simple context: confirm to delete
         if (deck.slides.length > 1 && confirm(`Delete slide ${i + 1}?`)) {
           D.removeSlide(deck, slide.id);
           if (state.selectedSlideId === slide.id) {
@@ -208,6 +224,46 @@
           renderSlideList(); renderEditor(); updateStatusBar(); scheduleSave();
         }
       });
+
+      // Drag-to-reorder. dragstart stores the source slide id;
+      // dragover marks the drop target with a visual cue and
+      // chooses before/after based on cursor Y; drop calls
+      // D.moveSlide and re-renders.
+      item.addEventListener('dragstart', (e) => {
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('application/x-rodman-slide-id', slide.id);
+        item.classList.add('is-dragging');
+      });
+      item.addEventListener('dragend', () => {
+        item.classList.remove('is-dragging');
+        list.querySelectorAll('.is-drop-before, .is-drop-after').forEach((n) => {
+          n.classList.remove('is-drop-before', 'is-drop-after');
+        });
+      });
+      item.addEventListener('dragover', (e) => {
+        if (!e.dataTransfer.types.includes('application/x-rodman-slide-id')) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        const r = item.getBoundingClientRect();
+        const isBefore = (e.clientY - r.top) < r.height / 2;
+        item.classList.toggle('is-drop-before', isBefore);
+        item.classList.toggle('is-drop-after', !isBefore);
+      });
+      item.addEventListener('dragleave', () => {
+        item.classList.remove('is-drop-before', 'is-drop-after');
+      });
+      item.addEventListener('drop', (e) => {
+        e.preventDefault();
+        const sourceId = e.dataTransfer.getData('application/x-rodman-slide-id');
+        if (!sourceId || sourceId === slide.id) return;
+        const r = item.getBoundingClientRect();
+        const isBefore = (e.clientY - r.top) < r.height / 2;
+        const targetIdx = deck.slides.findIndex((s) => s.id === slide.id);
+        if (targetIdx === -1) return;
+        D.moveSlide(deck, sourceId, isBefore ? targetIdx : targetIdx + (deck.slides.findIndex((s) => s.id === sourceId) < targetIdx ? 0 : 1));
+        renderSlideList(); renderEditor(); updateStatusBar(); scheduleSave();
+      });
+
       list.appendChild(item);
     });
   }
@@ -236,6 +292,7 @@
     R.renderSlide(stageEl, slide, {
       editable: true,
       selectedId: state.selectedElementId,
+      selectedIds: state.selectedElementIds,
     });
     layoutEditor();
     if (state.showNotes) {
@@ -285,41 +342,95 @@
 
     const elNode = e.target.closest('.slide-element');
     if (!elNode) {
-      // Clicked empty stage → deselect
-      state.selectedElementId = null;
+      // Clicked empty stage → deselect (unless shift-modifier "preserve")
+      if (!e.shiftKey) clearSelection();
       renderEditor();
       return;
     }
     const elId = elNode.dataset.elementId;
-    state.selectedElementId = elId;
+    if (e.shiftKey) {
+      // Toggle: shift-click an already-selected element removes it,
+      // shift-click an unselected element adds it. Last-touched
+      // becomes the new primary.
+      const next = new Set(state.selectedElementIds);
+      if (next.has(elId)) {
+        next.delete(elId);
+        const primary = next.size ? [...next].pop() : null;
+        setSelection(next, primary);
+      } else {
+        next.add(elId);
+        setSelection(next, elId);
+      }
+    } else if (!state.selectedElementIds.has(elId)) {
+      // Click on an unselected element → start fresh single selection
+      setSelection([elId], elId);
+    } else {
+      // Click on an already-selected element keeps the multi-select
+      // intact and just promotes this one to primary so subsequent
+      // formatting / resize affect it.
+      setSelection(state.selectedElementIds, elId);
+    }
     renderEditor();
 
-    // Begin drag
-    const el = selectedElement();
-    if (!el) return;
+    // Begin group drag — capture starting positions for every selected
+    // element so we can move them all together.
+    const slide = activeSlide();
+    const sel = [...state.selectedElementIds]
+      .map((id) => D.findElement(slide, id))
+      .filter(Boolean);
+    if (!sel.length) return;
     drag = {
       kind: 'move',
       startX: e.clientX, startY: e.clientY,
-      start: { x: el.x, y: el.y },
+      starts: sel.map((el) => ({ id: el.id, x: el.x, y: el.y })),
     };
     e.preventDefault();
   }
 
   function onStageMouseMove(e) {
     if (!drag) return;
-    const el = selectedElement();
-    if (!el) return;
     const dx = (e.clientX - drag.startX) / state.zoom;
     const dy = (e.clientY - drag.startY) / state.zoom;
-    if (drag.kind === 'move') {
-      el.x = Math.round(drag.start.x + dx);
-      el.y = Math.round(drag.start.y + dy);
-    } else if (drag.kind === 'resize') {
+
+    if (drag.kind === 'resize') {
+      const el = selectedElement();
+      if (!el) return;
       const r = R.applyResize(drag.start, drag.dir, dx, dy);
       el.x = Math.round(r.x); el.y = Math.round(r.y);
       el.w = Math.round(r.w); el.h = Math.round(r.h);
+      updateElementNode(el);
+      drawSnapGuides([]);
+      return;
     }
-    // Live update: just adjust style, full re-render on mouseup
+
+    // kind === 'move': move every dragged element by the same (dx, dy),
+    // optionally snapped against sibling edges + slide center when
+    // exactly one element is being dragged.
+    let snapDx = dx, snapDy = dy;
+    let guides = [];
+    if (drag.starts.length === 1) {
+      const startEl = drag.starts[0];
+      const moving = D.findElement(activeSlide(), startEl.id);
+      if (moving) {
+        const snapped = computeSnap(moving, startEl.x + dx, startEl.y + dy);
+        snapDx = snapped.x - startEl.x;
+        snapDy = snapped.y - startEl.y;
+        guides = snapped.guides;
+      }
+    }
+
+    const slide = activeSlide();
+    drag.starts.forEach((start) => {
+      const el = D.findElement(slide, start.id);
+      if (!el) return;
+      el.x = Math.round(start.x + snapDx);
+      el.y = Math.round(start.y + snapDy);
+      updateElementNode(el);
+    });
+    drawSnapGuides(guides);
+  }
+
+  function updateElementNode(el) {
     const node = stageEl.querySelector(`[data-element-id="${el.id}"]`);
     if (node) {
       node.style.left = el.x + 'px';
@@ -329,9 +440,86 @@
     }
   }
 
+  // ---------- Smart alignment guides + snap ----------
+  const SNAP_THRESHOLD = 6; // px, in stage coords
+  function computeSnap(movingEl, proposedX, proposedY) {
+    const slide = activeSlide();
+    const w = movingEl.w, h = movingEl.h;
+    const movingEdgesX = [proposedX, proposedX + w / 2, proposedX + w]; // left, center, right
+    const movingEdgesY = [proposedY, proposedY + h / 2, proposedY + h]; // top, middle, bottom
+
+    // Candidate snap targets: each sibling element's three edges + slide center.
+    const SLIDE_W = D.SLIDE_W, SLIDE_H = D.SLIDE_H;
+    const targetsX = [SLIDE_W / 2];
+    const targetsY = [SLIDE_H / 2];
+    for (const el of slide.elements) {
+      if (el.id === movingEl.id) continue;
+      targetsX.push(el.x, el.x + el.w / 2, el.x + el.w);
+      targetsY.push(el.y, el.y + el.h / 2, el.y + el.h);
+    }
+
+    let bestDx = null, bestEdgeIdxX = -1, bestTargetX = null;
+    for (let mi = 0; mi < movingEdgesX.length; mi++) {
+      for (const t of targetsX) {
+        const d = t - movingEdgesX[mi];
+        if (Math.abs(d) <= SNAP_THRESHOLD && (bestDx === null || Math.abs(d) < Math.abs(bestDx))) {
+          bestDx = d; bestEdgeIdxX = mi; bestTargetX = t;
+        }
+      }
+    }
+    let bestDy = null, bestEdgeIdxY = -1, bestTargetY = null;
+    for (let mi = 0; mi < movingEdgesY.length; mi++) {
+      for (const t of targetsY) {
+        const d = t - movingEdgesY[mi];
+        if (Math.abs(d) <= SNAP_THRESHOLD && (bestDy === null || Math.abs(d) < Math.abs(bestDy))) {
+          bestDy = d; bestEdgeIdxY = mi; bestTargetY = t;
+        }
+      }
+    }
+
+    const finalX = proposedX + (bestDx || 0);
+    const finalY = proposedY + (bestDy || 0);
+    const guides = [];
+    if (bestDx !== null) guides.push({ kind: 'v', x: bestTargetX });
+    if (bestDy !== null) guides.push({ kind: 'h', y: bestTargetY });
+    return { x: finalX, y: finalY, guides };
+  }
+
+  function drawSnapGuides(guides) {
+    if (!stageEl) return;
+    let layer = stageEl.querySelector('.snap-guide-layer');
+    if (!layer) {
+      layer = document.createElement('div');
+      layer.className = 'snap-guide-layer';
+      Object.assign(layer.style, {
+        position: 'absolute', inset: '0',
+        pointerEvents: 'none',
+        zIndex: 999,
+      });
+      stageEl.appendChild(layer);
+    }
+    layer.innerHTML = '';
+    for (const g of guides) {
+      const ln = document.createElement('div');
+      Object.assign(ln.style, {
+        position: 'absolute',
+        background: '#ff44dd',
+        boxShadow: '0 0 0 0.5px #ff44dd',
+        pointerEvents: 'none',
+      });
+      if (g.kind === 'v') {
+        Object.assign(ln.style, { left: g.x + 'px', top: '0', width: '1px', height: '100%' });
+      } else {
+        Object.assign(ln.style, { left: '0', top: g.y + 'px', width: '100%', height: '1px' });
+      }
+      layer.appendChild(ln);
+    }
+  }
+
   function onStageMouseUp() {
     if (!drag) return;
     drag = null;
+    drawSnapGuides([]);
     renderEditor();
     scheduleSave();
   }
@@ -393,7 +581,7 @@
       R.renderSlide(stageEl, slide, { editable: false });
       item.addEventListener('click', () => {
         state.selectedSlideId = slide.id;
-        state.selectedElementId = null;
+        clearSelection();
         state.viewMode = 'normal';
         renderSlideList(); renderEditor(); updateStatusBar();
       });
@@ -415,7 +603,7 @@
     const i = deck.slides.findIndex((s) => s.id === state.selectedSlideId);
     const slide = D.addSlide(deck, { layout, afterIndex: i });
     state.selectedSlideId = slide.id;
-    state.selectedElementId = null;
+    clearSelection();
     renderSlideList(); renderEditor(); updateStatusBar(); scheduleSave();
   }
 
@@ -432,15 +620,30 @@
       const removed = D.removeSlide(deck, state.selectedSlideId);
       if (removed) {
         state.selectedSlideId = deck.slides[Math.max(0, i - 1)].id;
-        state.selectedElementId = null;
+        clearSelection();
         renderSlideList(); renderEditor(); updateStatusBar(); scheduleSave();
       }
     },
     deleteElement() {
       const slide = activeSlide();
-      if (!state.selectedElementId) return;
-      D.removeElement(slide, state.selectedElementId);
-      state.selectedElementId = null;
+      if (!state.selectedElementIds.size) return;
+      [...state.selectedElementIds].forEach((id) => D.removeElement(slide, id));
+      clearSelection();
+      renderEditor(); scheduleSave();
+    },
+    duplicateElement() {
+      const slide = activeSlide();
+      if (!state.selectedElementIds.size) return;
+      const newIds = [];
+      [...state.selectedElementIds].forEach((id) => {
+        const original = D.findElement(slide, id);
+        if (!original) return;
+        const copy = D.cloneElement(original);
+        copy.x += 20; copy.y += 20;
+        slide.elements.push(copy);
+        newIds.push(copy.id);
+      });
+      if (newIds.length) setSelection(newIds, newIds[newIds.length - 1]);
       renderEditor(); scheduleSave();
     },
     bringForward() {
@@ -470,6 +673,53 @@
         persistEditingText();
       }
     },
+    numberedList() {
+      const inner = currentEditingTextNode();
+      if (inner) {
+        document.execCommand('insertOrderedList');
+        persistEditingText();
+      }
+    },
+    indent() {
+      const inner = currentEditingTextNode();
+      if (inner) {
+        document.execCommand('indent');
+        persistEditingText();
+      }
+    },
+    outdent() {
+      const inner = currentEditingTextNode();
+      if (inner) {
+        document.execCommand('outdent');
+        persistEditingText();
+      }
+    },
+    insertLink() {
+      // Two paths:
+      // - If a text element is being edited and there's a selection,
+      //   wrap that selection in <a>.
+      // - Otherwise the active element gets an `href`; clicking it in
+      //   present mode opens the URL.
+      const inner = currentEditingTextNode();
+      if (inner) {
+        const sel = window.getSelection();
+        if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
+          alert('Select some text first, then click the link button.');
+          return;
+        }
+        const url = window.prompt('Link URL:', 'https://');
+        if (!url) return;
+        document.execCommand('createLink', false, url);
+        persistEditingText();
+        return;
+      }
+      const el = selectedElement();
+      if (!el) return;
+      const url = window.prompt('Link URL (opens in present mode):', el.href || 'https://');
+      if (url === null) return;
+      el.href = url || null;
+      renderEditor(); scheduleSave();
+    },
 
     insertText() {
       const slide = activeSlide();
@@ -478,7 +728,7 @@
         html: 'Click to edit', role: 'free',
         fontSize: 24, fontWeight: 400, align: 'left',
       }));
-      state.selectedElementId = slide.elements[slide.elements.length - 1].id;
+      setSelection([slide.elements[slide.elements.length - 1].id], slide.elements[slide.elements.length - 1].id);
       renderEditor(); scheduleSave();
     },
     insertImage() { $('#imageFileInput').click(); },
@@ -492,7 +742,7 @@
       slide.elements.push(D.newShapeElement({
         ...dims, shape, fill, strokeWidth: 0,
       }));
-      state.selectedElementId = slide.elements[slide.elements.length - 1].id;
+      setSelection([slide.elements[slide.elements.length - 1].id], slide.elements[slide.elements.length - 1].id);
       renderEditor(); scheduleSave();
     },
 
@@ -508,7 +758,7 @@
       if (!confirm('Discard current deck and start a new one?')) return;
       deck = D.newDeck();
       state.selectedSlideId = deck.slides[0].id;
-      state.selectedElementId = null;
+      clearSelection();
       bootstrap();
       scheduleSave();
     },
@@ -546,7 +796,7 @@
       D.clear();
       deck = D.newDeck();
       state.selectedSlideId = deck.slides[0].id;
-      state.selectedElementId = null;
+      clearSelection();
       bootstrap();
     },
 
@@ -609,7 +859,7 @@
       slide.elements.push(D.newImageElement({
         x: 320, y: 180, w: 640, h: 360, src: reader.result,
       }));
-      state.selectedElementId = slide.elements[slide.elements.length - 1].id;
+      setSelection([slide.elements[slide.elements.length - 1].id], slide.elements[slide.elements.length - 1].id);
       renderEditor(); scheduleSave();
     };
     reader.readAsDataURL(f);
@@ -626,7 +876,7 @@
         if (!D.validate(obj)) { alert('That file does not look like a RodmanSlides deck.'); return; }
         deck = obj;
         state.selectedSlideId = deck.slides[0].id;
-        state.selectedElementId = null;
+        clearSelection();
         bootstrap();
         scheduleSave();
       } catch (err) {
@@ -655,7 +905,7 @@
       fresh.slides = imported.slides;
       deck = fresh;
       state.selectedSlideId = deck.slides[0] ? deck.slides[0].id : null;
-      state.selectedElementId = null;
+      clearSelection();
       bootstrap();
       scheduleSave();
     } catch (err) {
@@ -777,6 +1027,36 @@
     }, 100);
   }
 
+  // ---------- Element clipboard (in-memory, cross-slide) ----------
+  // Stores cloned element JSON (no DOM references). Survives switching
+  // slides; lost on page reload (mirrors how Photoshop / PowerPoint's
+  // app-local clipboard works for object selections).
+  let elementClipboard = [];
+
+  function copySelectionToClipboard(cut) {
+    if (!state.selectedElementIds.size) return false;
+    const slide = activeSlide();
+    elementClipboard = [...state.selectedElementIds]
+      .map((id) => D.findElement(slide, id))
+      .filter(Boolean)
+      .map((el) => JSON.parse(JSON.stringify(el)));
+    if (cut) COMMANDS.deleteElement();
+    return true;
+  }
+  function pasteFromClipboard() {
+    if (!elementClipboard.length) return;
+    const slide = activeSlide();
+    const newIds = [];
+    elementClipboard.forEach((tpl) => {
+      const copy = D.cloneElement(tpl);
+      copy.x += 20; copy.y += 20;
+      slide.elements.push(copy);
+      newIds.push(copy.id);
+    });
+    setSelection(newIds, newIds[newIds.length - 1]);
+    renderEditor(); scheduleSave();
+  }
+
   // ---------- Keyboard shortcuts ----------
   document.addEventListener('keydown', (e) => {
     // Skip if user is typing in an input or contentEditable
@@ -794,21 +1074,64 @@
       e.preventDefault(); cmd_newSlide(); return;
     }
     if (mod && (e.key === 'd' || e.key === 'D')) {
-      e.preventDefault(); COMMANDS.duplicateSlide(); return;
+      // Ctrl+D: duplicate selected element(s) if any are selected,
+      // otherwise duplicate the slide (the original behaviour).
+      e.preventDefault();
+      if (state.selectedElementIds.size && !isEditableEl) COMMANDS.duplicateElement();
+      else COMMANDS.duplicateSlide();
+      return;
+    }
+    if (mod && (e.key === 'k' || e.key === 'K')) {
+      e.preventDefault(); COMMANDS.insertLink(); return;
+    }
+
+    // Clipboard operations only fire when we're not capturing the
+    // browser's native clipboard for text editing.
+    if (mod && !isEditableEl && !isFormField) {
+      if (e.key === 'c' || e.key === 'C') {
+        if (copySelectionToClipboard(false)) e.preventDefault();
+        return;
+      }
+      if (e.key === 'x' || e.key === 'X') {
+        if (copySelectionToClipboard(true)) e.preventDefault();
+        return;
+      }
+      if (e.key === 'v' || e.key === 'V') {
+        if (elementClipboard.length) { e.preventDefault(); pasteFromClipboard(); }
+        return;
+      }
     }
 
     if (!isFormField && !isEditableEl) {
-      if ((e.key === 'Delete' || e.key === 'Backspace') && state.selectedElementId) {
+      if ((e.key === 'Delete' || e.key === 'Backspace') && state.selectedElementIds.size) {
         e.preventDefault();
         COMMANDS.deleteElement();
         return;
+      }
+      // Arrow nudging — only when one or more elements are selected.
+      // Empty selection falls through to slide navigation below.
+      if (state.selectedElementIds.size && /^Arrow(Up|Down|Left|Right)$/.test(e.key)) {
+        const step = e.shiftKey ? 10 : 1;
+        let dx = 0, dy = 0;
+        if (e.key === 'ArrowLeft')  dx = -step;
+        if (e.key === 'ArrowRight') dx = step;
+        if (e.key === 'ArrowUp')    dy = -step;
+        if (e.key === 'ArrowDown')  dy = step;
+        const slide = activeSlide();
+        [...state.selectedElementIds].forEach((id) => {
+          const el = D.findElement(slide, id);
+          if (!el) return;
+          el.x += dx; el.y += dy;
+          updateElementNode(el);
+        });
+        e.preventDefault(); scheduleSave(); return;
       }
       if (e.key === 'ArrowDown' || e.key === 'PageDown') {
         e.preventDefault();
         const i = deck.slides.findIndex((s) => s.id === state.selectedSlideId);
         if (i < deck.slides.length - 1) {
           state.selectedSlideId = deck.slides[i + 1].id;
-          state.selectedElementId = null;
+          clearSelection();
           renderSlideList(); renderEditor(); updateStatusBar();
         }
         return;
@@ -818,11 +1141,19 @@
         const i = deck.slides.findIndex((s) => s.id === state.selectedSlideId);
         if (i > 0) {
           state.selectedSlideId = deck.slides[i - 1].id;
-          state.selectedElementId = null;
+          clearSelection();
           renderSlideList(); renderEditor(); updateStatusBar();
         }
         return;
       }
+    }
+
+    // Tab/Shift+Tab inside a text edit: indent / outdent
+    if (isEditableEl && e.key === 'Tab') {
+      e.preventDefault();
+      document.execCommand(e.shiftKey ? 'outdent' : 'indent');
+      persistEditingText();
+      return;
     }
   });
 
@@ -840,7 +1171,7 @@
         slide.elements.push(D.newImageElement({
           x: 320, y: 180, w: 640, h: 360, src: reader.result,
         }));
-        state.selectedElementId = slide.elements[slide.elements.length - 1].id;
+        setSelection([slide.elements[slide.elements.length - 1].id], slide.elements[slide.elements.length - 1].id);
         renderEditor(); scheduleSave();
       };
       reader.readAsDataURL(f);
