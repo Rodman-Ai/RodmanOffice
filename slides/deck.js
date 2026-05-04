@@ -237,6 +237,14 @@
     return true;
   }
 
+  // Deep-clone an element with a fresh id. Used by copy/paste,
+  // duplicate-element and the "drop the same image twice" path.
+  function cloneElement(el) {
+    const copy = JSON.parse(JSON.stringify(el));
+    copy.id = newId('el');
+    return copy;
+  }
+
   // Public API
   window.RodmanDeck = {
     SCHEMA, SLIDE_W, SLIDE_H, LAYOUTS,
@@ -245,5 +253,6 @@
     addSlide, removeSlide, duplicateSlide, moveSlide,
     findSlide, findElement, removeElement,
     bringForward, sendBackward,
+    cloneElement,
   };
 })();

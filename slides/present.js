@@ -43,6 +43,17 @@
 
       window.RodmanRender.renderSlide(stage, slide, { editable: false });
 
+      // In present mode, clicks on elements with an `href` open the URL.
+      // (Authored via the Insert → Link button or Ctrl+K in the editor.)
+      stage.addEventListener('click', (ev) => {
+        const node = ev.target.closest('.slide-element');
+        if (!node) return;
+        const el = slide.elements.find((e) => e.id === node.dataset.elementId);
+        if (!el || !el.href) return;
+        ev.preventDefault();
+        window.open(el.href, '_blank', 'noopener');
+      });
+
       if (prevStage) {
         // Animate transition; remove prev after animation completes
         stage.classList.add('enter');
