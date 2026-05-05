@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
-import { api } from "@/lib/client";
+import { api, appPath } from "@/lib/client";
 import { useUI } from "@/components/ui/UIProvider";
 import type { Activity, FormDef, Sequence } from "@/lib/types";
 
@@ -112,16 +112,17 @@ export default function FormsPage() {
           </div>
         ) : (
           forms.map((f) => {
+            const path = appPath(`/f/${f.slug}`);
             const url =
               typeof window !== "undefined"
-                ? `${window.location.origin}/f/${f.slug}`
-                : `/f/${f.slug}`;
+                ? `${window.location.origin}${path}`
+                : path;
             return (
               <div key={f.id} className="card">
                 <div className="flex items-center justify-between">
                   <h3 className="text-base font-semibold">{f.name}</h3>
                   <a
-                    href={`/f/${f.slug}`}
+                    href={path}
                     target="_blank"
                     rel="noreferrer"
                     className="text-xs text-leo-600 hover:underline"
@@ -129,7 +130,7 @@ export default function FormsPage() {
                     Open ↗
                   </a>
                 </div>
-                <p className="mt-1 text-xs text-slate-500">/f/{f.slug}</p>
+                <p className="mt-1 text-xs text-slate-500">{path}</p>
                 <div className="mt-2 break-all rounded-lg bg-slate-50 p-2 font-mono text-xs dark:bg-slate-800">
                   {url}
                 </div>

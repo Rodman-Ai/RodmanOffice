@@ -12,9 +12,9 @@ export function createQueue() {
   const items = new Map();
   return {
     items,
-    add(file) {
+    add(file, extra = {}) {
       const id = nextId++;
-      items.set(id, { id, file, status: 'pending', target: null, error: null });
+      items.set(id, { id, file, status: 'pending', target: null, error: null, blocked: false, ...extra });
       return id;
     },
     remove(id) { items.delete(id); },
@@ -30,6 +30,7 @@ export function createQueue() {
     pendingWithTargets() {
       return [...items.values()].filter((it) => (
         it.target && (it.status === 'pending' || it.status === 'error')
+        && !it.blocked
       ));
     },
   };

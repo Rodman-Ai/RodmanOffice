@@ -5,6 +5,7 @@
 // SW's scope (./), so we cannot precache it here. It's fetched from the
 // network on first PPTX import / export and HTTP-cached after that.
 const VERSION = 'rodman-slides-v2';
+const CACHE_PREFIX = 'rodman-slides-';
 const APP_SHELL = [
   './',
   './index.html',
@@ -28,7 +29,11 @@ self.addEventListener('install', (e) => {
 self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== VERSION).map((k) => caches.delete(k)))
+      Promise.all(
+        keys
+          .filter((k) => k.startsWith(CACHE_PREFIX) && k !== VERSION)
+          .map((k) => caches.delete(k))
+      )
     ).then(() => self.clients.claim())
   );
 });

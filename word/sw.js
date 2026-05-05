@@ -9,6 +9,7 @@
 // Keep VERSION in sync with RW_BUILD.cache in app.js so the About
 // dialog displays the same version users actually have cached.
 const VERSION = 'rwd-v10';
+const CACHE_PREFIX = 'rwd-';
 // Note: the doc engines now live in /lib/docs/ which is outside this
 // SW's scope (./), so we cannot precache them here. They're fetched
 // from the network on first load and then cached by the HTTP layer.
@@ -31,7 +32,11 @@ self.addEventListener('install', (e) => {
 self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== VERSION).map((k) => caches.delete(k)))
+      Promise.all(
+        keys
+          .filter((k) => k.startsWith(CACHE_PREFIX) && k !== VERSION)
+          .map((k) => caches.delete(k))
+      )
     ).then(() => self.clients.claim())
   );
 });

@@ -1,5 +1,6 @@
 // RodBooks service worker — cache-first for static shell, network-first for everything else.
 const CACHE = "rodbooks-shell-v2";
+const CACHE_PREFIX = "rodbooks-shell-";
 const SHELL = [
   "./",
   "./index.html",
@@ -16,7 +17,11 @@ self.addEventListener("install", (e) => {
 self.addEventListener("activate", (e) => {
   e.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))),
+      Promise.all(
+        keys
+          .filter((k) => k.startsWith(CACHE_PREFIX) && k !== CACHE)
+          .map((k) => caches.delete(k)),
+      ),
     ),
   );
   self.clients.claim();

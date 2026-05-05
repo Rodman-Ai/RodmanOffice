@@ -1,6 +1,7 @@
 // RodmanConvert service worker — offline app shell.
 // Network-first, cache-fallback. Mirrors /word/sw.js's strategy.
 const VERSION = 'rconv-v2';
+const CACHE_PREFIX = 'rconv-';
 const APP_SHELL = [
   './',
   './index.html',
@@ -24,7 +25,11 @@ self.addEventListener('install', (e) => {
 self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== VERSION).map((k) => caches.delete(k)))
+      Promise.all(
+        keys
+          .filter((k) => k.startsWith(CACHE_PREFIX) && k !== VERSION)
+          .map((k) => caches.delete(k))
+      )
     ).then(() => self.clients.claim())
   );
 });

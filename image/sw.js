@@ -1,5 +1,6 @@
 /* Retro Paint — minimal offline-cache service worker */
 const CACHE = 'retro-paint-v6';
+const CACHE_PREFIX = 'retro-paint-';
 const ASSETS = [
   './',
   './index.html',
@@ -20,7 +21,11 @@ self.addEventListener('install', (e) => {
 self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
+      Promise.all(
+        keys
+          .filter((k) => k.startsWith(CACHE_PREFIX) && k !== CACHE)
+          .map((k) => caches.delete(k))
+      )
     ).then(() => self.clients.claim())
   );
 });

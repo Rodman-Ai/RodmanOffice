@@ -118,7 +118,7 @@
     const inner = document.createElement('div');
     inner.className = 'slide-text';
     inner.dataset.role = el.role || 'free';
-    inner.contentEditable = 'false'; // toggled to true on dblclick
+    inner.contentEditable = 'false'; // toggled to true while editing
     inner.innerHTML = sanitizeTextHtml(el.html);
 
     const isTitle = el.role === 'title';

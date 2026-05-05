@@ -16,6 +16,7 @@ interface OwnerCreds {
   LEOCRM_SPREADSHEET_ID: string;
   LEOCRM_DRIVE_FOLDER_ID: string;
   LEOCRM_OWNER_REFRESH_TOKEN: string;
+  hasSessionRefreshToken?: boolean;
   configured: boolean;
 }
 
@@ -26,6 +27,7 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showToken, setShowToken] = useState(false);
+  const [revealingToken, setRevealingToken] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -43,6 +45,29 @@ export default function SettingsPage() {
       }
     })();
   }, []);
+
+  async function revealOwnerToken() {
+    if (showToken) {
+      setShowToken(false);
+      setCreds((c) => (c ? { ...c, LEOCRM_OWNER_REFRESH_TOKEN: "" } : c));
+      return;
+    }
+    setRevealingToken(true);
+    setError(null);
+    try {
+      const next = await api.get<OwnerCreds>("/api/owner-credentials?reveal=1");
+      setCreds(next);
+      setShowToken(true);
+      window.setTimeout(() => {
+        setShowToken(false);
+        setCreds((c) => (c ? { ...c, LEOCRM_OWNER_REFRESH_TOKEN: "" } : c));
+      }, 60_000);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setRevealingToken(false);
+    }
+  }
 
   return (
     <div>
@@ -123,10 +148,11 @@ export default function SettingsPage() {
                   LEOCRM_OWNER_REFRESH_TOKEN
                 </span>
                 <button
-                  onClick={() => setShowToken((s) => !s)}
+                  onClick={revealOwnerToken}
+                  disabled={revealingToken}
                   className="text-leo-600"
                 >
-                  {showToken ? "Hide" : "Reveal"}
+                  {showToken ? "Hide" : revealingToken ? "Revealing..." : "Reveal"}
                 </button>
               </div>
               <div className="mt-1 break-all">
@@ -137,9 +163,8 @@ export default function SettingsPage() {
             </div>
           </div>
           <p className="mt-3 text-xs text-amber-700 dark:text-amber-300">
-            Treat the refresh token like a password — it grants the same
-            Sheets/Drive/Gmail access you granted at sign-in. Store it only in
-            your own deployment&apos;s env config.
+            Treat the refresh token like a password. It is only fetched when
+            you reveal it, and it hides again after one minute.
           </p>
         </div>
       ) : null}

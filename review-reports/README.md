@@ -18,6 +18,7 @@ This folder contains separate reports for the suite as a whole, the shared libra
 - `09-documentation.md` - cross-repo documentation drift and missing docs
 - `10-ux-ui.md` - cross-app UX/UI review and most pressing UX priorities
 - `11-ranked-issues.md` - deduplicated ranked backlog, sorted by impact and effort
+- `12-current-code-review-findings.md` - latest code-review findings after the follow-up pass
 
 ## Severity Key
 

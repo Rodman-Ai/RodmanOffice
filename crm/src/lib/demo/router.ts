@@ -49,7 +49,9 @@ async function dispatch(ctx: RouteCtx): Promise<unknown> {
       LEOCRM_OWNER_EMAIL: "demo@yourco.example",
       LEOCRM_SPREADSHEET_ID: "demo-spreadsheet-id",
       LEOCRM_DRIVE_FOLDER_ID: "demo-drive-folder-id",
-      LEOCRM_OWNER_REFRESH_TOKEN: "(demo-mode — not applicable)",
+      LEOCRM_OWNER_REFRESH_TOKEN:
+        search.get("reveal") === "1" ? "(demo-mode - not applicable)" : "",
+      hasSessionRefreshToken: false,
       configured: false,
     };
   }

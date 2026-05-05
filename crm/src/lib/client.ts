@@ -1,6 +1,17 @@
 import { demoFetch } from "./demo/router";
 
 export const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === "1";
+export const APP_BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || "";
+
+export function appPath(path: string): string {
+  if (!path.startsWith("/")) return `${APP_BASE_PATH}/${path}`;
+  return `${APP_BASE_PATH}${path}`;
+}
+
+function fetchPath(url: string): string {
+  if (!APP_BASE_PATH || !url.startsWith("/api")) return url;
+  return `${APP_BASE_PATH}${url}`;
+}
 
 async function jsonFetch<T>(
   url: string,
@@ -13,7 +24,7 @@ async function jsonFetch<T>(
       body: body !== undefined ? JSON.stringify(body) : null,
     });
   }
-  const res = await fetch(url, {
+  const res = await fetch(fetchPath(url), {
     ...rest,
     headers: { "Content-Type": "application/json", ...(headers || {}) },
     body: body !== undefined ? JSON.stringify(body) : undefined,

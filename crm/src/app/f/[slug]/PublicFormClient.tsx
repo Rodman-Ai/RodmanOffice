@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { api } from "@/lib/client";
 
 interface PublicForm {
   name: string;
@@ -29,14 +30,8 @@ export default function PublicFormPage() {
   const [done, setDone] = useState(false);
 
   useEffect(() => {
-    fetch(`/api/forms/public?slug=${encodeURIComponent(params.slug)}`)
-      .then(async (r) => {
-        if (!r.ok) {
-          const j = (await r.json()) as { error?: string };
-          throw new Error(j.error ?? `HTTP ${r.status}`);
-        }
-        return r.json() as Promise<PublicForm>;
-      })
+    api
+      .get<PublicForm>(`/api/forms/public?slug=${encodeURIComponent(params.slug)}`)
       .then(setForm)
       .catch((e) => setError((e as Error).message));
   }, [params.slug]);
@@ -46,17 +41,12 @@ export default function PublicFormPage() {
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch("/api/forms/submit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slug: params.slug, values }),
-      });
-      const j = (await res.json()) as {
+      const j = await api.post<{
         ok?: boolean;
         error?: string;
         redirectUrl?: string;
-      };
-      if (!res.ok || !j.ok) {
+      }>("/api/forms/submit", { slug: params.slug, values });
+      if (!j.ok) {
         throw new Error(j.error ?? "Failed");
       }
       if (j.redirectUrl) {

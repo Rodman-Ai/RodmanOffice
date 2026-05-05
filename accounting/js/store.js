@@ -77,6 +77,8 @@ const defaults = () => ({
 
 let cache = null;
 const subscribers = new Set();
+const persistenceSubscribers = new Set();
+let persistenceState = { kind: "saved", error: null, at: 0 };
 
 // Encrypted-at-rest support (#70). When enabled, the localStorage blob is
 // "enc:v1:..." and we keep the in-memory state plain; writes re-encrypt.
@@ -86,6 +88,26 @@ let _writeSeq = 0;
 export function isVaultEncrypted() { return _encrypted; }
 export function enableVaultEncryption(encryptFn) { _encrypted = true; _encryptCb = encryptFn; write(); }
 export function disableVaultEncryption() { _encrypted = false; _encryptCb = null; write(); }
+
+function setPersistenceState(kind, error = null) {
+  persistenceState = { kind, error, at: Date.now() };
+  persistenceSubscribers.forEach((fn) => {
+    try { fn(persistenceState); } catch (e) { console.error(e); }
+  });
+}
+
+function persistRaw(targetKey, value, seq, { throwOnError = false } = {}) {
+  try {
+    localStorage.setItem(targetKey, value);
+    if (seq === _writeSeq) setPersistenceState("saved");
+    return true;
+  } catch (e) {
+    if (seq === _writeSeq) setPersistenceState("error", e);
+    console.warn("store write failed:", e);
+    if (throwOnError) throw e;
+    return false;
+  }
+}
 
 function read() {
   try {
@@ -141,7 +163,7 @@ export async function enableEncryptionWithPassphrase(passphrase) {
   const plaintext = JSON.stringify(cache);
   const blob = await enableWithPassphrase(passphrase, plaintext);
   _writeSeq++;
-  localStorage.setItem(KEY(), blob);
+  persistRaw(KEY(), blob, _writeSeq, { throwOnError: true });
   _encrypted = true;
   const { encryptCurrent } = await import("./cryptoVault.js");
   _encryptCb = encryptCurrent;
@@ -158,7 +180,7 @@ export async function disableEncryption() {
   disable();
   // Re-write as plaintext.
   _writeSeq++;
-  localStorage.setItem(KEY(), JSON.stringify(cache));
+  persistRaw(KEY(), JSON.stringify(cache), _writeSeq, { throwOnError: true });
 }
 
 function migrate(data) {
@@ -196,6 +218,7 @@ function migrate(data) {
 function write() {
   const plain = JSON.stringify(cache);
   const seq = ++_writeSeq;
+  setPersistenceState("saving");
   // Capture the target storage key at dispatch time so an in-flight async
   // encrypt from the previous profile can't write into the new profile's
   // blob during a profile switch. (Audit defect #7.)
@@ -204,12 +227,13 @@ function write() {
     // Encrypt asynchronously; only the latest write may persist. Without
     // this guard, a slower older encryption can overwrite newer state.
     _encryptCb(plain).then((blob) => {
-      if (seq === _writeSeq) localStorage.setItem(targetKey, blob);
+      if (seq === _writeSeq) persistRaw(targetKey, blob, seq);
     }).catch((e) => {
-      if (seq === _writeSeq) console.warn("encrypt write failed:", e);
+      if (seq === _writeSeq) setPersistenceState("error", e);
+      console.warn("encrypt write failed:", e);
     });
   } else {
-    localStorage.setItem(targetKey, plain);
+    persistRaw(targetKey, plain, seq);
   }
   subscribers.forEach((fn) => {
     try { fn(cache); } catch (e) { console.error(e); }
@@ -241,6 +265,16 @@ export function resetCache() { cache = null; }
 export function subscribe(fn) {
   subscribers.add(fn);
   return () => subscribers.delete(fn);
+}
+
+export function subscribePersistence(fn) {
+  persistenceSubscribers.add(fn);
+  fn(persistenceState);
+  return () => persistenceSubscribers.delete(fn);
+}
+
+export function getPersistenceState() {
+  return persistenceState;
 }
 
 /**

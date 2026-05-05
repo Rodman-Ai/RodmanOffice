@@ -28,6 +28,11 @@ let isConverting = false;
 
 const TXT_DEC = new TextDecoder('utf-8');
 const TXT_ENC = new TextEncoder();
+const MAX_QUEUE_FILES = 100;
+const MAX_FILE_BYTES = 50 * 1024 * 1024;
+const MAX_TOTAL_INPUT_BYTES = 200 * 1024 * 1024;
+const MAX_ZIP_INPUT_BYTES = 100 * 1024 * 1024;
+const MAX_ZIP_FILES = 25;
 
 // ---------- Worker dispatch (spreadsheets only) ----------
 
@@ -352,17 +357,21 @@ function renderRow(item) {
   if (item.status === 'converting') {
     status.textContent = 'Converting...';
   } else if (item.status === 'error') {
-    const retry = document.createElement('button');
-    retry.className = 'queue-retry';
-    retry.type = 'button';
-    retry.title = 'Retry conversion';
-    retry.setAttribute('aria-label', `Retry ${item.file.name}`);
-    retry.textContent = 'Retry';
-    retry.addEventListener('click', () => {
-      queue.setStatus(item.id, 'pending', { error: null });
-      render();
-    });
-    status.appendChild(retry);
+    if (item.blocked) {
+      status.textContent = 'Blocked';
+    } else {
+      const retry = document.createElement('button');
+      retry.className = 'queue-retry';
+      retry.type = 'button';
+      retry.title = 'Retry conversion';
+      retry.setAttribute('aria-label', `Retry ${item.file.name}`);
+      retry.textContent = 'Retry';
+      retry.addEventListener('click', () => {
+        queue.setStatus(item.id, 'pending', { error: null });
+        render();
+      });
+      status.appendChild(retry);
+    }
   }
 
   const remove = document.createElement('button');
@@ -386,17 +395,54 @@ function humanSize(n) {
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function queuedInputBytes() {
+  let total = 0;
+  for (const item of queue.items.values()) {
+    if (!item.blocked) total += item.file.size || 0;
+  }
+  return total;
+}
+
+async function detectFile(file) {
+  const headBuf = await file.slice(0, 16).arrayBuffer();
+  return detect(file.name, new Uint8Array(headBuf));
+}
+
+async function readSource(item) {
+  if (item.file.size > MAX_FILE_BYTES) {
+    throw new Error(`File is larger than the ${humanSize(MAX_FILE_BYTES)} per-file limit.`);
+  }
+  const buf = await item.file.arrayBuffer();
+  return {
+    bytes: buf,
+    mime: item.detected.mime,
+    name: item.file.name,
+    family: item.detected.family,
+  };
+}
+
 // ---------- File intake ----------
 
 async function addFiles(fileList) {
+  let total = queuedInputBytes();
   for (const file of fileList) {
-    const buf = await file.arrayBuffer();
-    const headBytes = new Uint8Array(buf, 0, Math.min(16, buf.byteLength));
-    const detected = detect(file.name, headBytes);
-    const id = queue.add(file);
-    const item = queue.items.get(id);
-    item.detected = detected;
-    item.bytes = buf;
+    if (queue.items.size >= MAX_QUEUE_FILES) {
+      window.alert(`Queue limit reached (${MAX_QUEUE_FILES} files).`);
+      break;
+    }
+    const detected = await detectFile(file);
+    const tooLarge = file.size > MAX_FILE_BYTES;
+    const wouldExceedTotal = !tooLarge && total + file.size > MAX_TOTAL_INPUT_BYTES;
+    const id = queue.add(file, { detected });
+    if (!tooLarge && !wouldExceedTotal) total += file.size;
+    if (tooLarge || wouldExceedTotal) {
+      queue.setStatus(id, 'error', {
+        blocked: true,
+        error: tooLarge
+          ? `File is larger than ${humanSize(MAX_FILE_BYTES)}.`
+          : `Adding this file would exceed the ${humanSize(MAX_TOTAL_INPUT_BYTES)} queue limit.`,
+      });
+    }
   }
   render();
 }
@@ -405,10 +451,14 @@ async function addFiles(fileList) {
 
 async function convertAll() {
   if (isConverting) return;
-  const bundleZip = zipToggle.checked;
-  const collected = [];
   const jobs = queue.pendingWithTargets();
   if (jobs.length === 0) return;
+  const estimatedInputBytes = jobs.reduce((sum, item) => sum + (item.file.size || 0), 0);
+  const bundleZip = zipToggle.checked && jobs.length <= MAX_ZIP_FILES && estimatedInputBytes <= MAX_ZIP_INPUT_BYTES;
+  if (zipToggle.checked && !bundleZip) {
+    window.alert(`Zip bundling is limited to ${MAX_ZIP_FILES} files and ${humanSize(MAX_ZIP_INPUT_BYTES)} of input. Files will download individually.`);
+  }
+  const collected = [];
   isConverting = true;
   render();
 
@@ -416,12 +466,7 @@ async function convertAll() {
     queue.setStatus(item.id, 'converting', { error: null });
     render();
     try {
-      const source = {
-        bytes: item.bytes.slice(0),
-        mime: item.detected.mime,
-        name: item.file.name,
-        family: item.detected.family,
-      };
+      const source = await readSource(item);
       let output;
       // Cross-family bridge: PDF source + image target → rasterize.
       const sourceExt = (source.name.split('.').pop() || '').toLowerCase();

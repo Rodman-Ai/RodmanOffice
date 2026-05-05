@@ -493,6 +493,7 @@ body {
 
 .slide-element {
   user-select: none;
+  touch-action: none;
   cursor: move;
 }
 .slide-element.is-selected {
@@ -554,6 +555,8 @@ body {
 .slide-text[contenteditable="true"] {
   outline: none;
   background: rgba(255, 255, 255, 0.05);
+  cursor: text;
+  user-select: text;
 }
 
 .resize-handle { z-index: 10; }

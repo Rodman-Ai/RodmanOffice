@@ -1,23 +1,12 @@
-import { useState, useRef, useEffect, useCallback, type ChangeEvent } from "react";
-import { a1, type Workbook, cellKey } from "@aicell/shared";
-import { useWorkbook, newBlankWorkbook } from "./useWorkbook";
+import { lazy, Suspense, useState, useRef, useEffect, useCallback, type ChangeEvent } from "react";
+import { a1, type Cell, type Workbook, cellKey } from "@aicell/shared";
+import { useWorkbook, newBlankWorkbook, type CellEdit } from "./useWorkbook";
 import { Grid } from "./Grid";
 import { SidePanel } from "./SidePanel";
 import { SheetTabs } from "./SheetTabs";
-import { ChartStrip } from "./ChartStrip";
 import { Ribbon, type RibbonActions } from "./Ribbon";
-import { FunctionPicker } from "./FunctionPicker";
-import { FindReplace } from "./FindReplace";
-import { ConditionalFormatModal } from "./ConditionalFormatModal";
-import { CommentModal } from "./CommentModal";
-import { AuditPanel } from "./AuditPanel";
 import { useReturnFocusOnClose } from "./useReturnFocusOnClose";
 import type { CellFormat } from "@aicell/shared";
-import {
-  importSpreadsheetFile,
-  exportSheetAsCSV,
-  exportWorkbookAsXLSX,
-} from "./csv";
 import {
   parseTSV,
   serializeCell,
@@ -27,6 +16,13 @@ import {
   type Range,
 } from "./clipboard";
 import { listWorkbooks, loadWorkbook, saveWorkbook, getHealth, isOffline } from "./api";
+
+const ChartStrip = lazy(() => import("./ChartStrip").then((m) => ({ default: m.ChartStrip })));
+const FunctionPicker = lazy(() => import("./FunctionPicker").then((m) => ({ default: m.FunctionPicker })));
+const FindReplace = lazy(() => import("./FindReplace").then((m) => ({ default: m.FindReplace })));
+const ConditionalFormatModal = lazy(() => import("./ConditionalFormatModal").then((m) => ({ default: m.ConditionalFormatModal })));
+const CommentModal = lazy(() => import("./CommentModal").then((m) => ({ default: m.CommentModal })));
+const AuditPanel = lazy(() => import("./AuditPanel").then((m) => ({ default: m.AuditPanel })));
 
 const AUTOSAVE_DEBOUNCE_MS = 800;
 
@@ -64,6 +60,7 @@ export function App() {
   const [aboutOpen, setAboutOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const formulaInputRef = useRef<HTMLInputElement>(null);
+  const formulaEditRef = useRef<{ row: number; col: number; raw: string } | null>(null);
 
   const bootedRef = useRef(false);
   useEffect(() => {
@@ -128,6 +125,7 @@ export function App() {
     if (!file) return;
     setBusy(true);
     try {
+      const { importSpreadsheetFile } = await import("./csv");
       const sheets = await importSpreadsheetFile(file);
       const [first, ...rest] = sheets;
       if (first) api.loadSheet(first);
@@ -327,13 +325,13 @@ export function App() {
       if (c > maxCol) maxCol = c;
     }
     if (maxRow < 0) return;
-    const rows: { keyVal: string; values: (string | undefined)[] }[] = [];
+    const rows: { keyVal: string; cells: (Cell | undefined)[] }[] = [];
     for (let r = 0; r <= maxRow; r++) {
-      const values: (string | undefined)[] = [];
+      const cells: (Cell | undefined)[] = [];
       for (let c = 0; c <= maxCol; c++) {
-        values.push(sheet.cells[cellKey(r, c)]?.raw);
+        cells.push(sheet.cells[cellKey(r, c)]);
       }
-      rows.push({ keyVal: values[col] ?? "", values });
+      rows.push({ keyVal: cells[col]?.raw ?? "", cells });
     }
     rows.sort((a, b) => {
       const an = Number(a.keyVal);
@@ -342,10 +340,14 @@ export function App() {
       const cmp = bothNum ? an - bn : a.keyVal.localeCompare(b.keyVal);
       return ascending ? cmp : -cmp;
     });
-    const edits = [];
+    const edits: CellEdit[] = [];
     for (let r = 0; r < rows.length; r++) {
       for (let c = 0; c <= maxCol; c++) {
-        edits.push({ row: r, col: c, raw: rows[r]!.values[c] ?? "" });
+        edits.push({
+          row: r,
+          col: c,
+          cell: rows[r]!.cells[c] ? { ...rows[r]!.cells[c]! } : null,
+        });
       }
     }
     api.setCellsOnSheetBatch(sheet.name, edits);
@@ -362,21 +364,21 @@ export function App() {
     }
     if (maxRow < 0) return;
     const seen = new Set<string>();
-    const kept: (string | undefined)[][] = [];
+    const kept: (Cell | undefined)[][] = [];
     for (let r = 0; r <= maxRow; r++) {
       const v = sheet.cells[cellKey(r, col)]?.raw ?? "";
       if (v === "" || !seen.has(v)) {
         if (v !== "") seen.add(v);
-        const row: (string | undefined)[] = [];
-        for (let c = 0; c <= maxCol; c++) row.push(sheet.cells[cellKey(r, c)]?.raw);
+        const row: (Cell | undefined)[] = [];
+        for (let c = 0; c <= maxCol; c++) row.push(sheet.cells[cellKey(r, c)]);
         kept.push(row);
       }
     }
-    const edits = [];
+    const edits: CellEdit[] = [];
     for (let r = 0; r <= maxRow; r++) {
       for (let c = 0; c <= maxCol; c++) {
-        const raw = r < kept.length ? kept[r]![c] ?? "" : "";
-        edits.push({ row: r, col: c, raw });
+        const cell = r < kept.length ? kept[r]![c] : undefined;
+        edits.push({ row: r, col: c, cell: cell ? { ...cell } : null });
       }
     }
     api.setCellsOnSheetBatch(sheet.name, edits);
@@ -398,6 +400,28 @@ export function App() {
       : isOffline
         ? `Demo mode (no backend) · ${baseStatus}`
         : baseStatus;
+
+  function beginFormulaEdit(): void {
+    formulaEditRef.current = {
+      row: anchor.row,
+      col: anchor.col,
+      raw: api.getRaw(anchor.row, anchor.col),
+    };
+  }
+
+  function commitFormulaEdit(): void {
+    formulaEditRef.current = null;
+    formulaInputRef.current?.blur();
+  }
+
+  function cancelFormulaEdit(): void {
+    const started = formulaEditRef.current;
+    if (started && started.row === anchor.row && started.col === anchor.col) {
+      api.setCell(anchor.row, anchor.col, started.raw);
+    }
+    formulaEditRef.current = null;
+    formulaInputRef.current?.blur();
+  }
 
   // Insert SUM at the active cell. Picks a sensible default range
   // from the current selection: a single cell becomes =SUM(<col-above>),
@@ -425,8 +449,8 @@ export function App() {
       setSelection(ORIGIN_RANGE);
     },
     importFile: triggerImport,
-    exportCsv: () => exportSheetAsCSV(api.activeSheet),
-    exportXlsx: () => exportWorkbookAsXLSX(api.workbook),
+    exportCsv: () => void import("./csv").then(({ exportSheetAsCSV }) => exportSheetAsCSV(api.activeSheet)),
+    exportXlsx: () => void import("./csv").then(({ exportWorkbookAsXLSX }) => exportWorkbookAsXLSX(api.workbook)),
     undo: api.undo,
     redo: api.redo,
     canUndo: api.canUndo,
@@ -452,6 +476,7 @@ export function App() {
     openAudit: () => setAuditOpen(true),
     about: () => setAboutOpen(true),
   };
+  const hasCharts = (api.activeSheet.charts?.length ?? 0) > 0;
 
   return (
     <div className={`app${panelOpen ? " with-panel" : ""}`}>
@@ -498,8 +523,20 @@ export function App() {
       <div className="formula-bar">
         <span className="name-box" title="Active cell / range">{rangeLabel}</span>
         <span className="fx-cluster">
-          <button type="button" className="fx-btn cancel" title="Cancel edit (Esc)">×</button>
-          <button type="button" className="fx-btn commit" title="Commit edit (Enter)">✓</button>
+          <button
+            type="button"
+            className="fx-btn cancel"
+            title="Cancel edit (Esc)"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={cancelFormulaEdit}
+          >×</button>
+          <button
+            type="button"
+            className="fx-btn commit"
+            title="Commit edit (Enter)"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={commitFormulaEdit}
+          >✓</button>
           <button
             type="button"
             className="fx-btn fx"
@@ -510,6 +547,19 @@ export function App() {
         <input
           ref={formulaInputRef}
           value={selRaw}
+          onFocus={beginFormulaEdit}
+          onBlur={() => {
+            formulaEditRef.current = null;
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              e.preventDefault();
+              cancelFormulaEdit();
+            } else if (e.key === "Enter") {
+              e.preventDefault();
+              commitFormulaEdit();
+            }
+          }}
           onChange={(e) =>
             api.setCell(anchor.row, anchor.col, e.target.value)
           }
@@ -531,10 +581,14 @@ export function App() {
             onSortColumn={sortActiveSheetByColumn}
             onRemoveDupesInColumn={removeDuplicatesInColumn}
           />
-          <ChartStrip
-            sheet={api.activeSheet}
-            onRemove={(chartId) => api.removeChart(api.activeSheet.name, chartId)}
-          />
+          {hasCharts && (
+            <Suspense fallback={null}>
+              <ChartStrip
+                sheet={api.activeSheet}
+                onRemove={(chartId) => api.removeChart(api.activeSheet.name, chartId)}
+              />
+            </Suspense>
+          )}
           <SheetTabs
             sheets={api.workbook.sheets}
             activeId={api.activeSheet.id}
@@ -554,54 +608,64 @@ export function App() {
         )}
       </div>
       {pickerOpen && (
-        <FunctionPicker
-          onClose={() => setPickerOpen(false)}
-          onPick={(entry) => {
-            setPickerOpen(false);
-            insertFunctionAtSelection(entry.name);
-          }}
-        />
+        <Suspense fallback={null}>
+          <FunctionPicker
+            onClose={() => setPickerOpen(false)}
+            onPick={(entry) => {
+              setPickerOpen(false);
+              insertFunctionAtSelection(entry.name);
+            }}
+          />
+        </Suspense>
       )}
       {findOpen && (
-        <FindReplace
-          sheet={api.activeSheet}
-          onClose={() => setFindOpen(false)}
-          onJumpTo={(row, col) =>
-            setSelection({ startRow: row, startCol: col, endRow: row, endCol: col })
-          }
-          onApply={(sheetName, edits) => api.setCellsOnSheetBatch(sheetName, edits)}
-        />
+        <Suspense fallback={null}>
+          <FindReplace
+            sheet={api.activeSheet}
+            onClose={() => setFindOpen(false)}
+            onJumpTo={(row, col) =>
+              setSelection({ startRow: row, startCol: col, endRow: row, endCol: col })
+            }
+            onApply={(sheetName, edits) => api.setCellsOnSheetBatch(sheetName, edits)}
+          />
+        </Suspense>
       )}
       {cfOpen && (
-        <ConditionalFormatModal
-          rules={api.activeSheet.conditionalRules ?? []}
-          selection={selection}
-          onAdd={(rule) => api.addConditionalRule(api.activeSheet.name, rule)}
-          onRemove={(id) => api.removeConditionalRule(api.activeSheet.name, id)}
-          onClose={() => setCfOpen(false)}
-        />
+        <Suspense fallback={null}>
+          <ConditionalFormatModal
+            rules={api.activeSheet.conditionalRules ?? []}
+            selection={selection}
+            onAdd={(rule) => api.addConditionalRule(api.activeSheet.name, rule)}
+            onRemove={(id) => api.removeConditionalRule(api.activeSheet.name, id)}
+            onClose={() => setCfOpen(false)}
+          />
+        </Suspense>
       )}
       {commentOpen && (
-        <CommentModal
-          row={anchor.row}
-          col={anchor.col}
-          current={api.getCellComment(anchor.row, anchor.col)}
-          onSave={(text) => api.setCellComment(api.activeSheet.name, anchor.row, anchor.col, text)}
-          onClear={() => api.clearCellComment(api.activeSheet.name, anchor.row, anchor.col)}
-          onClose={() => setCommentOpen(false)}
-        />
+        <Suspense fallback={null}>
+          <CommentModal
+            row={anchor.row}
+            col={anchor.col}
+            current={api.getCellComment(anchor.row, anchor.col)}
+            onSave={(text) => api.setCellComment(api.activeSheet.name, anchor.row, anchor.col, text)}
+            onClear={() => api.clearCellComment(api.activeSheet.name, anchor.row, anchor.col)}
+            onClose={() => setCommentOpen(false)}
+          />
+        </Suspense>
       )}
       {auditOpen && (
-        <AuditPanel
-          workbook={api.workbook}
-          getComputedAt={api.getComputedOnSheet}
-          onJumpTo={(sheetName, row, col) => {
-            const sheet = api.workbook.sheets.find((s) => s.name === sheetName);
-            if (sheet) api.setActiveSheet(sheet.id);
-            setSelection({ startRow: row, startCol: col, endRow: row, endCol: col });
-          }}
-          onClose={() => setAuditOpen(false)}
-        />
+        <Suspense fallback={null}>
+          <AuditPanel
+            workbook={api.workbook}
+            getComputedAt={api.getComputedOnSheet}
+            onJumpTo={(sheetName, row, col) => {
+              const sheet = api.workbook.sheets.find((s) => s.name === sheetName);
+              if (sheet) api.setActiveSheet(sheet.id);
+              setSelection({ startRow: row, startCol: col, endRow: row, endCol: col });
+            }}
+            onClose={() => setAuditOpen(false)}
+          />
+        </Suspense>
       )}
       {aboutOpen && (
         <AboutDialog

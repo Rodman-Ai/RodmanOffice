@@ -3,6 +3,7 @@ import { CalcEngine, aiRegistry, type CellComputed } from "@aicell/calc";
 import {
   type Workbook,
   type Sheet,
+  type Cell,
   type ChartSpec,
   type CellFormat,
   type CellComment,
@@ -17,7 +18,7 @@ if (!isOffline) {
   aiRegistry.setRunner(({ fn, prompt, args }) => callAiCell({ fn, prompt, args }));
 }
 
-export type CellEdit = { row: number; col: number; raw: string };
+export type CellEdit = { row: number; col: number; raw?: string; cell?: Cell | null };
 
 export type WorkbookApi = {
   workbook: Workbook;
@@ -75,6 +76,27 @@ export const newBlankWorkbook = (id: string, name = "Untitled"): Workbook => ({
 
 const cloneWorkbook = (wb: Workbook): Workbook =>
   typeof structuredClone === "function" ? structuredClone(wb) : JSON.parse(JSON.stringify(wb));
+
+function nextCellWithRaw(existing: Cell | undefined, raw: string): Cell | undefined {
+  if (raw === "") {
+    if (!existing?.format && !existing?.comment) return undefined;
+    return { ...existing, raw: "" };
+  }
+  return existing ? { ...existing, raw } : { raw };
+}
+
+function cloneCell(cell: Cell): Cell {
+  return {
+    ...cell,
+    format: cell.format ? { ...cell.format } : undefined,
+    comment: cell.comment ? { ...cell.comment } : undefined,
+  };
+}
+
+function cellFromEdit(existing: Cell | undefined, edit: CellEdit): Cell | undefined {
+  if ("cell" in edit) return edit.cell ? cloneCell(edit.cell) : undefined;
+  return nextCellWithRaw(existing, edit.raw ?? "");
+}
 
 /** Suffix the proposed name with " (2)", " (3)", … until it doesn't collide. */
 function uniqueSheetName(proposed: string, existing: Sheet[]): string {
@@ -159,13 +181,9 @@ export function useWorkbook(): WorkbookApi {
           if (s.id !== activeSheetId) return s;
           const cells = { ...s.cells };
           const existing = cells[key];
-          if (raw === "") {
-            // Preserve format on empty cells; only delete when there's no format either.
-            if (existing?.format) cells[key] = { raw: "", format: existing.format };
-            else delete cells[key];
-          } else {
-            cells[key] = existing?.format ? { raw, format: existing.format } : { raw };
-          }
+          const next = nextCellWithRaw(existing, raw);
+          if (next) cells[key] = next;
+          else delete cells[key];
           return {
             ...s,
             cells,
@@ -295,12 +313,9 @@ export function useWorkbook(): WorkbookApi {
           if (s.name !== sheetName) return s;
           const cells = { ...s.cells };
           const existing = cells[key];
-          if (raw === "") {
-            if (existing?.format) cells[key] = { raw: "", format: existing.format };
-            else delete cells[key];
-          } else {
-            cells[key] = existing?.format ? { raw, format: existing.format } : { raw };
-          }
+          const next = nextCellWithRaw(existing, raw);
+          if (next) cells[key] = next;
+          else delete cells[key];
           return {
             ...s,
             cells,
@@ -338,12 +353,9 @@ export function useWorkbook(): WorkbookApi {
           for (const e of edits) {
             const key = cellKey(e.row, e.col);
             const existing = cells[key];
-            if (e.raw === "") {
-              if (existing?.format) cells[key] = { raw: "", format: existing.format };
-              else delete cells[key];
-            } else {
-              cells[key] = existing?.format ? { raw: e.raw, format: existing.format } : { raw: e.raw };
-            }
+            const next = cellFromEdit(existing, e);
+            if (next) cells[key] = next;
+            else delete cells[key];
             if (e.row + 1 > rowCount) rowCount = e.row + 1;
             if (e.col + 1 > colCount) colCount = e.col + 1;
           }
@@ -354,7 +366,7 @@ export function useWorkbook(): WorkbookApi {
       const eng = getEngine();
       for (const e of edits) {
         try {
-          eng.setCell(sheetName, e.row, e.col, e.raw);
+          eng.setCell(sheetName, e.row, e.col, "cell" in e ? e.cell?.raw ?? "" : e.raw ?? "");
         } catch {
           // ignore — engine will catch up on next reload
         }
@@ -417,8 +429,12 @@ export function useWorkbook(): WorkbookApi {
               const merged = mergeFormat(existing?.format, patch);
               if (existing) {
                 if (merged) cells[key] = { ...existing, format: merged };
-                else if (existing.raw === "") delete cells[key];
-                else cells[key] = { raw: existing.raw };
+                else if (existing.raw === "" && !existing.comment) delete cells[key];
+                else {
+                  const next = { ...existing };
+                  delete next.format;
+                  cells[key] = next;
+                }
               } else if (merged) {
                 cells[key] = { raw: "", format: merged };
               }
@@ -451,8 +467,12 @@ export function useWorkbook(): WorkbookApi {
               const key = cellKey(r, c);
               const existing = cells[key];
               if (!existing) continue;
-              if (existing.raw === "") delete cells[key];
-              else cells[key] = { raw: existing.raw };
+              if (existing.raw === "" && !existing.comment) delete cells[key];
+              else {
+                const next = { ...existing };
+                delete next.format;
+                cells[key] = next;
+              }
             }
           }
           return { ...s, cells };

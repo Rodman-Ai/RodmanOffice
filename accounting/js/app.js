@@ -1,5 +1,5 @@
 import { register, start, go } from "./router.js";
-import { getState, loadSampleData, Deals, Bills, Contacts, subscribe, rawIsEncrypted, unlockVaultAndLoad } from "./store.js";
+import { getState, loadSampleData, Deals, Bills, Contacts, subscribe, subscribePersistence, rawIsEncrypted, unlockVaultAndLoad } from "./store.js";
 import { openQuickAdd } from "./forms.js";
 import { applyTheme } from "./theme.js";
 import { isLockEnabled, isUnlocked, showLockScreen } from "./lock.js";
@@ -142,6 +142,17 @@ window.installPrompt = async () => {
 
 // Run recurring-deal scheduler on every load.
 try { runScheduler(); } catch (e) { console.warn("scheduler:", e); }
+
+let lastPersistenceToastAt = 0;
+subscribePersistence(async (status) => {
+  if (status.kind !== "error") return;
+  const now = Date.now();
+  if (now - lastPersistenceToastAt < 4000) return;
+  lastPersistenceToastAt = now;
+  const { toast } = await import("./ui.js");
+  const msg = status.error?.message || "Browser storage rejected the save.";
+  toast(`Save failed: ${msg}`, "warn", 6000);
+});
 
 // Routes
 register("/", () => dashboard());

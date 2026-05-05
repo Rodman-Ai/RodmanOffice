@@ -11,7 +11,7 @@
  *   - Tab switching (ribbon)
  *   - Slide list rendering + thumbnail painting
  *   - Editor canvas rendering + zoom
- *   - Element interaction: select, drag, resize, double-click-to-edit
+ *   - Element interaction: select, drag, resize, click/tap-to-edit
  *   - Ribbon command dispatch
  *   - Theme + transition strips
  *   - File operations (open / save / export PDF)
@@ -456,9 +456,61 @@
 
   // ---------- Element interaction (click/drag/resize/edit) ----------
   let drag = null;
+  const CLICK_EDIT_MOVE_PX = 5;
 
-  function onStageMouseDown(e) {
+  function findElementNode(id) {
+    return $$('.slide-element', stageEl).find((node) => node.dataset.elementId === id) || null;
+  }
+
+  function placeCaretAtEnd(node) {
+    const range = document.createRange();
+    range.selectNodeContents(node);
+    range.collapse(false);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+
+  function beginTextEdit(elNode, el) {
+    if (!elNode || !el || el.kind !== 'text' || state.isEditingText) return false;
+    const inner = elNode.querySelector('.slide-text');
+    if (!inner) return false;
+    state.isEditingText = true;
+    inner.contentEditable = 'true';
+    inner.focus();
+    placeCaretAtEnd(inner);
+
+    inner.addEventListener('blur', () => {
+      el.html = R.sanitizeTextHtml(inner.innerHTML);
+      state.isEditingText = false;
+      inner.contentEditable = 'false';
+      scheduleSave();
+    }, { once: true });
+    return true;
+  }
+
+  function beginTableCellEdit(cell, el) {
+    if (!cell || !el || el.kind !== 'table' || state.isEditingText) return false;
+    const r = parseInt(cell.dataset.r, 10);
+    const c = parseInt(cell.dataset.c, 10);
+    if (!Number.isFinite(r) || !Number.isFinite(c)) return false;
+    cell.contentEditable = 'true';
+    cell.focus();
+    state.isEditingText = true;
+    placeCaretAtEnd(cell);
+    cell.addEventListener('blur', () => {
+      if (!el.cells[r]) el.cells[r] = [];
+      el.cells[r][c] = cell.textContent;
+      cell.contentEditable = 'false';
+      state.isEditingText = false;
+      scheduleSave();
+    }, { once: true });
+    return true;
+  }
+
+  function onStagePointerDown(e) {
     if (state.isEditingText) return;
+    if (e.pointerType && e.isPrimary === false) return;
     const handle = e.target.closest('.resize-handle');
     if (handle) {
       const el = selectedElement();
@@ -467,6 +519,8 @@
         kind: 'resize',
         dir: handle.dataset.dir,
         startX: e.clientX, startY: e.clientY,
+        pointerId: e.pointerId,
+        hasMoved: false,
         start: { x: el.x, y: el.y, w: el.w, h: el.h },
       };
       e.preventDefault();
@@ -481,6 +535,16 @@
       return;
     }
     const elId = elNode.dataset.elementId;
+    const slide = activeSlide();
+    const el = D.findElement(slide, elId);
+    const wasSoleSelected = state.selectedElementIds.size === 1 && state.selectedElementIds.has(elId);
+    const canEnterTextEdit = Boolean(
+      wasSoleSelected &&
+      !e.shiftKey &&
+      el &&
+      el.kind === 'text' &&
+      e.target.closest('.slide-text')
+    );
     if (e.shiftKey) {
       // Toggle: shift-click an already-selected element removes it,
       // shift-click an unselected element adds it. Last-touched
@@ -507,7 +571,6 @@
 
     // Begin group drag — capture starting positions for every selected
     // element so we can move them all together.
-    const slide = activeSlide();
     const sel = [...state.selectedElementIds]
       .map((id) => D.findElement(slide, id))
       .filter(Boolean);
@@ -515,19 +578,31 @@
     drag = {
       kind: 'move',
       startX: e.clientX, startY: e.clientY,
+      pointerId: e.pointerId,
+      targetId: elId,
+      hasMoved: false,
+      canEnterTextEdit,
       starts: sel.map((el) => ({ id: el.id, x: el.x, y: el.y })),
     };
     e.preventDefault();
   }
 
-  function onStageMouseMove(e) {
+  function onStagePointerMove(e) {
     if (!drag) return;
+    if (drag.pointerId !== undefined && e.pointerId !== undefined && drag.pointerId !== e.pointerId) return;
+    const screenDx = e.clientX - drag.startX;
+    const screenDy = e.clientY - drag.startY;
+    if (drag.kind === 'move' && !drag.hasMoved) {
+      if (Math.hypot(screenDx, screenDy) < CLICK_EDIT_MOVE_PX) return;
+      drag.hasMoved = true;
+    }
     const dx = (e.clientX - drag.startX) / state.zoom;
     const dy = (e.clientY - drag.startY) / state.zoom;
 
     if (drag.kind === 'resize') {
       const el = selectedElement();
       if (!el) return;
+      drag.hasMoved = true;
       const r = R.applyResize(drag.start, drag.dir, dx, dy);
       el.x = Math.round(r.x); el.y = Math.round(r.y);
       el.w = Math.round(r.w); el.h = Math.round(r.h);
@@ -649,15 +724,26 @@
     }
   }
 
-  function onStageMouseUp() {
+  function onStagePointerUp(e) {
     if (!drag) return;
+    if (drag.pointerId !== undefined && e.pointerId !== undefined && drag.pointerId !== e.pointerId) return;
+    const finished = drag;
+    const wasCanceled = e.type === 'pointercancel';
     drag = null;
     drawSnapGuides([]);
     renderEditor();
-    scheduleSave();
+    if (!wasCanceled && finished.kind === 'move' && finished.canEnterTextEdit && !finished.hasMoved) {
+      const el = D.findElement(activeSlide(), finished.targetId);
+      if (beginTextEdit(findElementNode(finished.targetId), el)) {
+        e.preventDefault();
+        return;
+      }
+    }
+    if (finished.hasMoved) scheduleSave();
   }
 
   function onStageDoubleClick(e) {
+    if (state.isEditingText) return;
     const elNode = e.target.closest('.slide-element');
     if (!elNode) return;
     const el = D.findElement(activeSlide(), elNode.dataset.elementId);
@@ -666,24 +752,7 @@
     // Table cells: dblclick the cell to edit its text.
     if (el.kind === 'table') {
       const cell = e.target.closest('td, th');
-      if (!cell) return;
-      const r = parseInt(cell.dataset.r, 10);
-      const c = parseInt(cell.dataset.c, 10);
-      cell.contentEditable = 'true';
-      cell.focus();
-      state.isEditingText = true;
-      const range = document.createRange();
-      range.selectNodeContents(cell);
-      range.collapse(false);
-      const sel = window.getSelection();
-      sel.removeAllRanges(); sel.addRange(range);
-      cell.addEventListener('blur', () => {
-        if (!el.cells[r]) el.cells[r] = [];
-        el.cells[r][c] = cell.textContent;
-        cell.contentEditable = 'false';
-        state.isEditingText = false;
-        scheduleSave();
-      }, { once: true });
+      beginTableCellEdit(cell, el);
       return;
     }
 
@@ -697,30 +766,16 @@
     }
 
     if (el.kind !== 'text') return;
-    const inner = elNode.querySelector('.slide-text');
-    if (!inner) return;
-    state.isEditingText = true;
-    inner.contentEditable = 'true';
-    inner.focus();
-    const range = document.createRange();
-    range.selectNodeContents(inner);
-    range.collapse(false);
-    const sel = window.getSelection();
-    sel.removeAllRanges(); sel.addRange(range);
-
-    inner.addEventListener('blur', () => {
-      el.html = R.sanitizeTextHtml(inner.innerHTML);
-      state.isEditingText = false;
-      inner.contentEditable = 'false';
-      scheduleSave();
-    }, { once: true });
+    beginTextEdit(elNode, el);
   }
 
-  document.addEventListener('mousedown', (e) => {
-    if (e.target.closest('#stage')) onStageMouseDown(e);
+  const pointerEventsSupported = 'PointerEvent' in window;
+  document.addEventListener(pointerEventsSupported ? 'pointerdown' : 'mousedown', (e) => {
+    if (e.target.closest('#stage')) onStagePointerDown(e);
   });
-  document.addEventListener('mousemove', onStageMouseMove);
-  document.addEventListener('mouseup', onStageMouseUp);
+  document.addEventListener(pointerEventsSupported ? 'pointermove' : 'mousemove', onStagePointerMove);
+  document.addEventListener(pointerEventsSupported ? 'pointerup' : 'mouseup', onStagePointerUp);
+  if (pointerEventsSupported) document.addEventListener('pointercancel', onStagePointerUp);
   document.addEventListener('dblclick', (e) => {
     if (e.target.closest('#stage')) onStageDoubleClick(e);
   });

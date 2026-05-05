@@ -10,6 +10,7 @@
 // initial /word/ navigation request, which the word SW will own from
 // then on.
 const VERSION = 'rodmanoffice-launcher-v1';
+const CACHE_PREFIX = 'rodmanoffice-launcher-';
 const SHELL = [
   './',
   './index.html',
@@ -35,7 +36,11 @@ self.addEventListener('install', (e) => {
 self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== VERSION).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(
+        keys
+          .filter((k) => k.startsWith(CACHE_PREFIX) && k !== VERSION)
+          .map((k) => caches.delete(k))
+      ))
       .then(() => self.clients.claim())
   );
 });
