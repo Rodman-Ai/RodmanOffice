@@ -32,17 +32,50 @@
     <div class="title-actions">
       <!-- Keep this visible while AI is disabled: it is an intentional setup affordance, not dead UI. -->
       <button
+        id="askClaudeBtn"
         class="ask-claude"
         type="button"
-        title="AI is not configured"
-        aria-label="Ask Claude is not configured"
-        disabled
+        title="Ask Claude"
+        aria-label="Ask Claude"
+        aria-controls="askClaudePanel"
+        aria-expanded="false"
       >&#129302; Ask Claude</button>
       <span id="saveIndicator" class="save-indicator">Saved</span>
       <button class="icon-btn" id="presentBtn" title="Start presentation (F5)" aria-label="Present">▶</button>
       <button class="icon-btn" id="helpBtn" title="Help" aria-label="Help">?</button>
     </div>
   </header>
+
+  <aside id="askClaudePanel" class="claude-panel" aria-label="Ask Claude" hidden>
+    <header class="claude-panel-header">
+      <span>Ask Claude</span>
+      <button id="askClaudeCloseBtn" type="button" aria-label="Close Ask Claude panel">&times;</button>
+    </header>
+    <div class="claude-panel-body">
+      <div class="claude-panel-notice">
+        AI is not configured yet. Connect a Claude backend before sending prompts.
+      </div>
+      <div class="claude-panel-intro">
+        <h3>Skip the menus - just ask.</h3>
+        <p>
+          Draft presentation requests in plain English. Claude will eventually propose
+          slide edits, speaker notes, and layout changes for review.
+        </p>
+        <p class="claude-panel-label">Try one of these:</p>
+        <div class="claude-panel-chips">
+          <button type="button" data-claude-prompt="Turn this deck into a five-slide investor pitch with sharper titles.">Turn this deck into a five-slide investor pitch.</button>
+          <button type="button" data-claude-prompt="Rewrite every slide title so the takeaway is obvious at a glance.">Rewrite slide titles as takeaways.</button>
+          <button type="button" data-claude-prompt="Suggest stronger visuals and layouts for the current slide.">Suggest stronger visuals for this slide.</button>
+          <button type="button" data-claude-prompt="Create speaker notes for each slide in a confident but conversational tone.">Create speaker notes for each slide.</button>
+          <button type="button" data-claude-prompt="Tighten this presentation for a ten-minute demo and flag slides to cut.">Tighten this for a ten-minute demo.</button>
+        </div>
+      </div>
+    </div>
+    <form class="claude-panel-input">
+      <textarea id="askClaudeInput" rows="2" placeholder="Choose an example prompt..." readonly></textarea>
+      <button type="submit" disabled>Send</button>
+    </form>
+  </aside>
 
   <nav class="tabs" role="tablist" aria-label="Ribbon tabs">
     <button class="tab" role="tab" data-tab="file">File</button>

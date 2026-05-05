@@ -63,6 +63,39 @@
   function $(sel, root) { return (root || document).querySelector(sel); }
   function $$(sel, root) { return Array.from((root || document).querySelectorAll(sel)); }
 
+  function initAskClaudePanel() {
+    const button = $('#askClaudeBtn');
+    const panel = $('#askClaudePanel');
+    const close = $('#askClaudeCloseBtn');
+    const input = $('#askClaudeInput');
+    if (!button || !panel) return;
+
+    const setOpen = (open) => {
+      panel.hidden = !open;
+      button.setAttribute('aria-expanded', open ? 'true' : 'false');
+      if (open) input?.focus();
+    };
+
+    button.addEventListener('click', () => setOpen(panel.hidden));
+    close?.addEventListener('click', () => {
+      setOpen(false);
+      button.focus();
+    });
+    panel.addEventListener('click', (e) => {
+      const chip = e.target.closest('[data-claude-prompt]');
+      if (!chip || !input) return;
+      input.value = chip.dataset.claudePrompt || chip.textContent.trim();
+      input.focus();
+      input.select();
+    });
+    panel.querySelector('form')?.addEventListener('submit', (e) => e.preventDefault());
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !panel.hidden) setOpen(false);
+    });
+  }
+
+  initAskClaudePanel();
+
   function activeSlide() {
     return D.findSlide(deck, state.selectedSlideId) || deck.slides[0];
   }

@@ -107,6 +107,15 @@
         </div>
       </nav>
       <div class="header-actions">
+        <button
+          id="askClaudeBtn"
+          class="ask-claude"
+          type="button"
+          title="Ask Claude"
+          aria-label="Ask Claude"
+          aria-controls="askClaudePanel"
+          aria-expanded="false"
+        >&#129302; Ask Claude</button>
         <button id="btn-undo" title="Undo (Ctrl+Z)" aria-label="Undo">↶ Undo</button>
         <button id="btn-redo" title="Redo (Ctrl+Shift+Z)" aria-label="Redo">↷ Redo</button>
         <button id="btn-new" title="New canvas" aria-label="New">📄 New</button>
@@ -127,6 +136,37 @@
       </div>
       <input id="file-input" type="file" accept="image/*,.psd,.psb,.pdf,application/pdf,image/vnd.adobe.photoshop" hidden>
     </header>
+
+    <aside id="askClaudePanel" class="claude-panel" aria-label="Ask Claude" hidden>
+      <header class="claude-panel-header">
+        <span>Ask Claude</span>
+        <button id="askClaudeCloseBtn" type="button" aria-label="Close Ask Claude panel">&times;</button>
+      </header>
+      <div class="claude-panel-body">
+        <div class="claude-panel-notice">
+          AI is not configured yet. Connect a Claude backend before sending prompts.
+        </div>
+        <div class="claude-panel-intro">
+          <h3>Skip the tools - just ask.</h3>
+          <p>
+            Draft image editing requests in plain English. Claude will eventually propose
+            edits you can preview before pixels change.
+          </p>
+          <p class="claude-panel-label">Try one of these:</p>
+          <div class="claude-panel-chips">
+            <button type="button" data-claude-prompt="Remove the background and make a clean product cutout.">Remove the background and make a product cutout.</button>
+            <button type="button" data-claude-prompt="Suggest a crop and color grade for a polished hero image.">Suggest a crop and color grade.</button>
+            <button type="button" data-claude-prompt="Create three thumbnail directions for this image with bold text areas.">Create three thumbnail directions.</button>
+            <button type="button" data-claude-prompt="Retouch dust, scratches, and small distractions while preserving the subject.">Retouch dust, scratches, and distractions.</button>
+            <button type="button" data-claude-prompt="Turn this into a square social post with better contrast and safe margins.">Make this a square social post.</button>
+          </div>
+        </div>
+      </div>
+      <form class="claude-panel-input">
+        <textarea id="askClaudeInput" rows="2" placeholder="Choose an example prompt..." readonly></textarea>
+        <button type="submit" disabled>Send</button>
+      </form>
+    </aside>
 
     <main class="workspace">
       <aside class="tools-panel">

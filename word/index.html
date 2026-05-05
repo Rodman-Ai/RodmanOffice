@@ -39,11 +39,13 @@
     <div class="title-actions">
       <!-- Keep this visible while AI is disabled: it is an intentional setup affordance, not dead UI. -->
       <button
+        id="askClaudeBtn"
         class="ask-claude"
         type="button"
-        title="AI is not configured"
-        aria-label="Ask Claude is not configured"
-        disabled
+        title="Ask Claude"
+        aria-label="Ask Claude"
+        aria-controls="askClaudePanel"
+        aria-expanded="false"
       >&#129302; Ask Claude</button>
       <span id="presencePill" class="presence-pill" hidden></span>
       <button class="icon-btn" id="focusBtn" title="Focus mode (F11)" aria-label="Focus mode">⛶</button>
@@ -55,6 +57,37 @@
       </button>
     </div>
   </header>
+
+  <aside id="askClaudePanel" class="claude-panel" aria-label="Ask Claude" hidden>
+    <header class="claude-panel-header">
+      <span>Ask Claude</span>
+      <button id="askClaudeCloseBtn" type="button" aria-label="Close Ask Claude panel">&times;</button>
+    </header>
+    <div class="claude-panel-body">
+      <div class="claude-panel-notice">
+        AI is not configured yet. Connect a Claude backend before sending prompts.
+      </div>
+      <div class="claude-panel-intro">
+        <h3>Skip the menus - just ask.</h3>
+        <p>
+          Draft editing requests in plain English. Claude will eventually propose changes
+          you can review before anything in the document is changed.
+        </p>
+        <p class="claude-panel-label">Try one of these:</p>
+        <div class="claude-panel-chips">
+          <button type="button" data-claude-prompt="Rewrite the selected paragraph to be clearer and more concise.">Rewrite the selected paragraph to be clearer and more concise.</button>
+          <button type="button" data-claude-prompt="Turn this draft into a one-page executive brief with bullets and a strong opening.">Turn this draft into a one-page executive brief.</button>
+          <button type="button" data-claude-prompt="Find weak claims, missing citations, and places where the tone should be more direct.">Find weak claims and missing citations.</button>
+          <button type="button" data-claude-prompt="Create an outline from the current document and suggest better section headings.">Create an outline and better section headings.</button>
+          <button type="button" data-claude-prompt="Draft a follow-up email based on this document's main points.">Draft a follow-up email from this document.</button>
+        </div>
+      </div>
+    </div>
+    <form class="claude-panel-input">
+      <textarea id="askClaudeInput" rows="2" placeholder="Choose an example prompt..." readonly></textarea>
+      <button type="submit" disabled>Send</button>
+    </form>
+  </aside>
 
   <nav class="tabs" role="tablist" aria-label="Ribbon tabs">
     <button class="tab" role="tab" title="Double-click to collapse the ribbon" data-tab="file">File</button>

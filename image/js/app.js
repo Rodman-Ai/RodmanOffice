@@ -12,6 +12,42 @@
   let W = canvas.width;
   let H = canvas.height;
 
+  function initAskClaudePanel() {
+    const button = $('askClaudeBtn');
+    const panel = $('askClaudePanel');
+    const close = $('askClaudeCloseBtn');
+    const input = $('askClaudeInput');
+    if (!button || !panel) return;
+
+    const setOpen = (open) => {
+      panel.hidden = !open;
+      button.setAttribute('aria-expanded', open ? 'true' : 'false');
+      if (open) input && input.focus();
+    };
+
+    button.addEventListener('click', () => setOpen(panel.hidden));
+    if (close) {
+      close.addEventListener('click', () => {
+        setOpen(false);
+        button.focus();
+      });
+    }
+    panel.addEventListener('click', (e) => {
+      const chip = e.target.closest('[data-claude-prompt]');
+      if (!chip || !input) return;
+      input.value = chip.dataset.claudePrompt || chip.textContent.trim();
+      input.focus();
+      input.select();
+    });
+    const form = panel.querySelector('form');
+    if (form) form.addEventListener('submit', (e) => e.preventDefault());
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !panel.hidden) setOpen(false);
+    });
+  }
+
+  initAskClaudePanel();
+
   // ---- Document / Layer model ----
   let nextId = 1;
   function createLayer(name, w, h) {
