@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, type FormEvent } from "react";
 import type { Workbook, ChartSpec } from "@aicell/shared";
-import { callAiAgent, type ChatTurn, type PlanStep } from "./api";
+import type { PlanStep } from "./api";
+import { sendClaudeMessage, type ClaudeMessage } from "../../../../lib/claude/index.js";
 
 type Props = {
   workbook: Workbook;
@@ -23,6 +24,45 @@ const EXAMPLE_PROMPTS = [
   "Write a VLOOKUP that pulls customer name from the Customers sheet by ID.",
 ];
 
+const SHEETS_SYSTEM = [
+  "You are Claude inside RodmanSheets, a spreadsheet editor.",
+  "Use the attached workbook snapshot to answer questions and suggest formulas, cleanup steps, charts, and analysis.",
+  "Keep replies practical and concise.",
+  "Do not claim you changed cells directly; describe changes the user can review and apply manually.",
+].join(" ");
+
+function renderWorkbookForClaude(wb: Workbook): string {
+  const sheetLimit = 5;
+  const rowLimit = 50;
+  const colLimit = 26;
+  const lines: string[] = [`Workbook: ${wb.name}`];
+
+  for (const sheet of wb.sheets.slice(0, sheetLimit)) {
+    lines.push("");
+    lines.push(`# Sheet: ${sheet.name} (${sheet.rowCount} rows x ${sheet.colCount} cols)`);
+    const rows = Math.min(sheet.rowCount, rowLimit);
+    const cols = Math.min(sheet.colCount, colLimit);
+    for (let r = 0; r < rows; r++) {
+      const cells: string[] = [];
+      let hasValue = false;
+      for (let c = 0; c < cols; c++) {
+        const raw = sheet.cells[`${r},${c}`]?.raw ?? "";
+        if (raw !== "") hasValue = true;
+        cells.push(raw);
+      }
+      if (hasValue) lines.push(`row ${r + 1}: ${cells.join(" | ")}`);
+    }
+    if (sheet.rowCount > rowLimit) {
+      lines.push(`... (${sheet.rowCount - rowLimit} more rows)`);
+    }
+  }
+  if (wb.sheets.length > sheetLimit) {
+    lines.push("");
+    lines.push(`... (${wb.sheets.length - sheetLimit} more sheets)`);
+  }
+  return lines.join("\n");
+}
+
 export function SidePanel({
   workbook,
   aiEnabled,
@@ -33,9 +73,11 @@ export function SidePanel({
 }: Props) {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [input, setInput] = useState("");
+  const [apiKeyReady, setApiKeyReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const apiKeyRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
@@ -44,16 +86,23 @@ export function SidePanel({
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     const text = input.trim();
+    let apiKey = apiKeyRef.current?.value.trim() ?? "";
     if (!text || busy) return;
+    if (!apiKey) {
+      setError("Enter a Claude API key before sending.");
+      return;
+    }
     setError(null);
 
     const userTurn: Turn = { kind: "user", content: text };
     const nextTurns = [...turns, userTurn];
     setTurns(nextTurns);
     setInput("");
+    if (apiKeyRef.current) apiKeyRef.current.value = "";
+    setApiKeyReady(false);
     setBusy(true);
 
-    const transcript: ChatTurn[] = nextTurns.map((t) => ({
+    const transcript: ClaudeMessage[] = nextTurns.map((t) => ({
       role: t.kind === "user" ? "user" : "assistant",
       content: t.content,
     }));
@@ -64,19 +113,24 @@ export function SidePanel({
     const workbookAtPrompt = workbook;
 
     try {
-      const result = await callAiAgent({ messages: transcript, workbook: workbookAtPrompt });
+      const result = await sendClaudeMessage({
+        apiKey,
+        system: `${SHEETS_SYSTEM}\n\nCurrent workbook snapshot:\n${renderWorkbookForClaude(workbookAtPrompt)}`,
+        messages: transcript,
+        maxTokens: 4096,
+      });
       setTurns((cur) => [
         ...cur,
         {
           kind: "assistant",
-          content: result.reply,
-          plan: result.plan.length > 0 ? result.plan : undefined,
+          content: result.text || "Claude returned an empty response.",
         },
       ]);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       setError(msg);
     } finally {
+      apiKey = "";
       setBusy(false);
     }
   };
@@ -116,19 +170,30 @@ export function SidePanel({
         <span>Ask Claude</span>
         <button onClick={onClose} aria-label="Close panel">×</button>
       </header>
+      <div className="side-panel-key">
+        <label htmlFor="askClaudeKey">Click here to enter a Claude API key to enable AI features</label>
+        <input
+          id="askClaudeKey"
+          ref={apiKeyRef}
+          type="password"
+          autoComplete="off"
+          spellCheck={false}
+          placeholder="sk-ant-..."
+          onInput={(e) => setApiKeyReady(e.currentTarget.value.trim().length > 0)}
+        />
+      </div>
       <div className="side-panel-messages" ref={scrollRef}>
         {!aiEnabled && (
           <div className="side-panel-notice">
-            AI is not configured. Set <code>ANTHROPIC_API_KEY</code> in the API service environment to enable.
+            BYOK chat works in demo mode. AI cell formulas and applyable plans still require a hosted API.
           </div>
         )}
         {turns.length === 0 && (
           <div className="panel-intro">
             <h3>Skip the menus — just ask.</h3>
             <p>
-              This panel can do anything the toolbar can, and a lot it can't. Type what
-              you want in plain English and Claude proposes a plan you review before any
-              cells change.
+              Type what you want in plain English. Claude answers with formulas,
+              cleanup steps, chart ideas, and analysis grounded in this workbook.
             </p>
             <p className="panel-intro-label">Try one of these:</p>
             <div className="panel-intro-chips">
@@ -137,7 +202,6 @@ export function SidePanel({
                   key={p}
                   type="button"
                   className="panel-intro-chip"
-                  disabled={!aiEnabled}
                   onClick={() => setInput(p)}
                 >
                   {p}
@@ -169,8 +233,8 @@ export function SidePanel({
         <textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder={aiEnabled ? "Ask anything…" : "AI disabled"}
-          disabled={!aiEnabled || busy}
+          placeholder="Ask anything..."
+          disabled={busy}
           rows={2}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
@@ -179,7 +243,7 @@ export function SidePanel({
             }
           }}
         />
-        <button type="submit" disabled={!aiEnabled || busy || !input.trim()}>
+        <button type="submit" disabled={busy || !apiKeyReady || !input.trim()}>
           Send
         </button>
       </form>

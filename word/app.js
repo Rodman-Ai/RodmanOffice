@@ -114,12 +114,30 @@
     const panel = $('#askClaudePanel');
     const close = $('#askClaudeCloseBtn');
     const input = $('#askClaudeInput');
+    const keyInput = $('#askClaudeKey');
+    const send = $('#askClaudeSendBtn');
+    const output = $('#askClaudeOutput');
+    const form = panel?.querySelector('form');
     if (!button || !panel) return;
+    let busy = false;
+
+    const setOutput = (message, kind = '') => {
+      if (!output) return;
+      output.hidden = !message;
+      output.textContent = message || '';
+      output.classList.toggle('status', kind === 'status');
+      output.classList.toggle('error', kind === 'error');
+    };
+
+    const updateSend = () => {
+      if (!send) return;
+      send.disabled = busy || !keyInput?.value.trim() || !input?.value.trim();
+    };
 
     const setOpen = (open) => {
       panel.hidden = !open;
       button.setAttribute('aria-expanded', open ? 'true' : 'false');
-      if (open) input?.focus();
+      if (open) (keyInput?.value.trim() ? input : keyInput)?.focus();
     };
 
     button.addEventListener('click', () => setOpen(panel.hidden));
@@ -131,13 +149,47 @@
       const chip = e.target.closest('[data-claude-prompt]');
       if (!chip || !input) return;
       input.value = chip.dataset.claudePrompt || chip.textContent.trim();
-      input.focus();
-      input.select();
+      updateSend();
+      if (keyInput && !keyInput.value.trim()) keyInput.focus();
+      else {
+        input.focus();
+        input.select();
+      }
     });
-    panel.querySelector('form')?.addEventListener('submit', (e) => e.preventDefault());
+    keyInput?.addEventListener('input', updateSend);
+    input?.addEventListener('input', updateSend);
+    form?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (busy || !input || !keyInput) return;
+      let apiKey = keyInput.value.trim();
+      const prompt = input.value.trim();
+      if (!apiKey || !prompt) {
+        updateSend();
+        return;
+      }
+      keyInput.value = '';
+      busy = true;
+      updateSend();
+      setOutput('Claude is thinking...', 'status');
+      try {
+        const result = await window.RodmanClaude.sendClaudeMessage({
+          apiKey,
+          system: 'You are Claude inside RodmanWord. Help the user draft, revise, summarize, and reason about documents. Do not claim you changed the document directly; propose clear edits the user can apply.',
+          messages: [{ role: 'user', content: prompt }],
+        });
+        setOutput(result.text || 'Claude returned an empty response.');
+      } catch (err) {
+        setOutput(err instanceof Error ? err.message : String(err), 'error');
+      } finally {
+        apiKey = '';
+        busy = false;
+        updateSend();
+      }
+    });
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && !panel.hidden) setOpen(false);
     });
+    updateSend();
   }
 
   initAskClaudePanel();

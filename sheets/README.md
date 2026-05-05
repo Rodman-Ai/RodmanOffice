@@ -25,7 +25,7 @@ docs/              Strategy docs (competitor analysis, features, roadmap)
 - **Audit panel**: Help → Audit formulas walks every formula in every sheet, lists evaluation errors, click a cell ref to jump.
 - **Formulas**: ~400 Excel-compatible functions via HyperFormula.
 - **AI cell functions**: `=AI`, `=CLASSIFY`, `=EXTRACT`, `=SUMMARIZE`, `=TRANSLATE`, `=SENTIMENT`, `=FORMULA` (Claude Haiku 4.5 with prompt caching).
-- **Plan-then-apply agent**: Claude Opus 4.7 with tool use proposes a plan (set_cell / add_sheet / create_chart) plus read-only audit/forecast helpers; user reviews and applies. Side panel empty-state has five click-to-prefill example prompts.
+- **Hosted AI endpoints**: the API service contains Claude Haiku 4.5 cell functions and a Claude Opus 4.7 plan-then-apply agent (set_cell / add_sheet / create_chart plus read-only audit/forecast helpers). The side panel supports per-request BYOK chat in static demo mode.
 - **Charts**: bar / line / area / pie / scatter via Recharts, attached per-sheet.
 - **Persistence**: file-based store by default; Postgres adapter when `DATABASE_URL` is set.
 
@@ -41,13 +41,13 @@ pnpm dev:api
 pnpm dev:web
 ```
 
-To enable AI features, set `ANTHROPIC_API_KEY` in the API service environment before booting:
+To enable AI cell functions and the hosted plan-then-apply agent, set `ANTHROPIC_API_KEY` in the API service environment before booting:
 
 ```sh
 ANTHROPIC_API_KEY=sk-ant-... pnpm dev:api
 ```
 
-Without a key, the side panel and AI cell functions surface a clear "AI is not configured" notice; the rest of the app works normally.
+Without a hosted API key, AI cell functions surface `#AI_DISABLED`; the Ask Claude side panel can still run as per-request BYOK chat when a user enters their own Claude API key.
 
 ## Deployment
 
@@ -55,7 +55,7 @@ Without a key, the side panel and AI cell functions surface a clear "AI is not c
 
 A workflow at `.github/workflows/pages.yml` builds `apps/web` and publishes it to GitHub Pages on every push to `main` (or via manual trigger from the Actions tab).
 
-The Pages build is **demo mode**: `VITE_API_BASE` is empty, so the app skips every backend call. Persistence and AI features are disabled — you get a working spreadsheet UI and the formula engine, no chat panel, no autosave. The toolbar shows "Demo mode (no backend)".
+The Pages build is **demo mode**: `VITE_API_BASE` is empty, so the app skips every backend call. Persistence, AI cell formulas, and applyable plan-then-apply agent actions are disabled. You still get a working spreadsheet UI, the formula engine, browser-local workbook state, and an Ask Claude panel that supports per-request BYOK chat. The toolbar shows "Demo mode (no backend)".
 
 **One-time setup:**
 1. In the repo settings → **Pages** → set **Source** to **GitHub Actions**.

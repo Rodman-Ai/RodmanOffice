@@ -28,8 +28,9 @@ Two apps are exceptions and are built at deploy time:
 - **Spreadsheets (AiCell)** — pnpm monorepo with a Vite + React 19 web
   app. The workflow runs `pnpm install` and `pnpm --filter @aicell/web
   build` with `VITE_BASE=/RodmanOffice/sheets/` and an empty
-  `VITE_API_BASE` (which puts AiCell in demo mode — all backend calls
-  stub out, workbook state lives in browser storage).
+  `VITE_API_BASE` (which puts AiCell in demo mode: backend persistence,
+  AI cell formulas, and applyable AI plans are disabled; workbook state lives
+  in browser storage, and Ask Claude supports per-request BYOK chat).
 - **CRM (LeoCRM)** — Next.js 14 app. The workflow runs `npm ci` and
   `scripts/build-demo.sh` with `NEXT_PUBLIC_BASE_PATH=/RodmanOffice/crm`
   to produce a static export. In demo mode, all `/api/*` calls are

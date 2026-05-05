@@ -53,12 +53,15 @@
     </header>
     <div class="claude-panel-body">
       <div class="claude-panel-notice">
-        AI is not configured yet. Connect a Claude backend before sending prompts.
+        <label class="claude-api-key-row" for="askClaudeKey">
+          <span>Click here to enter a Claude API key to enable AI features</span>
+          <input id="askClaudeKey" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-..." />
+        </label>
       </div>
       <div class="claude-panel-intro">
         <h3>Skip the menus - just ask.</h3>
         <p>
-          Draft presentation requests in plain English. Claude will eventually propose
+          Draft presentation requests in plain English. Claude can propose
           slide edits, speaker notes, and layout changes for review.
         </p>
         <p class="claude-panel-label">Try one of these:</p>
@@ -71,9 +74,10 @@
         </div>
       </div>
     </div>
+    <div id="askClaudeOutput" class="claude-panel-output" aria-live="polite" hidden></div>
     <form class="claude-panel-input">
-      <textarea id="askClaudeInput" rows="2" placeholder="Choose an example prompt..." readonly></textarea>
-      <button type="submit" disabled>Send</button>
+      <textarea id="askClaudeInput" rows="2" placeholder="Choose an example or type a prompt..."></textarea>
+      <button id="askClaudeSendBtn" type="submit" disabled>Send</button>
     </form>
   </aside>
 
@@ -404,10 +408,12 @@
     // both execute deferred, in source order — this shim runs before
     // the deck/render/app scripts below.
     import * as slidesio from '../lib/slides/index.js';
+    import * as claude from '../lib/claude/index.js';
     window.RodmanSlidesIO = {
       savePptx: slidesio.savePptx,
       loadPptx: slidesio.loadPptx,
     };
+    window.RodmanClaude = claude;
   </script>
   <script src="deck.js" defer></script>
   <script src="themes.js" defer></script>

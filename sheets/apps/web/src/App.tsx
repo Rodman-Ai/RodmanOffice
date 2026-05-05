@@ -501,7 +501,7 @@ export function App() {
           <button
             className="ask-claude"
             onClick={() => setPanelOpen((v) => !v)}
-            title={aiEnabled ? "Ask Claude" : "AI is not configured"}
+            title="Ask Claude"
           >
             {/* Keep this visible when AI is disabled: it is an intentional setup affordance, not dead UI. */}
             {panelOpen ? "Close panel" : "🤖 Ask Claude"}
@@ -722,7 +722,7 @@ function AboutDialog({
             </div>
             <div>
               <dt>AI</dt>
-              <dd>{aiEnabled ? "Configured" : "Disabled until the API key is configured"}</dd>
+              <dd>{aiEnabled ? "Hosted API configured; BYOK chat also available" : "BYOK chat available; formulas and applyable plans need a hosted API"}</dd>
             </div>
           </dl>
         </div>

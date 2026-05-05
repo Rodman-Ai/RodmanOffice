@@ -144,12 +144,15 @@
       </header>
       <div class="claude-panel-body">
         <div class="claude-panel-notice">
-          AI is not configured yet. Connect a Claude backend before sending prompts.
+          <label class="claude-api-key-row" for="askClaudeKey">
+            <span>Click here to enter a Claude API key to enable AI features</span>
+            <input id="askClaudeKey" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-..." />
+          </label>
         </div>
         <div class="claude-panel-intro">
           <h3>Skip the tools - just ask.</h3>
           <p>
-            Draft image editing requests in plain English. Claude will eventually propose
+            Draft image editing requests in plain English. Claude can propose
             edits you can preview before pixels change.
           </p>
           <p class="claude-panel-label">Try one of these:</p>
@@ -162,9 +165,10 @@
           </div>
         </div>
       </div>
+      <div id="askClaudeOutput" class="claude-panel-output" aria-live="polite" hidden></div>
       <form class="claude-panel-input">
-        <textarea id="askClaudeInput" rows="2" placeholder="Choose an example prompt..." readonly></textarea>
-        <button type="submit" disabled>Send</button>
+        <textarea id="askClaudeInput" rows="2" placeholder="Choose an example or type a prompt..."></textarea>
+        <button id="askClaudeSendBtn" type="submit" disabled>Send</button>
       </form>
     </aside>
 
@@ -273,6 +277,7 @@
     // scripts and `<script defer>` both execute deferred, in source
     // order — so this shim runs before menus.js / app.js below.
     import * as imageio from '../lib/images/index.js';
+    import * as claude from '../lib/claude/index.js';
     window.IO = {
       decodeFile: imageio.decodeFile,
       decodeBlob: imageio.decodeBlob,
@@ -289,6 +294,7 @@
       triggerDownload: imageio.triggerDownload,
       suggestFilename: imageio.suggestFilename,
     };
+    window.RodmanClaude = claude;
   </script>
   <script src="js/menus.js" defer></script>
   <script src="js/app.js" defer></script>

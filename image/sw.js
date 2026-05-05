@@ -1,5 +1,5 @@
 /* Retro Paint — minimal offline-cache service worker */
-const CACHE = 'retro-paint-v6';
+const CACHE = 'retro-paint-v7';
 const CACHE_PREFIX = 'retro-paint-';
 const ASSETS = [
   './',

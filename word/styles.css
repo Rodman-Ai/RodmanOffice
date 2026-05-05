@@ -210,6 +210,24 @@ body {
   font-size: 12px;
   line-height: 1.4;
 }
+.claude-api-key-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.claude-api-key-row span {
+  font-weight: 600;
+}
+.claude-api-key-row input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #fed7aa;
+  border-radius: 4px;
+  padding: 7px 8px;
+  font: inherit;
+  color: var(--text);
+  background: var(--page-bg);
+}
 .claude-panel-intro {
   background: #eef4ff;
   border: 1px solid #c7d8f3;
@@ -257,6 +275,26 @@ body {
 .claude-panel-chips button:hover {
   background: var(--hover);
   border-color: var(--primary-light);
+}
+.claude-panel-output {
+  margin: 0 12px 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--ribbon-border);
+  border-radius: 6px;
+  background: var(--page-bg);
+  color: var(--text);
+  font-size: 12.5px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.claude-panel-output.status {
+  color: var(--muted);
+}
+.claude-panel-output.error {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #991b1b;
 }
 .claude-panel-input {
   flex-shrink: 0;

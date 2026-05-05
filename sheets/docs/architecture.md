@@ -67,14 +67,14 @@ The API exposes `WorkbookStore` (file-backed JSON or Postgres, picked by `DATABA
 | Imports / exports | `apps/web/src/csv.ts` |
 | Sheet tabs | `apps/web/src/SheetTabs.tsx` |
 | Charts | `apps/web/src/Chart.tsx` + `apps/web/src/ChartStrip.tsx` |
-| Side-panel agent | `apps/web/src/SidePanel.tsx`, `services/api/src/ai/agent.ts`, `tools.ts` |
+| Ask Claude side panel | `apps/web/src/SidePanel.tsx` for BYOK browser chat; `services/api/src/ai/agent.ts`, `tools.ts` for hosted plan-then-apply |
 | AI cell functions | `packages/calc/src/ai-plugin.ts`, `services/api/src/ai/cell.ts` |
 | Cross-package types | `packages/shared/src/index.ts` |
 | Persistence | `services/api/src/storage.ts`, `storage-pg.ts`, `app.ts` |
 
 ## Load-bearing for the differentiation thesis
 
-- **Plan-then-apply agent.** `services/api/src/ai/agent.ts` runs Claude Opus 4.7 with adaptive thinking and five tools (`set_cell`, `add_sheet`, `create_chart`, plus read-only `audit_formulas` and `forecast`). The user reviews each step before any edit lands. This is the single biggest behavioural differentiator vs. Excel Copilot's dialog-only plan mode.
+- **Plan-then-apply agent.** `services/api/src/ai/agent.ts` runs Claude Opus 4.7 with adaptive thinking and five tools (`set_cell`, `add_sheet`, `create_chart`, plus read-only `audit_formulas` and `forecast`). It returns plan steps for a client to review before edits land. The static Pages side panel uses BYOK browser chat; applyable plans require a hosted API.
 - **AI cell registry.** `=AI()` and friends are first-class formulas that share the recalc graph. Competitors generally bolt these on as side calls; ours are part of the sheet's evaluation order, with prompt caching for cost control.
 - **MCP-readiness.** Architectural decision (not yet implemented): the agent's tool surface is normalized so plugging in Model Context Protocol servers later is mostly a registry change in `services/api/src/ai/tools.ts`. Tracked as P1 #11.
 - **Stay-skinny chrome.** A six-menu bar, not a ribbon. Investment goes into the `Insert → Function` picker and the side-panel intro instead — the places where chat is genuinely worse than UI.

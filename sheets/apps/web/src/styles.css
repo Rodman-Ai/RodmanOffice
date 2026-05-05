@@ -621,6 +621,33 @@ body,
   padding: 0 4px;
 }
 
+.side-panel-key {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--aicell-border);
+  background: #fff7ed;
+  color: #9a3412;
+  font-size: 12px;
+}
+
+.side-panel-key label {
+  font-weight: 600;
+}
+
+.side-panel-key input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #fed7aa;
+  border-radius: 4px;
+  padding: 7px 8px;
+  font: inherit;
+  color: #111827;
+  background: #fff;
+}
+
 .side-panel-messages {
   flex: 1;
   overflow-y: auto;

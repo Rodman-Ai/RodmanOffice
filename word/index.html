@@ -65,13 +65,16 @@
     </header>
     <div class="claude-panel-body">
       <div class="claude-panel-notice">
-        AI is not configured yet. Connect a Claude backend before sending prompts.
+        <label class="claude-api-key-row" for="askClaudeKey">
+          <span>Click here to enter a Claude API key to enable AI features</span>
+          <input id="askClaudeKey" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-..." />
+        </label>
       </div>
       <div class="claude-panel-intro">
         <h3>Skip the menus - just ask.</h3>
         <p>
-          Draft editing requests in plain English. Claude will eventually propose changes
-          you can review before anything in the document is changed.
+          Draft editing requests in plain English. Claude can propose changes
+          you review before anything in the document is changed.
         </p>
         <p class="claude-panel-label">Try one of these:</p>
         <div class="claude-panel-chips">
@@ -83,9 +86,10 @@
         </div>
       </div>
     </div>
+    <div id="askClaudeOutput" class="claude-panel-output" aria-live="polite" hidden></div>
     <form class="claude-panel-input">
-      <textarea id="askClaudeInput" rows="2" placeholder="Choose an example prompt..." readonly></textarea>
-      <button type="submit" disabled>Send</button>
+      <textarea id="askClaudeInput" rows="2" placeholder="Choose an example or type a prompt..."></textarea>
+      <button id="askClaudeSendBtn" type="submit" disabled>Send</button>
     </form>
   </aside>
 
@@ -1868,6 +1872,7 @@
     // both execute after the document is parsed, in source order —
     // so this shim runs before app.js below it.
     import * as docs from '../lib/docs/index.js';
+    import * as claude from '../lib/claude/index.js';
     window.RodmanDocx = {
       saveDocx: docs.saveDocx, loadDocx: docs.loadDocx,
       __buildZip: docs.buildZip, __readZip: docs.readZip,
@@ -1878,6 +1883,7 @@
       mdExport: docs.mdExport, asciidocExport: docs.asciidocExport, latexExport: docs.latexExport,
       rtfImport: docs.rtfImport, odtImport: docs.odtImport, epubImport: docs.epubImport,
     };
+    window.RodmanClaude = claude;
   </script>
   <script src="app.js" defer></script>
 </body>
