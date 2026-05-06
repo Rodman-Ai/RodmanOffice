@@ -455,6 +455,16 @@ export function App() {
     api.setCellsOnSheetBatch(api.activeSheet.name, edits);
   }
 
+  function selectedRowCount(): number {
+    const norm = normalizeRange(selection);
+    return norm.endRow - norm.startRow + 1;
+  }
+
+  function selectedColCount(): number {
+    const norm = normalizeRange(selection);
+    return norm.endCol - norm.startCol + 1;
+  }
+
   const selRaw = api.getRaw(anchor.row, anchor.col);
   const selComputed = api.getComputed(anchor.row, anchor.col);
   const cellCount = rangeCellCount(selection);
@@ -552,6 +562,46 @@ export function App() {
     patchFormat: applyFormatPatch,
     clearFormat: clearFormatRange,
     openConditionalFormat: () => setCfOpen(true),
+    insertRowAbove: () => {
+      const norm = normalizeRange(selection);
+      api.insertRows(api.activeSheet.name, norm.startRow, selectedRowCount());
+      setSelection({
+        startRow: norm.startRow,
+        endRow: norm.startRow + selectedRowCount() - 1,
+        startCol: 0,
+        endCol: api.activeSheet.colCount - 1,
+      });
+    },
+    insertColLeft: () => {
+      const norm = normalizeRange(selection);
+      api.insertCols(api.activeSheet.name, norm.startCol, selectedColCount());
+      setSelection({
+        startRow: 0,
+        endRow: api.activeSheet.rowCount - 1,
+        startCol: norm.startCol,
+        endCol: norm.startCol + selectedColCount() - 1,
+      });
+    },
+    deleteRows: () => {
+      const norm = normalizeRange(selection);
+      api.deleteRows(api.activeSheet.name, norm.startRow, selectedRowCount());
+      setSelection({
+        startRow: Math.min(norm.startRow, Math.max(0, api.activeSheet.rowCount - selectedRowCount() - 1)),
+        startCol: 0,
+        endRow: Math.min(norm.startRow, Math.max(0, api.activeSheet.rowCount - selectedRowCount() - 1)),
+        endCol: api.activeSheet.colCount - 1,
+      });
+    },
+    deleteCols: () => {
+      const norm = normalizeRange(selection);
+      api.deleteCols(api.activeSheet.name, norm.startCol, selectedColCount());
+      setSelection({
+        startRow: 0,
+        startCol: Math.min(norm.startCol, Math.max(0, api.activeSheet.colCount - selectedColCount() - 1)),
+        endRow: api.activeSheet.rowCount - 1,
+        endCol: Math.min(norm.startCol, Math.max(0, api.activeSheet.colCount - selectedColCount() - 1)),
+      });
+    },
     addSheet: api.addSheet,
     openCommentModal: () => setCommentOpen(true),
     openFunctionPicker: (category = null) => {

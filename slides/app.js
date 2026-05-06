@@ -77,6 +77,11 @@
     div.innerHTML = R.sanitizeTextHtml(html || '');
     return div.textContent || '';
   }
+  function titleCase(text) {
+    return text.toLowerCase().replace(/\b[\p{L}\p{N}'-]+/gu, (word) =>
+      word.charAt(0).toUpperCase() + word.slice(1)
+    );
+  }
 
   function initAskClaudePanel() {
     const button = $('#askClaudeBtn');
@@ -540,6 +545,10 @@
         ? slide.background.color
         : '#ffffff';
     }
+    const transitionDuration = $('#transitionDuration');
+    if (transitionDuration) transitionDuration.value = ((slide.transition?.durationMs || 400) / 1000).toFixed(1);
+    const advanceOnClick = $('#advanceOnClick');
+    if (advanceOnClick) advanceOnClick.checked = slide.advanceOnClick !== false;
     R.renderSlide(stageEl, slide, {
       editable: true,
       selectedId: state.selectedElementId,
@@ -1031,6 +1040,18 @@
       });
       renderEditor(); scheduleSave();
     },
+    decreaseLetterSpacing() {
+      const els = selectedElements().filter((el) => el.kind === 'text');
+      if (!els.length) return;
+      els.forEach((el) => { el.letterSpacing = Math.max(-3, (el.letterSpacing || 0) - 0.5); });
+      renderEditor(); scheduleSave();
+    },
+    increaseLetterSpacing() {
+      const els = selectedElements().filter((el) => el.kind === 'text');
+      if (!els.length) return;
+      els.forEach((el) => { el.letterSpacing = Math.min(12, (el.letterSpacing || 0) + 0.5); });
+      renderEditor(); scheduleSave();
+    },
     alignLeft() { applyAlign('left'); },
     alignCenter() { applyAlign('center'); },
     alignRight() { applyAlign('right'); },
@@ -1087,6 +1108,15 @@
       if (url === null) return;
       el.href = url || null;
       renderEditor(); scheduleSave();
+    },
+    resetSlideLayout() {
+      const slide = activeSlide();
+      const layout = $('#layoutSelect').value || slide.layout || 'titleAndContent';
+      if (slide.elements.length && !confirm('Reset this slide to the selected layout?')) return;
+      slide.layout = layout;
+      slide.elements = D.LAYOUTS[layout] ? D.LAYOUTS[layout](deck.theme) : [];
+      clearSelection();
+      renderSlideList(); renderEditor(); scheduleSave();
     },
     selectAllElements() {
       const slide = activeSlide();
@@ -1185,14 +1215,25 @@
       }
       const trigger = $('#animTrigger') ? $('#animTrigger').value : 'onEnter';
       const durationMs = $('#animDuration') ? parseInt($('#animDuration').value, 10) : 500;
+      const delayMs = $('#animDelay') ? parseInt($('#animDelay').value, 10) : 0;
       els.forEach((el) => {
         if (kind === 'none') {
           delete el.animation;
         } else {
-          el.animation = { kind, trigger, durationMs };
+          el.animation = { kind, trigger, durationMs, delayMs };
         }
       });
       scheduleSave();
+    },
+    showAnimationPane() {
+      const rows = activeSlide().elements
+        .map((el, i) => ({ el, i }))
+        .filter(({ el }) => el.animation && el.animation.kind !== 'none')
+        .map(({ el, i }) => {
+          const a = el.animation;
+          return `${i + 1}. ${el.kind} - ${a.kind}, ${a.trigger || 'onEnter'}, ${a.durationMs || 500}ms${a.delayMs ? `, delay ${a.delayMs}ms` : ''}`;
+        });
+      alert(rows.length ? rows.join('\n') : 'No animations on this slide.');
     },
     insertTable() {
       const dim = window.prompt('Table size (rows × cols):', '3 × 3');
@@ -1459,6 +1500,30 @@
     el.color = e.target.value;
     renderEditor(); scheduleSave();
   });
+  $('#lineHeightSelect')?.addEventListener('change', (e) => {
+    const value = Number(e.target.value);
+    e.target.value = '';
+    if (!Number.isFinite(value) || value <= 0) return;
+    const els = selectedElements().filter((el) => el.kind === 'text');
+    if (!els.length) return;
+    els.forEach((el) => { el.lineHeight = value; });
+    renderEditor(); scheduleSave();
+  });
+  $('#changeCaseSelect')?.addEventListener('change', (e) => {
+    const mode = e.target.value;
+    e.target.value = '';
+    if (!mode) return;
+    const els = selectedElements().filter((el) => el.kind === 'text');
+    if (!els.length) return;
+    els.forEach((el) => {
+      const text = textFromHtml(el.html);
+      const next = mode === 'upper' ? text.toUpperCase()
+        : mode === 'lower' ? text.toLowerCase()
+          : titleCase(text);
+      el.html = escapeHtml(next);
+    });
+    renderEditor(); scheduleSave();
+  });
   $('#shapeFill').addEventListener('input', (e) => {
     const el = selectedElement();
     if (!el || el.kind !== 'shape') return;
@@ -1493,6 +1558,17 @@
   $('#slideBgColor')?.addEventListener('input', (e) => {
     activeSlide().background = { kind: 'solid', color: e.target.value };
     renderSlideList(); renderEditor(); scheduleSave();
+  });
+  $('#transitionDuration')?.addEventListener('change', (e) => {
+    const seconds = Math.max(0.1, Math.min(5, Number(e.target.value) || 0.4));
+    const slide = activeSlide();
+    slide.transition = { ...(slide.transition || { kind: 'none' }), durationMs: Math.round(seconds * 1000) };
+    e.target.value = seconds.toFixed(1);
+    scheduleSave();
+  });
+  $('#advanceOnClick')?.addEventListener('change', (e) => {
+    activeSlide().advanceOnClick = e.target.checked;
+    scheduleSave();
   });
 
   // ---------- Status bar ----------

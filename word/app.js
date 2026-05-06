@@ -2641,6 +2641,18 @@ ${editor.innerHTML}
     );
   });
 
+  $('#insertIconBtn')?.addEventListener('click', () => {
+    const icon = prompt('Icon character or symbol:', '★');
+    if (!icon) return;
+    restoreSelection();
+    document.execCommand(
+      'insertHTML',
+      false,
+      '<span class="rwd-icon" contenteditable="false">' + escapeHtml(icon.slice(0, 4)) + '</span>'
+    );
+    queueAutosave();
+  });
+
   // ============================================================
   // FEATURE: Watermark
   // ============================================================
@@ -2861,6 +2873,31 @@ ${editor.innerHTML}
   $('#mailMergeBtn')?.addEventListener('click', () => {
     refreshMergeFieldSelect();
     openModal($('#mailMergeModal'));
+  });
+  $('#envelopesBtn')?.addEventListener('click', () => {
+    const recipient = prompt('Recipient address:', 'Recipient Name\nStreet Address\nCity, ST 00000');
+    if (recipient === null) return;
+    const sender = prompt('Return address:', 'Sender Name\nStreet Address\nCity, ST 00000') || '';
+    restoreSelection();
+    const html =
+      '<section class="rwd-envelope">' +
+      '<div class="rwd-envelope-return">' + escapeHtml(sender).replace(/\n/g, '<br>') + '</div>' +
+      '<div class="rwd-envelope-recipient">' + escapeHtml(recipient).replace(/\n/g, '<br>') + '</div>' +
+      '</section><p><br></p>';
+    document.execCommand('insertHTML', false, html);
+    queueAutosave();
+  });
+  $('#labelsBtn')?.addEventListener('click', () => {
+    const text = prompt('Label text:', 'Name\nAddress\nCity, ST 00000');
+    if (text === null) return;
+    restoreSelection();
+    const label = escapeHtml(text).replace(/\n/g, '<br>');
+    const rows = Array.from({ length: 5 }, () =>
+      '<tr>' + Array.from({ length: 2 }, () => '<td>' + label + '</td>').join('') + '</tr>'
+    ).join('');
+    const html = '<table class="rwd-label-sheet"><tbody>' + rows + '</tbody></table><p><br></p>';
+    document.execCommand('insertHTML', false, html);
+    queueAutosave();
   });
   mergeFieldSelect?.addEventListener('change', (e) => {
     const field = e.target.value;

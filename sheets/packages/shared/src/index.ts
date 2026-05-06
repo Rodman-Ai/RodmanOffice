@@ -22,10 +22,18 @@ export type CellFormat = {
   italic?: boolean;
   underline?: boolean;
   align?: "left" | "center" | "right";
+  /** CSS font-family string. */
+  fontFamily?: string;
+  /** Font size in px. */
+  fontSize?: number;
   /** CSS color string for text. */
   color?: string;
   /** CSS color string for cell background. */
   bg?: string;
+  /** Draw a simple all-sides cell border. */
+  border?: boolean;
+  /** Allow cell text to wrap. */
+  wrap?: boolean;
   /** Number-format preset; "general" or undefined uses HyperFormula's raw value. */
   numberFmt?: NumberFormat;
   /** Decimal places for "number", "currency", and "percent". Defaults to 2. */

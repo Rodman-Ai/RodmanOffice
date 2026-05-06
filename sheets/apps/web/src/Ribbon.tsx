@@ -29,6 +29,10 @@ export type RibbonActions = {
   patchFormat: (patch: Partial<CellFormat>) => void;
   clearFormat: () => void;
   openConditionalFormat: () => void;
+  insertRowAbove: () => void;
+  insertColLeft: () => void;
+  deleteRows: () => void;
+  deleteCols: () => void;
   // Insert
   addSheet: () => void;
   openCommentModal: () => void;
@@ -146,6 +150,33 @@ export function Ribbon({ a }: { a: RibbonActions }) {
 
             <Group label="Font">
               <Row>
+                <select
+                  className="select"
+                  value={fmt.fontFamily ?? ""}
+                  onChange={(e) => a.patchFormat({ fontFamily: e.target.value || undefined })}
+                  title="Font family"
+                  style={{ width: 130 }}
+                >
+                  <option value="">Default</option>
+                  <option value="Aptos, Calibri, Arial, sans-serif">Aptos</option>
+                  <option value="Arial, sans-serif">Arial</option>
+                  <option value="Georgia, serif">Georgia</option>
+                  <option value="'Courier New', monospace">Courier New</option>
+                  <option value="'Times New Roman', Times, serif">Times New Roman</option>
+                </select>
+                <select
+                  className="select sm"
+                  value={fmt.fontSize ?? ""}
+                  onChange={(e) => a.patchFormat({ fontSize: e.target.value ? Number(e.target.value) : undefined })}
+                  title="Font size"
+                >
+                  <option value="">Size</option>
+                  {[10, 11, 12, 14, 16, 18, 20, 24, 28, 32].map((size) => (
+                    <option key={size} value={size}>{size}</option>
+                  ))}
+                </select>
+              </Row>
+              <Row>
                 <Btn
                   active={!!fmt.bold}
                   onClick={() => a.patchFormat({ bold: !fmt.bold })}
@@ -203,6 +234,16 @@ export function Ribbon({ a }: { a: RibbonActions }) {
                   onClick={() => a.patchFormat({ align: fmt.align === "right" ? undefined : "right" })}
                   title="Align right"
                 >Right</Btn>
+                <Btn
+                  active={!!fmt.wrap}
+                  onClick={() => a.patchFormat({ wrap: !fmt.wrap })}
+                  title="Wrap text"
+                >Wrap</Btn>
+                <Btn
+                  active={!!fmt.border}
+                  onClick={() => a.patchFormat({ border: !fmt.border })}
+                  title="Toggle cell borders"
+                >Borders</Btn>
               </Row>
             </Group>
 
@@ -247,9 +288,13 @@ export function Ribbon({ a }: { a: RibbonActions }) {
             <Group label="Cells">
               <Row>
                 <Btn icon="+" label="Insert Sheet" onClick={a.addSheet} />
+                <Btn icon="Row+" label="Insert Row" onClick={a.insertRowAbove} />
+                <Btn icon="Col+" label="Insert Column" onClick={a.insertColLeft} />
               </Row>
               <Row>
                 <Btn icon="Del" label="Clear Contents" onClick={a.clearSelection} title="Delete contents" />
+                <Btn icon="Row-" label="Delete Row" onClick={a.deleteRows} />
+                <Btn icon="Col-" label="Delete Column" onClick={a.deleteCols} />
               </Row>
             </Group>
 

@@ -1030,6 +1030,46 @@ body.reading-mode.dyslexia .editor {
 .editor svg.rwd-qr, .editor svg.rwd-barcode {
   display: inline-block; max-width: 200px; height: auto; margin: 4px;
 }
+.editor .rwd-icon {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.35em;
+  min-height: 1.35em;
+  margin: 0 0.12em;
+  color: var(--theme-accent-1, var(--primary));
+  font-size: 1.3em;
+  line-height: 1;
+}
+.editor .rwd-envelope {
+  min-height: 3.8in;
+  border: 1px dashed var(--ribbon-border);
+  margin: 12px 0;
+  padding: 0.35in;
+  position: relative;
+  page-break-after: always;
+}
+.editor .rwd-envelope-return {
+  font-size: 9pt;
+  max-width: 2.5in;
+}
+.editor .rwd-envelope-recipient {
+  position: absolute;
+  left: 40%;
+  top: 45%;
+  min-width: 3in;
+}
+.editor table.rwd-label-sheet {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0.12in;
+}
+.editor table.rwd-label-sheet td {
+  border: 1px dashed var(--ribbon-border);
+  height: 1in;
+  padding: 0.12in;
+  vertical-align: middle;
+}
 
 /* Custom list bullets */
 .editor ul[data-bullet] { list-style: none; padding-left: 1.6em; }

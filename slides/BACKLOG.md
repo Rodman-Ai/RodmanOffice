@@ -13,9 +13,9 @@ subsystem or external integration.
 |---|---:|---|
 | Undo / redo history | M | Visible disabled buttons were removed; needs deck snapshot or command history. |
 | Paste dropdown variants | M | Needs paste-as-text/image/format choices. |
-| Reset slide and section controls | M | Requires section model and layout reset behavior. |
-| Font advanced controls | M | Strikethrough and basic clear-formatting exist; character spacing and case controls remain deferred. |
-| Paragraph advanced controls | M | Line spacing, vertical alignment, columns, and paragraph direction need text layout support. |
+| Advanced reset slide and section controls | M | Basic slide reset exists; section model and section controls remain deferred. |
+| Advanced font controls | M | Strikethrough, character spacing, change case, and basic clear-formatting exist; richer typography remains deferred. |
+| Advanced paragraph controls | M | Basic line spacing exists; vertical alignment, columns, and paragraph direction remain deferred. |
 | Advanced find / replace / select menu | M | Basic deck-wide find, replace, and select-all controls exist; richer scoped search options remain deferred. |
 | Designer | L | Requires layout recommendation engine. |
 | Add-ins and sensitivity labels | L | Requires extension/security and policy models. |
@@ -49,16 +49,16 @@ subsystem or external integration.
 |---|---:|---|
 | Advanced transition gallery | M | Current transition set is intentionally small. |
 | Effect options | M | Needs per-transition parameters. |
-| Sound, duration, and advance-slide timing | M | Duration is stored but runtime currently uses fixed CSS timings. |
+| Sound and advanced advance-slide timing | M | Duration and on-click controls exist; sound and automatic advance timing remain deferred. |
 
 ## Animations
 
 | Feature | Effort | Notes |
 |---|---:|---|
-| Animation pane | M | Needs visible list of element animations. |
+| Advanced animation pane | M | Basic animation list is exposed; reorderable pane editing remains deferred. |
 | Add animation and effect options | M | Current animation command replaces animation state. |
 | Trigger menu and animation painter | M | Trigger exists as a select; richer PowerPoint flows are deferred. |
-| Reorder animation and timing controls | M | Needs ordered animation list per slide. |
+| Reorder animation and advanced timing controls | M | Duration and delay controls exist; ordered animation lists remain deferred. |
 
 ## Slide Show
 

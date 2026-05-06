@@ -14,11 +14,11 @@ large subsystem or integration.
 |---|---:|---|
 | Paste dropdown variants | M | Needs paste-special options such as values, formulas, formatting, transpose, and text import behavior. |
 | Advanced format painter | M | Basic copied-format state and target range application exist; repeat/multi-paint behavior remains deferred. |
-| Font family and font size | M | Requires cell-format schema extension and renderer/export support. |
-| Borders and border presets | M | Requires cell-format schema extension and range edge handling. |
-| Wrap text, text orientation, merge cells | M | Needs layout changes in the virtualized grid. |
+| Advanced font formatting | M | Basic font family and font size controls exist; export fidelity and richer font lists remain deferred. |
+| Advanced borders and border presets | M | Basic all-sides border toggle exists; edge-specific presets remain deferred. |
+| Advanced wrap text, text orientation, merge cells | M | Basic wrap toggle exists; row auto-height, text orientation, and merge cells remain deferred. |
 | Format as Table and Cell Styles galleries | L | Needs table model, style definitions, totals/header semantics, and export mapping. |
-| Insert/Delete/Format cell operations | M | Needs row/column insertion/deletion and workbook-shift semantics. |
+| Advanced Insert/Delete/Format cell operations | M | Basic row/column insert/delete controls exist; cell-shift options and richer format dialogs remain deferred. |
 | Add-ins and sensitivity labels | L | Requires extension/security and policy models. |
 
 ## Insert

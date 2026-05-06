@@ -53,8 +53,19 @@ export function formatToStyle(format: CellFormat | undefined): React.CSSProperti
   if (format.bold) style.fontWeight = 600;
   if (format.italic) style.fontStyle = "italic";
   if (format.underline) style.textDecoration = "underline";
+  if (format.fontFamily) style.fontFamily = format.fontFamily;
+  if (format.fontSize) style.fontSize = `${format.fontSize}px`;
   if (format.color) style.color = format.color;
   if (format.bg) style.background = format.bg;
+  if (format.border) {
+    style.borderColor = "#4b5563";
+    style.borderStyle = "solid";
+  }
+  if (format.wrap) {
+    style.whiteSpace = "normal";
+    style.alignItems = "flex-start";
+    style.lineHeight = 1.25;
+  }
   if (format.align === "left") style.justifyContent = "flex-start";
   else if (format.align === "center") style.justifyContent = "center";
   else if (format.align === "right") style.justifyContent = "flex-end";

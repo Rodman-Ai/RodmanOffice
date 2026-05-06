@@ -23,7 +23,7 @@ large subsystem or format model work.
 | Feature | Effort | Notes |
 |---|---:|---|
 | SmartArt | L | Needs diagram model, editing UI, and export behavior. |
-| Icons library | M | Could start with a bundled icon picker. |
+| Advanced icons library | M | Basic icon insertion exists; bundled searchable icon gallery remains deferred. |
 | 3D Models | L | Needs asset handling and renderer/export strategy. |
 | Screenshot insertion | M | Browser capture permissions and fallback UX required. |
 | Full online video provider picker | M | Current video insert is basic. |
@@ -63,8 +63,8 @@ large subsystem or format model work.
 
 | Feature | Effort | Notes |
 |---|---:|---|
-| Envelopes | M | Needs envelope page presets and address layout. |
-| Labels | M | Needs label sheet templates and repeated layout. |
+| Advanced envelopes | M | Basic envelope layout insertion exists; presets and print setup remain deferred. |
+| Advanced labels | M | Basic repeated label sheet insertion exists; template sizes and merge integration remain deferred. |
 | Recipient list manager | M | Current mail merge accepts pasted CSV only. |
 | Edit recipient list | M | Needs table UI for CSV rows. |
 | Address block and greeting line | M | Needs field mapping helpers. |

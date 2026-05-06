@@ -129,19 +129,23 @@
 
       function playAnim(node, a) {
         const dur = (a.durationMs || 500) + 'ms';
+        node.style.animationDelay = (a.delayMs || 0) + 'ms';
         node.style.animation = `${a.kind} ${dur} cubic-bezier(0.16, 1, 0.3, 1) both`;
       }
 
       if (prevStage) {
         // Animate transition; remove prev after animation completes
+        const transitionMs = Math.max(100, Math.min(5000, slide.transition?.durationMs || 400));
+        stage.style.animationDuration = transitionMs + 'ms';
         stage.classList.add('enter');
         prevStage.classList.add('leave');
         const oldStage = prevStage;
+        oldStage.style.animationDuration = transitionMs + 'ms';
         oldStage.addEventListener('animationend', () => {
           oldStage.remove();
         }, { once: true });
-        // Fallback: if animation doesn't fire, clean up after 600ms
-        setTimeout(() => oldStage.remove(), 700);
+        // Fallback: if animation doesn't fire, clean up shortly after the requested duration.
+        setTimeout(() => oldStage.remove(), transitionMs + 300);
         requestAnimationFrame(() => {
           stage.classList.remove('enter');
           stage.classList.add('entering');
@@ -215,6 +219,7 @@
     function onOverlayClick(e) {
       // Click-anywhere-but-controls advances
       if (e.target.closest('.present-controls')) return;
+      if (deck.slides[idx]?.advanceOnClick === false) return;
       go(1);
     }
 

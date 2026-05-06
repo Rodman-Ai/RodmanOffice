@@ -42,6 +42,10 @@ export type WorkbookApi = {
   removeChart: (sheetName: string, chartId: string) => void;
   /** Set a single column's width (px). Pushes one undo step per call. */
   setColWidth: (sheetName: string, col: number, width: number) => void;
+  insertRows: (sheetName: string, row: number, count?: number) => void;
+  deleteRows: (sheetName: string, row: number, count?: number) => void;
+  insertCols: (sheetName: string, col: number, count?: number) => void;
+  deleteCols: (sheetName: string, col: number, count?: number) => void;
   /** Apply a format patch to every cell in the range. One undo step. */
   applyFormat: (sheetName: string, range: Range, patch: Partial<CellFormat>) => void;
   /** Remove all formatting from every cell in the range. One undo step. */
@@ -97,6 +101,11 @@ function cloneCell(cell: Cell): Cell {
 function cellFromEdit(existing: Cell | undefined, edit: CellEdit): Cell | undefined {
   if ("cell" in edit) return edit.cell ? cloneCell(edit.cell) : undefined;
   return nextCellWithRaw(existing, edit.raw ?? "");
+}
+
+function parseCellKey(key: string): [number, number] {
+  const [r = "0", c = "0"] = key.split(",");
+  return [Number(r), Number(c)];
 }
 
 /** Suffix the proposed name with " (2)", " (3)", … until it doesn't collide. */
@@ -598,6 +607,99 @@ export function useWorkbook(): WorkbookApi {
     [pushHistory]
   );
 
+  const transformSheetStructure = useCallback(
+    (sheetName: string, transform: (sheet: Sheet) => Sheet) => {
+      const current = workbookRef.current;
+      if (!current.sheets.some((s) => s.name === sheetName)) return;
+      pushHistory();
+      const next = {
+        ...current,
+        sheets: current.sheets.map((s) => (s.name === sheetName ? transform(s) : s)),
+      };
+      reloadEngine(next);
+      setWorkbook(next);
+      setVersion((v) => v + 1);
+    },
+    [pushHistory, reloadEngine]
+  );
+
+  const insertRows = useCallback(
+    (sheetName: string, row: number, count = 1) => {
+      const amount = Math.max(1, Math.floor(count));
+      transformSheetStructure(sheetName, (sheet) => {
+        const at = Math.max(0, Math.min(row, sheet.rowCount));
+        const cells: Record<string, Cell> = {};
+        for (const [key, cell] of Object.entries(sheet.cells)) {
+          const [r, c] = parseCellKey(key);
+          cells[cellKey(r >= at ? r + amount : r, c)] = cloneCell(cell);
+        }
+        return { ...sheet, cells, rowCount: sheet.rowCount + amount };
+      });
+    },
+    [transformSheetStructure]
+  );
+
+  const deleteRows = useCallback(
+    (sheetName: string, row: number, count = 1) => {
+      const amount = Math.max(1, Math.floor(count));
+      transformSheetStructure(sheetName, (sheet) => {
+        const at = Math.max(0, Math.min(row, sheet.rowCount - 1));
+        const cells: Record<string, Cell> = {};
+        for (const [key, cell] of Object.entries(sheet.cells)) {
+          const [r, c] = parseCellKey(key);
+          if (r >= at && r < at + amount) continue;
+          cells[cellKey(r >= at + amount ? r - amount : r, c)] = cloneCell(cell);
+        }
+        return { ...sheet, cells, rowCount: Math.max(1, sheet.rowCount - amount) };
+      });
+    },
+    [transformSheetStructure]
+  );
+
+  const insertCols = useCallback(
+    (sheetName: string, col: number, count = 1) => {
+      const amount = Math.max(1, Math.floor(count));
+      transformSheetStructure(sheetName, (sheet) => {
+        const at = Math.max(0, Math.min(col, sheet.colCount));
+        const cells: Record<string, Cell> = {};
+        for (const [key, cell] of Object.entries(sheet.cells)) {
+          const [r, c] = parseCellKey(key);
+          cells[cellKey(r, c >= at ? c + amount : c)] = cloneCell(cell);
+        }
+        const colWidths: Record<number, number> = {};
+        for (const [key, width] of Object.entries(sheet.colWidths ?? {})) {
+          const c = Number(key);
+          colWidths[c >= at ? c + amount : c] = width;
+        }
+        return { ...sheet, cells, colWidths, colCount: sheet.colCount + amount };
+      });
+    },
+    [transformSheetStructure]
+  );
+
+  const deleteCols = useCallback(
+    (sheetName: string, col: number, count = 1) => {
+      const amount = Math.max(1, Math.floor(count));
+      transformSheetStructure(sheetName, (sheet) => {
+        const at = Math.max(0, Math.min(col, sheet.colCount - 1));
+        const cells: Record<string, Cell> = {};
+        for (const [key, cell] of Object.entries(sheet.cells)) {
+          const [r, c] = parseCellKey(key);
+          if (c >= at && c < at + amount) continue;
+          cells[cellKey(r, c >= at + amount ? c - amount : c)] = cloneCell(cell);
+        }
+        const colWidths: Record<number, number> = {};
+        for (const [key, width] of Object.entries(sheet.colWidths ?? {})) {
+          const c = Number(key);
+          if (c >= at && c < at + amount) continue;
+          colWidths[c >= at + amount ? c - amount : c] = width;
+        }
+        return { ...sheet, cells, colWidths, colCount: Math.max(1, sheet.colCount - amount) };
+      });
+    },
+    [transformSheetStructure]
+  );
+
   const undo = useCallback(() => {
     const prev = pastRef.current.pop();
     if (!prev) return;
@@ -647,6 +749,10 @@ export function useWorkbook(): WorkbookApi {
     addChart,
     removeChart,
     setColWidth,
+    insertRows,
+    deleteRows,
+    insertCols,
+    deleteCols,
     applyFormat,
     clearFormat,
     getCellFormat,

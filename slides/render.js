@@ -138,7 +138,8 @@
       fontFamily: el.fontFamily || themeFont,
       outline: 'none',
       overflow: 'hidden',
-      lineHeight: '1.25',
+      lineHeight: String(el.lineHeight || 1.25),
+      letterSpacing: (el.letterSpacing || 0) + 'px',
       whiteSpace: 'normal',
       wordWrap: 'break-word',
     });
