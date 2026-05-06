@@ -36,15 +36,15 @@ large subsystem or format model work.
 | Word-like theme gallery strip | M | Current Document Themes modal is functional but not a ribbon gallery. |
 | Separate Colors, Fonts, and Effects menus | M | Existing document themes bundle these together. |
 | Set as Default | M | Needs persistent default theme/style behavior. |
-| Page Color | M | Needs print/export-safe page background handling. |
-| Page Borders | M | Needs page-level border model and export mapping. |
+| Advanced Page Color | M | Basic persisted page color control exists; print/export-safe document metadata is still deferred. |
+| Advanced Page Borders | M | Basic page border toggle exists; border presets and export mapping remain deferred. |
 
 ## Layout
 
 | Feature | Effort | Notes |
 |---|---:|---|
-| Numeric left/right indent controls | M | Current indent/outdent commands are coarse. |
-| Numeric before/after paragraph spacing controls | M | Current spacing select is preset-based. |
+| Advanced paragraph indent controls | M | Basic numeric left/right indent controls exist; first-line/hanging presets remain deferred. |
+| Advanced before/after paragraph spacing controls | M | Basic numeric before/after controls exist; style-aware spacing presets remain deferred. |
 | Breaks dropdown with all Word break types | M | Current section/page breaks cover only the basics. |
 | Advanced line-number options | M | Current line numbers are a toggle. |
 | Advanced hyphenation options | M | Current hyphenation is a toggle. |
@@ -54,7 +54,7 @@ large subsystem or format model work.
 
 | Feature | Effort | Notes |
 |---|---:|---|
-| Endnotes | M | Footnotes exist; endnotes need separate collection and rendering. |
+| Advanced endnotes | M | Basic endnotes exist; conversion, renumbering options, and export mapping remain deferred. |
 | Manage Sources | M | Current citations are lightweight. |
 | Citation provider switching | M | Needs provider abstraction beyond local source records. |
 | Table of Authorities | L | Requires legal citation model and marked authorities. |
@@ -77,7 +77,7 @@ large subsystem or format model work.
 
 | Feature | Effort | Notes |
 |---|---:|---|
-| Thesaurus | M | Needs local or service-backed synonym data. |
+| Advanced thesaurus | M | Ribbon opens the selected word in Merriam-Webster; local/service-backed synonym data remains deferred. |
 | Accessibility checker | L | Needs semantic checks and actionable issue panel. |
 | Linked notes / OneNote-style integration | L | Requires external integration or local notes model. |
 | Ink hide/show parity | L | Needs ink/stylus model first. |

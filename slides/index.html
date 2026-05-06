@@ -177,6 +177,8 @@
           <button class="ribbon-btn" data-cmd="bold" title="Bold (Ctrl+B)"><b>B</b></button>
           <button class="ribbon-btn" data-cmd="italic" title="Italic (Ctrl+I)"><i>I</i></button>
           <button class="ribbon-btn" data-cmd="underline" title="Underline (Ctrl+U)"><u>U</u></button>
+          <button class="ribbon-btn" data-cmd="strike" title="Strikethrough"><s>S</s></button>
+          <button class="ribbon-btn" data-cmd="clearTextFormatting" title="Clear text formatting">Clear</button>
           <input class="color-input" type="color" id="textColor" title="Text color" value="#000000" />
         </div>
         <div class="group-label">Font</div>
@@ -224,6 +226,9 @@
           <button class="ribbon-btn" data-cmd="duplicateElement" title="Duplicate (Ctrl+D)">Duplicate</button>
           <button class="ribbon-btn" data-cmd="deleteElement" title="Delete (Del)">Delete</button>
           <button class="ribbon-btn" data-cmd="insertLink" title="Hyperlink (Ctrl+K)">Link</button>
+          <button class="ribbon-btn" data-cmd="selectAllElements" title="Select all elements on this slide">Select All</button>
+          <button class="ribbon-btn" data-cmd="findText" title="Find text in deck">Find</button>
+          <button class="ribbon-btn" data-cmd="replaceText" title="Replace text in deck">Replace</button>
         </div>
         <div class="group-label">Editing</div>
       </div>
@@ -318,6 +323,8 @@
             <option value="16:9" selected>Widescreen 16:9</option>
             <option value="4:3">Standard 4:3</option>
           </select>
+          <input class="color-input" type="color" id="slideBgColor" title="Slide background color" value="#ffffff" />
+          <button class="ribbon-btn" data-cmd="clearSlideBackground" title="Use theme background">Theme bg</button>
         </div>
         <div class="group-label">Customize</div>
       </div>
@@ -405,6 +412,7 @@
       <div class="group">
         <div class="group-row">
           <button class="ribbon-btn wide" data-cmd="toggleNotes">Speaker notes</button>
+          <button class="ribbon-btn wide" data-cmd="toggleHideSlide">Hide Slide</button>
         </div>
         <div class="group-label">Set Up</div>
       </div>

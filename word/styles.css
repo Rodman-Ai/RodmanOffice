@@ -625,6 +625,12 @@ body.fullscreen-editor .rodmanoffice-back { display: none; }
   margin-bottom: calc(var(--page-height, 11.69in) * (var(--zoom, 1) - 1));
   transition: width 0.2s, min-height 0.2s, padding 0.2s;
 }
+
+body.word-page-border .page {
+  outline: 2px solid var(--theme-accent-1, var(--primary));
+  outline-offset: -16px;
+}
+
 .page.a4 { --page-width: 8.27in; --page-height: 11.69in; }
 .page.letter { --page-width: 8.5in; --page-height: 11in; }
 .page.legal { --page-width: 8.5in; --page-height: 14in; }
@@ -916,6 +922,15 @@ body.reading-mode.dyslexia .editor {
 .editor input.rwd-form-date:invalid {
   background: rgba(210,63,49,0.08);
 }
+
+.editor .rwd-endnotes {
+  border-top: 2px double var(--ribbon-border);
+  margin-top: 28px;
+  padding-top: 12px;
+  font-size: 10pt;
+}
+.editor .rwd-endnotes ol { padding-left: 20px; }
+.editor .rwd-endnotes li { margin: 0.2em 0; }
 
 /* Index entries (back-of-book) */
 .editor .rwd-index {

@@ -2630,6 +2630,17 @@ ${editor.innerHTML}
     }, 10);
   }, true);
 
+  $('#reviewThesaurusBtn')?.addEventListener('click', () => {
+    const word = selectedWord() || window.prompt('Thesaurus word:', '') || '';
+    const cleaned = word.trim();
+    if (!cleaned) return;
+    window.open(
+      'https://www.merriam-webster.com/thesaurus/' + encodeURIComponent(cleaned),
+      '_blank',
+      'noopener'
+    );
+  });
+
   // ============================================================
   // FEATURE: Watermark
   // ============================================================
@@ -2664,6 +2675,45 @@ ${editor.innerHTML}
     try { localStorage.setItem(STORE_WM, JSON.stringify(v)); } catch {}
     applyWatermark();
     closeModal($('#watermarkModal'));
+  });
+
+  const STORE_PAGE_BG = 'rodmanword:page-background';
+  function applyPageBackground() {
+    let v = {};
+    try { v = JSON.parse(localStorage.getItem(STORE_PAGE_BG) || '{}'); } catch {}
+    if (v.color) {
+      page.style.backgroundColor = v.color;
+      const input = $('#pageColorInput');
+      if (input) input.value = v.color;
+    } else {
+      page.style.backgroundColor = '';
+    }
+    document.body.classList.toggle('word-page-border', !!v.border);
+  }
+  applyPageBackground();
+
+  $('#pageColorInput')?.addEventListener('input', (e) => {
+    let v = {};
+    try { v = JSON.parse(localStorage.getItem(STORE_PAGE_BG) || '{}'); } catch {}
+    v.color = e.target.value;
+    try { localStorage.setItem(STORE_PAGE_BG, JSON.stringify(v)); } catch {}
+    applyPageBackground();
+  });
+
+  $('#clearPageColorBtn')?.addEventListener('click', () => {
+    let v = {};
+    try { v = JSON.parse(localStorage.getItem(STORE_PAGE_BG) || '{}'); } catch {}
+    delete v.color;
+    try { localStorage.setItem(STORE_PAGE_BG, JSON.stringify(v)); } catch {}
+    applyPageBackground();
+  });
+
+  $('#pageBorderBtn')?.addEventListener('click', () => {
+    let v = {};
+    try { v = JSON.parse(localStorage.getItem(STORE_PAGE_BG) || '{}'); } catch {}
+    v.border = !v.border;
+    try { localStorage.setItem(STORE_PAGE_BG, JSON.stringify(v)); } catch {}
+    applyPageBackground();
   });
 
   // ============================================================
@@ -3232,6 +3282,44 @@ ${editor.innerHTML}
   // change (and on doc load) we walk all such spans and refresh their
   // text content. Most fields are global; the 'page' field counts
   // page-break HRs that precede the field in document order.
+  const insertEndnoteBtn = $('#insertEndnoteBtn');
+  if (insertEndnoteBtn) {
+    insertEndnoteBtn.addEventListener('click', () => {
+      const text = prompt('Endnote text:', '');
+      if (!text) return;
+      restoreSelection();
+      const existing = editor.querySelectorAll('.rwd-en-ref');
+      const num = existing.length + 1;
+      let container = editor.querySelector('.rwd-endnotes');
+      if (!container) {
+        container = document.createElement('div');
+        container.className = 'rwd-endnotes';
+        container.contentEditable = 'true';
+        container.innerHTML = '<h4 contenteditable="false">Endnotes</h4><ol></ol>';
+        editor.appendChild(container);
+      }
+      const ol = container.querySelector('ol');
+      const id = 'rwd-en-' + Date.now() + '-' + num;
+      const li = document.createElement('li');
+      li.id = id;
+      li.textContent = text;
+      ol.appendChild(li);
+      const ref = '<sup class="rwd-en-ref" title="' + escapeHtml(text) +
+        '" data-en="' + id + '">' + num + '</sup>';
+      document.execCommand('insertHTML', false, ref);
+      queueAutosave();
+    });
+  }
+
+  editor.addEventListener('click', (e) => {
+    const sup = e.target.closest && e.target.closest('.rwd-en-ref');
+    if (!sup) return;
+    const id = sup.dataset.en;
+    if (!id) return;
+    const li = document.getElementById(id);
+    if (li) li.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  });
+
   const FIELDS = {
     page(el) {
       // Count <hr class="page-break"> and equivalent break elements
@@ -7565,6 +7653,30 @@ ${editor.innerHTML}
       b.style.marginBottom = v + 'em';
     });
     queueAutosave();
+  });
+
+  function applyParagraphNumberInput(input, apply) {
+    input?.addEventListener('change', (e) => {
+      const value = Number(e.target.value);
+      if (!Number.isFinite(value)) return;
+      const blocks = affectedBlocks();
+      if (!blocks.length) { toast('Place the cursor in a paragraph first', 'info'); return; }
+      blocks.forEach((b) => apply(b, value));
+      queueAutosave();
+    });
+  }
+
+  applyParagraphNumberInput($('#indentLeftInput'), (b, v) => {
+    b.style.marginLeft = Math.max(0, v) + 'in';
+  });
+  applyParagraphNumberInput($('#indentRightInput'), (b, v) => {
+    b.style.marginRight = Math.max(0, v) + 'in';
+  });
+  applyParagraphNumberInput($('#spacingBeforeInput'), (b, v) => {
+    b.style.marginTop = Math.max(0, v) + 'pt';
+  });
+  applyParagraphNumberInput($('#spacingAfterInput'), (b, v) => {
+    b.style.marginBottom = Math.max(0, v) + 'pt';
   });
 
   // ============================================================

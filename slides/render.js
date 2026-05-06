@@ -57,7 +57,10 @@
   // resize/dblclick-to-edit; `opts.readonly` is the present-mode path.
   function renderSlide(container, slide, opts = {}) {
     container.innerHTML = '';
-    container.style.background = 'var(--slide-bg)';
+    container.style.background =
+      slide.background && slide.background.kind === 'solid' && slide.background.color
+        ? slide.background.color
+        : 'var(--slide-bg)';
     container.style.fontFamily = 'var(--slide-font-body)';
 
     slide.elements.forEach((el) => {

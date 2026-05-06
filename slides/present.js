@@ -56,7 +56,20 @@
       setTimeout(broadcastSync, 400);
     }
 
-    let idx = Math.max(0, Math.min(startIndex, deck.slides.length - 1));
+    function firstVisibleFrom(start, direction) {
+      if (!deck.slides.length) return 0;
+      const dir = direction || 1;
+      let i = Math.max(0, Math.min(start, deck.slides.length - 1));
+      for (let step = 0; step < deck.slides.length; step++) {
+        if (!deck.slides[i]?.hidden) return i;
+        i += dir;
+        if (i < 0 || i >= deck.slides.length) break;
+      }
+      return deck.slides.findIndex((s) => !s.hidden);
+    }
+
+    let idx = firstVisibleFrom(startIndex, 1);
+    if (idx < 0) idx = 0;
     let prevStage = null;
 
     function applyTheme() {
@@ -142,7 +155,10 @@
     }
 
     function go(delta) {
-      const ni = idx + delta;
+      let ni = idx + delta;
+      while (ni >= 0 && ni < deck.slides.length && deck.slides[ni]?.hidden) {
+        ni += delta;
+      }
       if (ni < 0 || ni >= deck.slides.length) return;
       const target = deck.slides[ni];
       const tk = target.transition?.kind || 'none';
@@ -171,8 +187,18 @@
       if (e.key === 'ArrowLeft' || e.key === 'Backspace' || e.key === 'PageUp') {
         e.preventDefault(); go(-1); return;
       }
-      if (e.key === 'Home') { e.preventDefault(); idx = 0; showSlide(0, 'none'); return; }
-      if (e.key === 'End') { e.preventDefault(); idx = deck.slides.length - 1; showSlide(idx, 'none'); return; }
+      if (e.key === 'Home') {
+        e.preventDefault();
+        const first = firstVisibleFrom(0, 1);
+        if (first >= 0) { idx = first; showSlide(idx, 'none'); }
+        return;
+      }
+      if (e.key === 'End') {
+        e.preventDefault();
+        const last = firstVisibleFrom(deck.slides.length - 1, -1);
+        if (last >= 0) { idx = last; showSlide(idx, 'none'); }
+        return;
+      }
     }
 
     function onCtrlClick(e) {

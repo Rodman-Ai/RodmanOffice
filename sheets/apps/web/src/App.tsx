@@ -69,6 +69,11 @@ export function App() {
   const [helpTopic, setHelpTopic] = useState<HelpTopic | null>(null);
   const [showGridlines, setShowGridlines] = useState(true);
   const [showHeadings, setShowHeadings] = useState(true);
+  const [showFormulas, setShowFormulas] = useState(false);
+  const [focusCell, setFocusCell] = useState(false);
+  const [formatPainter, setFormatPainter] = useState<
+    { row: number; col: number; source: Range; format: CellFormat | undefined } | null
+  >(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const formulaInputRef = useRef<HTMLInputElement>(null);
   const formulaEditRef = useRef<{ row: number; col: number; raw: string } | null>(null);
@@ -226,6 +231,28 @@ export function App() {
   }, [api, selection]);
 
   const anchorFormat = api.getCellFormat(anchor.row, anchor.col);
+
+  const startFormatPainter = useCallback(() => {
+    setFormatPainter({
+      row: anchor.row,
+      col: anchor.col,
+      source: { ...selection },
+      format: anchorFormat ? { ...anchorFormat } : undefined,
+    });
+  }, [anchor.row, anchor.col, anchorFormat, selection]);
+
+  useEffect(() => {
+    if (!formatPainter) return;
+    const sameSource =
+      selection.startRow === formatPainter.source.startRow &&
+      selection.endRow === formatPainter.source.endRow &&
+      selection.startCol === formatPainter.source.startCol &&
+      selection.endCol === formatPainter.source.endCol;
+    if (sameSource) return;
+    api.clearFormat(api.activeSheet.name, selection);
+    if (formatPainter.format) api.applyFormat(api.activeSheet.name, selection, formatPainter.format);
+    setFormatPainter(null);
+  }, [api, formatPainter, selection]);
 
   const insertTodayShortcut = useCallback(() => {
     api.setCell(anchor.row, anchor.col, "=TODAY()");
@@ -395,6 +422,39 @@ export function App() {
     api.setCellsOnSheetBatch(sheet.name, edits);
   }
 
+  function textToColumns(): void {
+    const rawDelimiter = window.prompt(
+      "Split selected cells by delimiter (comma, tab, semicolon, space, or a custom character):",
+      "comma"
+    );
+    if (rawDelimiter === null) return;
+    const key = rawDelimiter.trim().toLowerCase();
+    const delimiter =
+      key === "comma" ? "," :
+      key === "tab" ? "\t" :
+      key === "semicolon" ? ";" :
+      key === "space" ? " " :
+      rawDelimiter;
+    if (!delimiter) return;
+    const norm = normalizeRange(selection);
+    const edits: CellEdit[] = [];
+    for (let r = norm.startRow; r <= norm.endRow; r++) {
+      for (let c = norm.startCol; c <= norm.endCol; c++) {
+        const raw = api.activeSheet.cells[cellKey(r, c)]?.raw ?? "";
+        const parts = raw.split(delimiter).slice(0, 32);
+        if (parts.length <= 1) continue;
+        parts.forEach((part, offset) => {
+          edits.push({ row: r, col: c + offset, raw: part.trim() });
+        });
+      }
+    }
+    if (!edits.length) {
+      window.alert("No selected cells contained that delimiter.");
+      return;
+    }
+    api.setCellsOnSheetBatch(api.activeSheet.name, edits);
+  }
+
   const selRaw = api.getRaw(anchor.row, anchor.col);
   const selComputed = api.getComputed(anchor.row, anchor.col);
   const cellCount = rangeCellCount(selection);
@@ -484,6 +544,8 @@ export function App() {
     cut: () => void onCut(),
     copy: () => void onCopy(),
     paste: () => void onPaste(),
+    startFormatPainter,
+    formatPainterActive: formatPainter !== null,
     clearSelection: onClearSelection,
     openFindReplace: () => setFindOpen(true),
     format: anchorFormat,
@@ -497,17 +559,23 @@ export function App() {
       setPickerOpen(true);
     },
     insertSum,
+    recalculate: api.recalculate,
+    showFormulas,
+    toggleShowFormulas: () => setShowFormulas((v) => !v),
     canInsertChart,
     insertChart,
     sortAsc: () => sortActiveSheetByColumn(anchor.col, true),
     sortDesc: () => sortActiveSheetByColumn(anchor.col, false),
     removeDuplicates: () => removeDuplicatesInColumn(anchor.col),
+    textToColumns,
     panelOpen,
     togglePanel: () => setPanelOpen((v) => !v),
     showGridlines,
     toggleGridlines: () => setShowGridlines((v) => !v),
     showHeadings,
     toggleHeadings: () => setShowHeadings((v) => !v),
+    focusCell,
+    toggleFocusCell: () => setFocusCell((v) => !v),
     openAudit: () => setAuditOpen(true),
     openWorkbookStats: () => setStatsOpen(true),
     openWhatsNew: () => setHelpTopic("whatsNew"),
@@ -624,6 +692,8 @@ export function App() {
             onRemoveDupesInColumn={removeDuplicatesInColumn}
             showGridlines={showGridlines}
             showHeadings={showHeadings}
+            showFormulas={showFormulas}
+            focusCell={focusCell}
           />
           {hasCharts && (
             <Suspense fallback={null}>

@@ -26,6 +26,8 @@ type Props = {
   onRemoveDupesInColumn: (col: number) => void;
   showGridlines?: boolean;
   showHeadings?: boolean;
+  showFormulas?: boolean;
+  focusCell?: boolean;
 };
 
 export function Grid({
@@ -36,6 +38,8 @@ export function Grid({
   onRemoveDupesInColumn,
   showGridlines = true,
   showHeadings = true,
+  showFormulas = false,
+  focusCell = false,
 }: Props) {
   const { activeSheet, getRaw, getComputed, getCellFormat, getCellComment, setCell, version, setColWidth } = api;
   const parentRef = useRef<HTMLDivElement>(null);
@@ -380,6 +384,9 @@ export function Grid({
                   baseFormat={getCellFormat(r, c)}
                   comment={getCellComment(r, c)}
                   conditionalRules={activeSheet.conditionalRules}
+                  showFormula={showFormulas}
+                  focusRow={focusCell && r === selection.endRow}
+                  focusCol={focusCell && c === selection.endCol}
                   editing={editing && editing.row === r && editing.col === c ? editing : null}
                   versionTick={version}
                   getRaw={getRaw}
@@ -409,6 +416,9 @@ type CellProps = {
   baseFormat: CellFormat | undefined;
   comment: CellComment | undefined;
   conditionalRules: import("@aicell/shared").ConditionalRule[] | undefined;
+  showFormula: boolean;
+  focusRow: boolean;
+  focusCol: boolean;
   editing: { row: number; col: number; draft: string } | null;
   versionTick: number;
   getRaw: (row: number, col: number) => string;
@@ -433,6 +443,9 @@ function areCellPropsEqual(prev: CellProps, next: CellProps): boolean {
     prev.baseFormat === next.baseFormat &&
     prev.comment === next.comment &&
     prev.conditionalRules === next.conditionalRules &&
+    prev.showFormula === next.showFormula &&
+    prev.focusRow === next.focusRow &&
+    prev.focusCol === next.focusCol &&
     prev.editing === next.editing &&
     prev.versionTick === next.versionTick &&
     prev.getRaw === next.getRaw &&
@@ -455,6 +468,9 @@ function CellViewImpl({
   baseFormat,
   comment,
   conditionalRules,
+  showFormula,
+  focusRow,
+  focusCol,
   editing,
   versionTick,
   getRaw,
@@ -471,7 +487,9 @@ function CellViewImpl({
   const raw = getRaw(row, col);
   const format = resolveFormat(baseFormat, conditionalRules, row, col, raw, computed.value);
   const display =
-    computed.error !== undefined
+    showFormula && raw.trim().startsWith("=")
+      ? raw
+      : computed.error !== undefined
       ? computed.error
       : formatValue(computed.value, format?.numberFmt, format?.decimals ?? 2);
   const isNumeric = typeof computed.value === "number" && !format?.align;
@@ -511,6 +529,8 @@ function CellViewImpl({
     computed.error ? "error" : "",
     isAnchor ? "anchor" : "",
     inSelection && !isAnchor ? "in-range" : "",
+    focusRow && !isAnchor ? "focus-row" : "",
+    focusCol && !isAnchor ? "focus-col" : "",
   ]
     .filter(Boolean)
     .join(" ");

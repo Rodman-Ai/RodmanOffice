@@ -72,6 +72,11 @@
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;');
   }
+  function textFromHtml(html) {
+    const div = document.createElement('div');
+    div.innerHTML = R.sanitizeTextHtml(html || '');
+    return div.textContent || '';
+  }
 
   function initAskClaudePanel() {
     const button = $('#askClaudeBtn');
@@ -423,6 +428,7 @@
     deck.slides.forEach((slide, i) => {
       const item = document.createElement('div');
       item.className = 'slide-list-item';
+      if (slide.hidden) item.classList.add('hidden-slide');
       if (slide.id === state.selectedSlideId) item.classList.add('active');
       item.dataset.slideId = slide.id;
       item.draggable = true;
@@ -528,6 +534,12 @@
     stageShadowEl = $('#stageShadow');
     T.applyToStage(stageEl, deck.theme);
     const slide = activeSlide();
+    const bgInput = $('#slideBgColor');
+    if (bgInput) {
+      bgInput.value = slide.background?.kind === 'solid' && slide.background.color
+        ? slide.background.color
+        : '#ffffff';
+    }
     R.renderSlide(stageEl, slide, {
       editable: true,
       selectedId: state.selectedElementId,
@@ -894,6 +906,7 @@
     deck.slides.forEach((slide, i) => {
       const item = document.createElement('div');
       item.className = 'slide-list-item';
+      if (slide.hidden) item.classList.add('hidden-slide');
       if (slide.id === state.selectedSlideId) item.classList.add('active');
       item.innerHTML = `
         <div class="sli-num">${i + 1}</div>
@@ -995,6 +1008,29 @@
     bold() { document.execCommand('bold'); persistEditingText(); },
     italic() { document.execCommand('italic'); persistEditingText(); },
     underline() { document.execCommand('underline'); persistEditingText(); },
+    strike() { document.execCommand('strikeThrough'); persistEditingText(); },
+    clearTextFormatting() {
+      const inner = currentEditingTextNode();
+      if (inner) {
+        document.execCommand('removeFormat');
+        persistEditingText();
+        return;
+      }
+      const els = selectedElements().filter((el) => el.kind === 'text');
+      if (!els.length) {
+        alert('Select a text box first.');
+        return;
+      }
+      els.forEach((el) => {
+        el.fontSize = 24;
+        el.fontWeight = 400;
+        el.align = 'left';
+        el.color = null;
+        el.fontFamily = null;
+        el.html = escapeHtml(textFromHtml(el.html));
+      });
+      renderEditor(); scheduleSave();
+    },
     alignLeft() { applyAlign('left'); },
     alignCenter() { applyAlign('center'); },
     alignRight() { applyAlign('right'); },
@@ -1051,6 +1087,66 @@
       if (url === null) return;
       el.href = url || null;
       renderEditor(); scheduleSave();
+    },
+    selectAllElements() {
+      const slide = activeSlide();
+      if (!slide.elements.length) return;
+      const ids = slide.elements.map((el) => el.id);
+      setSelection(ids, ids[ids.length - 1]);
+      renderEditor();
+    },
+    findText() {
+      const query = window.prompt('Find text:', '');
+      if (!query) return;
+      const needle = query.toLowerCase();
+      for (const slide of deck.slides) {
+        for (const el of slide.elements) {
+          const haystack = el.kind === 'text'
+            ? textFromHtml(el.html)
+            : el.kind === 'table'
+              ? (el.cells || []).flat().join(' ')
+              : '';
+          if (haystack.toLowerCase().includes(needle)) {
+            state.selectedSlideId = slide.id;
+            state.viewMode = 'normal';
+            setSelection([el.id], el.id);
+            renderSlideList(); renderEditor(); updateStatusBar();
+            return;
+          }
+        }
+      }
+      alert('No matches found.');
+    },
+    replaceText() {
+      const query = window.prompt('Find text to replace:', '');
+      if (!query) return;
+      const replacement = window.prompt('Replace with:', '');
+      if (replacement === null) return;
+      let count = 0;
+      deck.slides.forEach((slide) => {
+        slide.elements.forEach((el) => {
+          if (el.kind === 'text') {
+            const text = textFromHtml(el.html);
+            if (text.includes(query)) {
+              el.html = escapeHtml(text.split(query).join(replacement));
+              count++;
+            }
+          } else if (el.kind === 'table') {
+            (el.cells || []).forEach((row) => row.forEach((cell, idx) => {
+              if (typeof cell === 'string' && cell.includes(query)) {
+                row[idx] = cell.split(query).join(replacement);
+                count++;
+              }
+            }));
+          }
+        });
+      });
+      if (!count) {
+        alert('No matches found.');
+        return;
+      }
+      renderSlideList(); renderEditor(); scheduleSave();
+      alert(`Replaced ${count} item${count === 1 ? '' : 's'}.`);
     },
 
     insertText() {
@@ -1134,6 +1230,10 @@
     },
     previewTransition: previewTransitionOnCanvas,
     previewAnimation: previewSelectedAnimations,
+    clearSlideBackground() {
+      activeSlide().background = { kind: 'theme' };
+      renderSlideList(); renderEditor(); scheduleSave();
+    },
 
     // File / deck
     newDeck() {
@@ -1193,6 +1293,11 @@
       document.querySelector('.workspace').classList.toggle('with-notes', state.showNotes);
       if (state.showNotes) $('#notesArea').value = activeSlide().notes || '';
       layoutEditor();
+    },
+    toggleHideSlide() {
+      const slide = activeSlide();
+      slide.hidden = !slide.hidden;
+      renderSlideList(); renderEditor(); updateStatusBar(); scheduleSave();
     },
     toggleSorter() {
       state.viewMode = state.viewMode === 'sorter' ? 'normal' : 'sorter';
@@ -1385,11 +1490,16 @@
     }
     scheduleSave();
   });
+  $('#slideBgColor')?.addEventListener('input', (e) => {
+    activeSlide().background = { kind: 'solid', color: e.target.value };
+    renderSlideList(); renderEditor(); scheduleSave();
+  });
 
   // ---------- Status bar ----------
   function updateStatusBar() {
     const idx = deck.slides.findIndex((s) => s.id === state.selectedSlideId);
-    $('#statusSlideCounter').textContent = `Slide ${idx + 1} of ${deck.slides.length}`;
+    const hidden = activeSlide().hidden ? ' (hidden)' : '';
+    $('#statusSlideCounter').textContent = `Slide ${idx + 1} of ${deck.slides.length}${hidden}`;
     $('#statusTheme').textContent = T.get(deck.theme).name;
   }
 

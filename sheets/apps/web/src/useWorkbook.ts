@@ -30,6 +30,7 @@ export type WorkbookApi = {
   getRaw: (row: number, col: number) => string;
   getComputed: (row: number, col: number) => CellComputed;
   getComputedOnSheet: (sheetName: string, row: number, col: number) => CellComputed;
+  recalculate: () => void;
   loadSheet: (sheet: Sheet) => void;
   replaceWorkbook: (wb: Workbook) => void;
   addSheet: () => void;
@@ -227,6 +228,11 @@ export function useWorkbook(): WorkbookApi {
     },
     [version]
   );
+
+  const recalculate = useCallback(() => {
+    getEngine().recalculate();
+    setVersion((v) => v + 1);
+  }, []);
 
   const loadSheet = useCallback(
     (sheet: Sheet) => {
@@ -631,6 +637,7 @@ export function useWorkbook(): WorkbookApi {
     getRaw,
     getComputed,
     getComputedOnSheet,
+    recalculate,
     loadSheet,
     replaceWorkbook,
     addSheet,

@@ -404,6 +404,15 @@ body,
   background: rgba(198, 239, 206, 0.55);
 }
 
+.grid-cell.focus-row,
+.grid-cell.focus-col {
+  background: rgba(16, 185, 129, 0.08);
+}
+
+.grid-cell.focus-row.focus-col {
+  background: rgba(16, 185, 129, 0.14);
+}
+
 .grid-cell.anchor {
   background: var(--aicell-selected);
   outline: 2px solid var(--aicell-selected-border);

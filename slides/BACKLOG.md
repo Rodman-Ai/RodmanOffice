@@ -14,9 +14,9 @@ subsystem or external integration.
 | Undo / redo history | M | Visible disabled buttons were removed; needs deck snapshot or command history. |
 | Paste dropdown variants | M | Needs paste-as-text/image/format choices. |
 | Reset slide and section controls | M | Requires section model and layout reset behavior. |
-| Font advanced controls | M | Strikethrough, character spacing, case, and clear-formatting need richer text-state handling. |
+| Font advanced controls | M | Strikethrough and basic clear-formatting exist; character spacing and case controls remain deferred. |
 | Paragraph advanced controls | M | Line spacing, vertical alignment, columns, and paragraph direction need text layout support. |
-| Find / replace / select menu | M | Needs deck-wide text search and object selection helpers. |
+| Advanced find / replace / select menu | M | Basic deck-wide find, replace, and select-all controls exist; richer scoped search options remain deferred. |
 | Designer | L | Requires layout recommendation engine. |
 | Add-ins and sensitivity labels | L | Requires extension/security and policy models. |
 
@@ -39,7 +39,7 @@ subsystem or external integration.
 | Feature | Effort | Notes |
 |---|---:|---|
 | Theme variants gallery | M | Theme colors are exposed, but PowerPoint-style variants are not. |
-| Format background | M | Deck has theme backgrounds; per-slide background UI is deferred. |
+| Advanced format background | M | Basic per-slide solid background color exists; gradient/picture/background pane options remain deferred. |
 | Design suggestions | L | Needs recommendation engine. |
 | Full slide-size/page setup | M | 4:3 is saved but editor stage remains 16:9. |
 
@@ -67,7 +67,7 @@ subsystem or external integration.
 | Custom slide show | M | Needs named subsets and show order. |
 | Rehearse with coach and rehearse timings | L | Requires recording/timing pipeline. |
 | Set Up Slide Show | M | Needs show options model. |
-| Hide slide | M | Needs hidden-slide flag and presenter/runtime handling. |
+| Advanced hide slide | M | Hidden-slide flag and presentation skipping exist; custom-show and print/export options remain deferred. |
 | Use timings, media controls, presenter view options | M | Presenter view exists separately; full show settings are deferred. |
 | Subtitles and subtitle settings | L | Requires speech/caption pipeline. |
 

@@ -537,6 +537,15 @@ body {
 .slide-list-item .sli-thumb .thumb-stage {
   pointer-events: none;
 }
+.slide-list-item.hidden-slide .sli-thumb {
+  opacity: 0.52;
+}
+.slide-list-item.hidden-slide .sli-num::after {
+  content: " hidden";
+  display: block;
+  font-size: 9px;
+  color: var(--primary);
+}
 
 .add-slide-btn {
   margin: 8px; padding: 8px;

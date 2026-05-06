@@ -394,6 +394,12 @@
       <div class="group">
         <div class="group-row">
           <button class="ribbon-btn" id="watermarkBtn" title="Watermark">Watermark</button>
+          <label class="ribbon-btn color" title="Page color">
+            <span>Color</span>
+            <input type="color" id="pageColorInput" value="#ffffff" aria-label="Page color" />
+          </label>
+          <button class="ribbon-btn" id="clearPageColorBtn" title="Clear page color">No color</button>
+          <button class="ribbon-btn" id="pageBorderBtn" title="Toggle page border">Borders</button>
         </div>
         <div class="group-label">Page Background</div>
       </div>
@@ -415,6 +421,7 @@
           <button class="ribbon-btn" id="insertFootnoteBtn" title="Insert footnote">⁺¹ Footnote</button>
           <button class="ribbon-btn" id="captionBtn" title="Insert auto-numbered caption">🏷 Caption</button>
           <button class="ribbon-btn" id="crossRefBtn" title="Insert cross-reference">↗ Cross-ref</button>
+          <button class="ribbon-btn" id="insertEndnoteBtn" title="Insert endnote">Endnote</button>
         </div>
         <div class="group-label">Footnotes &amp; captions</div>
       </div>
@@ -516,6 +523,29 @@
       </div>
       <div class="group">
         <div class="group-row">
+          <label class="control">
+            Left
+            <input class="select sm" id="indentLeftInput" type="number" min="0" max="6" step="0.25" value="0" title="Left indent in inches" />
+          </label>
+          <label class="control">
+            Right
+            <input class="select sm" id="indentRightInput" type="number" min="0" max="6" step="0.25" value="0" title="Right indent in inches" />
+          </label>
+        </div>
+        <div class="group-row">
+          <label class="control">
+            Before
+            <input class="select sm" id="spacingBeforeInput" type="number" min="0" max="72" step="1" value="0" title="Spacing before in points" />
+          </label>
+          <label class="control">
+            After
+            <input class="select sm" id="spacingAfterInput" type="number" min="0" max="72" step="1" value="8" title="Spacing after in points" />
+          </label>
+        </div>
+        <div class="group-label">Paragraph</div>
+      </div>
+      <div class="group">
+        <div class="group-row">
           <select class="select sm" id="headingNumScheme" title="Heading numbering scheme">
             <option value="">Heading №…</option>
             <option value="off">No numbering</option>
@@ -556,6 +586,7 @@
           <button class="ribbon-btn" id="reviewSpellBtn" title="Run spell check">📖 Spelling</button>
           <button class="ribbon-btn" id="reviewGrammarBtn" title="Run grammar">✓ Grammar</button>
           <button class="ribbon-btn" id="reviewWordCountBtn" title="Word count details">∑ Word count</button>
+          <button class="ribbon-btn" id="reviewThesaurusBtn" title="Open thesaurus for selected word">Thesaurus</button>
         </div>
         <div class="group-label">Proofing</div>
       </div>

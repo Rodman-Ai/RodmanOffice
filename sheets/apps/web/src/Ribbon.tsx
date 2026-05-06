@@ -20,6 +20,8 @@ export type RibbonActions = {
   cut: () => void;
   copy: () => void;
   paste: () => void;
+  startFormatPainter: () => void;
+  formatPainterActive: boolean;
   clearSelection: () => void;
   openFindReplace: () => void;
   // Format
@@ -32,12 +34,16 @@ export type RibbonActions = {
   openCommentModal: () => void;
   openFunctionPicker: (category?: FunctionCategory | null) => void;
   insertSum: () => void;
+  recalculate: () => void;
+  showFormulas: boolean;
+  toggleShowFormulas: () => void;
   canInsertChart: boolean;
   insertChart: (type: ChartType) => void;
   // Data
   sortAsc: () => void;
   sortDesc: () => void;
   removeDuplicates: () => void;
+  textToColumns: () => void;
   // View
   panelOpen: boolean;
   togglePanel: () => void;
@@ -45,6 +51,8 @@ export type RibbonActions = {
   toggleGridlines: () => void;
   showHeadings: boolean;
   toggleHeadings: () => void;
+  focusCell: boolean;
+  toggleFocusCell: () => void;
   // Help
   openAudit: () => void;
   openWorkbookStats: () => void;
@@ -126,6 +134,13 @@ export function Ribbon({ a }: { a: RibbonActions }) {
               <Row>
                 <Btn icon="Cut" label="Cut" onClick={a.cut} title="Cut" />
                 <Btn icon="Copy" label="Copy" onClick={a.copy} title="Copy" />
+                <Btn
+                  active={a.formatPainterActive}
+                  icon="Brush"
+                  label="Format Painter"
+                  onClick={a.startFormatPainter}
+                  title="Copy the active cell format, then select a target range"
+                />
               </Row>
             </Group>
 
@@ -209,6 +224,14 @@ export function Ribbon({ a }: { a: RibbonActions }) {
                 <Btn onClick={() => a.patchFormat({ numberFmt: "currency" })} title="Currency">$</Btn>
                 <Btn onClick={() => a.patchFormat({ numberFmt: "percent" })} title="Percent">%</Btn>
                 <Btn onClick={() => a.patchFormat({ numberFmt: "number" })} title="Comma separated">,</Btn>
+                <Btn
+                  onClick={() => a.patchFormat({ decimals: Math.max(0, (fmt.decimals ?? 2) - 1) })}
+                  title="Decrease decimals"
+                >.0</Btn>
+                <Btn
+                  onClick={() => a.patchFormat({ decimals: Math.min(8, (fmt.decimals ?? 2) + 1) })}
+                  title="Increase decimals"
+                >.00</Btn>
               </Row>
             </Group>
 
@@ -306,6 +329,11 @@ export function Ribbon({ a }: { a: RibbonActions }) {
               <Row>
                 <BigBtn icon="Audit" label="Audit Formulas" onClick={a.openAudit} />
               </Row>
+              <Row>
+                <Toggle checked={a.showFormulas} label="Show Formulas" onChange={a.toggleShowFormulas} />
+                <Btn icon="Calc" label="Recalculate" onClick={a.recalculate} title="Recalculate workbook formulas" />
+                <Btn icon="Check" label="Error Checking" onClick={a.openAudit} title="Open formula audit results" />
+              </Row>
             </Group>
           </div>
         )}
@@ -326,6 +354,7 @@ export function Ribbon({ a }: { a: RibbonActions }) {
             <Group label="Data Tools">
               <Row>
                 <Btn icon="Dedupe" label="Remove Duplicates" onClick={a.removeDuplicates} />
+                <Btn icon="Split" label="Text to Columns" onClick={a.textToColumns} />
               </Row>
             </Group>
           </div>
@@ -341,6 +370,7 @@ export function Ribbon({ a }: { a: RibbonActions }) {
             <Group label="Performance">
               <Row>
                 <BigBtn icon="Audit" label="Audit Formulas" onClick={a.openAudit} />
+                <BigBtn icon="Stats" label="Check Performance" onClick={a.openWorkbookStats} />
               </Row>
             </Group>
             <Group label="Statistics">
@@ -362,6 +392,7 @@ export function Ribbon({ a }: { a: RibbonActions }) {
               <Row>
                 <Toggle checked={a.showGridlines} label="Gridlines" onChange={a.toggleGridlines} />
                 <Toggle checked={a.showHeadings} label="Headings" onChange={a.toggleHeadings} />
+                <Toggle checked={a.focusCell} label="Focus Cell" onChange={a.toggleFocusCell} />
               </Row>
             </Group>
             <Group label="AI Panel">

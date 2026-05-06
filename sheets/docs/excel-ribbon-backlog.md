@@ -13,7 +13,7 @@ large subsystem or integration.
 | Feature | Effort | Notes |
 |---|---:|---|
 | Paste dropdown variants | M | Needs paste-special options such as values, formulas, formatting, transpose, and text import behavior. |
-| Format painter | M | Needs reusable copied-format state and range application. |
+| Advanced format painter | M | Basic copied-format state and target range application exist; repeat/multi-paint behavior remains deferred. |
 | Font family and font size | M | Requires cell-format schema extension and renderer/export support. |
 | Borders and border presets | M | Requires cell-format schema extension and range edge handling. |
 | Wrap text, text orientation, merge cells | M | Needs layout changes in the virtualized grid. |
@@ -51,9 +51,9 @@ large subsystem or integration.
 |---|---:|---|
 | Name Manager, Define Name, Use in Formula, Create from Selection | M | Needs named-range model and structured reference integration. |
 | Trace precedents/dependents and remove arrows | L | Needs dependency graph visualization over the grid. |
-| Show formulas | M | Needs grid-level formula display mode. |
-| Error checking and evaluate formula | M | Audit panel exists; step-by-step evaluation is deferred. |
-| Watch window and calculation options | M | Needs watch state and recalc-mode controls. |
+| Advanced formula display | M | Grid-level show-formulas mode exists; print/export formula views are deferred. |
+| Evaluate formula | M | Error checking opens the audit panel; step-by-step evaluation is deferred. |
+| Watch window and calculation options | M | Manual recalculate exists; watch state and recalc-mode controls are deferred. |
 
 ## Data
 
@@ -63,7 +63,7 @@ large subsystem or integration.
 | Queries & Connections | L | Depends on connector/query model. |
 | Data Types: Stocks and Currencies | L | Needs external market/reference data providers. |
 | Filter UI and advanced filter | M | Sort/dedupe exist; full filter state and UI are deferred. |
-| Text to Columns | M | Needs split preview and batch transform behavior. |
+| Advanced Text to Columns | M | Basic delimiter split works on selected cells; preview, fixed-width parsing, and destination choices are deferred. |
 | Data validation | M | Deferred until inline dropdown/rule UX is built. |
 | Consolidate, relationships, and data model | L | Requires workbook-level relational model. |
 | What-if analysis and Forecast Sheet | M | Basic agent forecasting exists; native ribbon workflows are deferred. |
@@ -74,7 +74,7 @@ large subsystem or integration.
 | Feature | Effort | Notes |
 |---|---:|---|
 | Spelling and thesaurus | M | Needs local or service-backed language tooling. |
-| Check performance | M | Formula audit exists; performance-specific diagnostics are deferred. |
+| Advanced performance diagnostics | M | Check Performance opens workbook statistics; performance-specific hot spots are deferred. |
 | Accessibility checker | L | Needs semantic workbook checks and issue remediation UI. |
 | Translate | M | Needs hosted or BYOK translation workflow beyond formula functions. |
 | Show changes and threaded comment navigation | L | Needs collaboration/version history and comment-thread model. |
@@ -89,7 +89,7 @@ large subsystem or integration.
 | Sheet View and custom views | L | Needs saved view/filter/sort state. |
 | Normal/Page Break Preview/Page Layout workbook views | L | Needs print/page layout renderer. |
 | Switch modes and dark mode | M | App chrome theme work is separate from workbook data. |
-| Ruler and focus cell | M | Needs viewport overlay and active-cell emphasis modes. |
+| Ruler and advanced focus cell | M | Focus Cell highlighting exists; ruler/advanced viewport overlays are deferred. |
 | Zoom controls | M | Needs grid scaling without breaking virtualization. |
 | Window management and split/freeze panes | L | Freeze panes were deferred because they affect the virtualizer. |
 | Macros | L | Needs macro/script runtime and safety model. |
