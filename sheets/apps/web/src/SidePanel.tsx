@@ -185,7 +185,7 @@ export function SidePanel({
       <div className="side-panel-messages" ref={scrollRef}>
         {!aiEnabled && (
           <div className="side-panel-notice">
-            BYOK chat works in demo mode. AI cell formulas and applyable plans still require a hosted API.
+            BYOK chat works in demo mode. AI cell formulas and apply-capable plans still require a hosted API.
           </div>
         )}
         {turns.length === 0 && (

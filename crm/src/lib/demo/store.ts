@@ -74,32 +74,41 @@ function lsAvailable(): boolean {
   }
 }
 
-function ensureSeeded() {
-  if (!lsAvailable()) return;
-  if (window.localStorage.getItem(SEED_FLAG)) return;
-  for (const [name, rows] of Object.entries(TABLES)) {
-    window.localStorage.setItem(PREFIX + name, JSON.stringify(rows));
+function ensureSeeded(): boolean {
+  if (!lsAvailable()) return false;
+  try {
+    if (window.localStorage.getItem(SEED_FLAG)) return true;
+    for (const [name, rows] of Object.entries(TABLES)) {
+      window.localStorage.setItem(PREFIX + name, JSON.stringify(rows));
+    }
+    window.localStorage.setItem(SEED_FLAG, "1");
+    return true;
+  } catch {
+    return false;
   }
-  window.localStorage.setItem(SEED_FLAG, "1");
 }
 
 export function readTable<T = AnyRow>(name: TableName): T[] {
   if (!lsAvailable()) {
     return [...(TABLES[name] as unknown as T[])];
   }
-  ensureSeeded();
-  const raw = window.localStorage.getItem(PREFIX + name);
-  if (!raw) return [];
   try {
+    if (!ensureSeeded()) return [...(TABLES[name] as unknown as T[])];
+    const raw = window.localStorage.getItem(PREFIX + name);
+    if (!raw) return [];
     return JSON.parse(raw) as T[];
   } catch {
-    return [];
+    return [...(TABLES[name] as unknown as T[])];
   }
 }
 
 export function writeTable<T = AnyRow>(name: TableName, rows: T[]) {
   if (!lsAvailable()) return;
-  window.localStorage.setItem(PREFIX + name, JSON.stringify(rows));
+  try {
+    window.localStorage.setItem(PREFIX + name, JSON.stringify(rows));
+  } catch {
+    // Demo persistence is best-effort when browser storage is blocked or full.
+  }
 }
 
 export function newId(prefix: string) {
@@ -113,9 +122,13 @@ export function nowIso() {
 
 export function resetDemo() {
   if (!lsAvailable()) return;
-  for (const name of Object.keys(TABLES)) {
-    window.localStorage.removeItem(PREFIX + name);
+  try {
+    for (const name of Object.keys(TABLES)) {
+      window.localStorage.removeItem(PREFIX + name);
+    }
+    window.localStorage.removeItem(SEED_FLAG);
+  } catch {
+    return;
   }
-  window.localStorage.removeItem(SEED_FLAG);
   ensureSeeded();
 }

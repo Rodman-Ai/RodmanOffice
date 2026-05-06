@@ -13,7 +13,9 @@ multi-format save / load) plus a
 handful of things modern competitors offer: WebRTC peer-to-peer
 collaboration, GitHub-Gist cloud sync, smart-compose ghost text,
 cover pages, a brand kit, dark / sepia / high-contrast themes, and
-offline support via a service worker.
+offline support via a service worker. The Ask Claude side panel supports
+per-request BYOK chat in static GitHub Pages mode; the API key is entered for
+one request and is not stored by RodmanWord.
 
 > **Live demo:** auto-deploys to GitHub Pages from `main` /
 > the active feature branch.

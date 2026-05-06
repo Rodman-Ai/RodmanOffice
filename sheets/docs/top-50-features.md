@@ -14,7 +14,7 @@ We then group into four shipping tiers. Higher tier = ship first.
 
 ## Competitor feature matrix (what they have, where we stand)
 
-Y = solid · ~ = partial / weak · — = absent. AiCell column reflects what's on `main` after the menubar / function-picker / undo-redo PR (commit `4296b06`).
+Y = solid · ~ = partial / weak · — = absent. AiCell column reflects what's on `main` after the Excel-style ribbon and BYOK Ask Claude passes.
 
 | Capability | Excel+Copilot | Sheets+Gemini | Quadratic | Sourcetable | Numerous | AiCell today |
 |---|:-:|:-:|:-:|:-:|:-:|:-:|
@@ -28,7 +28,7 @@ Y = solid · ~ = partial / weak · — = absent. AiCell column reflects what's o
 | Freeze panes | Y | Y | Y | Y | n/a | — |
 | Tables (auto-expand, headers) | Y | ~ | ~ | Y | n/a | — |
 | Pivot tables | Y | Y | ~ | Y | n/a | — |
-| Charts (bar/line/pie/etc.) | Y | Y | Y | Y | n/a | ~ (basic, AI-driven) |
+| Charts (bar/line/pie/etc.) | Y | Y | Y | Y | n/a | ~ (basic manual + hosted-agent created) |
 | 500+ formulas | Y | Y | Y | Y | n/a | Y (HF built-ins) |
 | LAMBDA / LET / named functions | Y | Y | Y | ~ | n/a | Y (HF) |
 | Python cells | — | — | Y | ~ | — | — |
@@ -50,7 +50,7 @@ Y = solid · ~ = partial / weak · — = absent. AiCell column reflects what's o
 | Data validation rules | Y | Y | ~ | Y | n/a | — |
 | Audit my formulas (errors view) | ~ | ~ | ~ | ~ | n/a | Y |
 
-The matrix shows the obvious truth: AiCell ships menus, undo/redo, formulas, exports, and plan-then-apply AI — but is missing the rest of the **Phase-1 grid UX** that any spreadsheet user reflexively reaches for (selection ranges, formatting, filter, freeze, find/replace). That's where most of the P0 list goes.
+The matrix shows the obvious truth: AiCell ships an Excel-style ribbon, undo/redo, formulas, exports, formatting, comments, charts, and hosted plan-then-apply AI — but is missing the rest of the **Phase-1 grid UX** that spreadsheet users reflexively reach for, especially filters, freeze panes, data validation, tables, and pivot tables. That's where most of the remaining P0 list goes.
 
 ## Tier P0 — Ship next (10 features)
 

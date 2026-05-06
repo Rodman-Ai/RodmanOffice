@@ -19,7 +19,10 @@ function apply(mode: Mode) {
 export function ThemeBoot() {
   // Apply saved theme as early as possible to avoid flash. Lives in <body>.
   useEffect(() => {
-    const saved = (localStorage.getItem(KEY) as Mode) || "system";
+    let saved: Mode = "system";
+    try {
+      saved = (localStorage.getItem(KEY) as Mode) || "system";
+    } catch {}
     apply(saved);
   }, []);
   return null;
@@ -28,11 +31,15 @@ export function ThemeBoot() {
 export function ThemeToggle() {
   const [mode, setMode] = useState<Mode>("system");
   useEffect(() => {
-    setMode((localStorage.getItem(KEY) as Mode) || "system");
+    try {
+      setMode((localStorage.getItem(KEY) as Mode) || "system");
+    } catch {}
   }, []);
   function set(next: Mode) {
     setMode(next);
-    localStorage.setItem(KEY, next);
+    try {
+      localStorage.setItem(KEY, next);
+    } catch {}
     apply(next);
   }
   return (

@@ -16,7 +16,9 @@ step.
 - Export PDF through the browser print path.
 - Present from the start, current slide, or a one-off custom slide range, with optional automatic slide advance timing.
 - Use View controls for ruler, gridlines, guides, color, grayscale, and black-and-white editor previews.
-- Open Ask Claude from the title bar, Insert, Review, or Help.
+- Open Ask Claude from the title bar, Insert, Review, or Help. The panel
+  supports per-request BYOK chat; the Claude API key is entered for one
+  request and is not stored by RodmanSlides.
 
 ## Storage
 

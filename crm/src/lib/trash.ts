@@ -16,7 +16,11 @@ export function pushTrash(entry: Omit<TrashEntry, "at">) {
   if (typeof window === "undefined") return;
   const list = getTrash();
   list.unshift({ ...entry, at: new Date().toISOString() });
-  window.localStorage.setItem(KEY, JSON.stringify(list.slice(0, MAX)));
+  try {
+    window.localStorage.setItem(KEY, JSON.stringify(list.slice(0, MAX)));
+  } catch {
+    // Trash is a best-effort undo affordance in the static demo.
+  }
 }
 
 export function getTrash(): TrashEntry[] {
@@ -34,7 +38,11 @@ export function popTrash(id: string): TrashEntry | undefined {
   if (idx === -1) return undefined;
   const [item] = list.splice(idx, 1);
   if (typeof window !== "undefined") {
-    window.localStorage.setItem(KEY, JSON.stringify(list));
+    try {
+      window.localStorage.setItem(KEY, JSON.stringify(list));
+    } catch {
+      // Keep returning the popped item; persistence is best-effort.
+    }
   }
   return item;
 }

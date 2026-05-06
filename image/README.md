@@ -142,6 +142,9 @@ Highlights:
 - **History** + **Snapshots** panels.
 - **Animation flipbook** — `Shift + F` opens a frame strip with
   add / delete / play and onion-skin preview.
+- **Ask Claude** side panel for per-request BYOK chat about edits, retouching,
+  crops, export settings, and creative direction. The Claude API key is not
+  stored by the app.
 - **Sound mute** toggle (`Shift+M`), persisted.
 - **Autosave** — debounced 1.5 s after every stroke; reloads offer to restore.
 - **Installable PWA** with an offline app shell. Shared PSD/PDF engines

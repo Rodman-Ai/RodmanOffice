@@ -55,14 +55,14 @@ Without a hosted API key, AI cell functions surface `#AI_DISABLED`; the Ask Clau
 
 A workflow at `.github/workflows/pages.yml` builds `apps/web` and publishes it to GitHub Pages on every push to `main` (or via manual trigger from the Actions tab).
 
-The Pages build is **demo mode**: `VITE_API_BASE` is empty, so the app skips every backend call. Persistence, AI cell formulas, and applyable plan-then-apply agent actions are disabled. You still get a working spreadsheet UI, the formula engine, browser-local workbook state, and an Ask Claude panel that supports per-request BYOK chat. The toolbar shows "Demo mode (no backend)".
+The Pages build is **demo mode**: `VITE_API_BASE` is empty, so the app skips every backend call. Persistence, AI cell formulas, and apply-capable plan-then-apply agent actions are disabled. You still get a working spreadsheet UI, the formula engine, browser-local workbook state, and an Ask Claude panel that supports per-request BYOK chat. The toolbar shows "Demo mode (no backend)".
 
 **One-time setup:**
 1. In the repo settings → **Pages** → set **Source** to **GitHub Actions**.
-2. Merge this branch (or any branch with the workflow) to `main`. The workflow runs and the site appears at `https://<owner>.github.io/AiCell/`.
+2. Merge this branch (or any branch with the workflow) to `main`. The workflow runs and the suite appears at `https://<owner>.github.io/RodmanOffice/`, with Sheets under `/RodmanOffice/sheets/`.
 3. To deploy from a feature branch for preview, run the workflow manually from the **Actions** tab via the **Run workflow** button.
 
-If your repo is forked under a different name, update `VITE_BASE` in the workflow to `/<your-repo-name>/`.
+If your suite repo is forked under a different name, update `VITE_BASE` in the workflow to `/<your-repo-name>/sheets/`.
 
 ### Pages with a hosted backend
 
@@ -71,7 +71,7 @@ To run a real (non-demo) deployment on Pages, host the API somewhere reachable (
 ```yaml
 # .github/workflows/pages.yml
 env:
-  VITE_BASE: /AiCell/
+  VITE_BASE: /RodmanOffice/sheets/
   VITE_API_BASE: https://api.example.com
   VITE_API_TOKEN: ${{ secrets.AICELL_API_TOKEN }}   # must match server
 ```

@@ -25,7 +25,11 @@ export default function LoginPage() {
             setLoading(true);
             if (DEMO_MODE) {
               if (typeof window !== "undefined") {
-                window.localStorage.setItem("leocrm.demo.session", "1");
+                try {
+                  window.localStorage.setItem("leocrm.demo.session", "1");
+                } catch {
+                  // Demo routing still works when storage is blocked; data persistence will be limited.
+                }
               }
               router.push("/");
               return;

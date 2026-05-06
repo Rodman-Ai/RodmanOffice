@@ -168,7 +168,7 @@ export default function incomeView() {
           if (!out.value) return;
           // Generate QR via tiny inline PNG: rely on Google Charts deprecated? We don't want network calls.
           // Instead just open in a new tab so the user can screenshot or share.
-          window.open(out.value, "_blank");
+          window.open(out.value, "_blank", "noopener,noreferrer");
         } }, "Open"),
       ),
     );

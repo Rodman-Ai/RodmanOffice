@@ -1,5 +1,5 @@
-// RodBooks service worker — cache-first for static shell, network-first for everything else.
-const CACHE = "rodbooks-shell-v2";
+// RodBooks service worker — network-first for same-origin updates, with offline fallback.
+const CACHE = "rodbooks-shell-v3";
 const CACHE_PREFIX = "rodbooks-shell-";
 const SHELL = [
   "./",
@@ -22,9 +22,8 @@ self.addEventListener("activate", (e) => {
           .filter((k) => k.startsWith(CACHE_PREFIX) && k !== CACHE)
           .map((k) => caches.delete(k)),
       ),
-    ),
+    ).then(() => self.clients.claim()),
   );
-  self.clients.claim();
 });
 
 self.addEventListener("fetch", (e) => {
@@ -35,8 +34,10 @@ self.addEventListener("fetch", (e) => {
   if (url.origin === self.location.origin) {
     e.respondWith(
       fetch(req).then((res) => {
-        const clone = res.clone();
-        caches.open(CACHE).then((c) => c.put(req, clone)).catch(() => {});
+        if (res && res.ok) {
+          const clone = res.clone();
+          caches.open(CACHE).then((c) => c.put(req, clone)).catch(() => {});
+        }
         return res;
       }).catch(() => caches.match(req)),
     );

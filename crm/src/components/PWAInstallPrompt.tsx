@@ -14,7 +14,11 @@ export function PWAInstallPrompt() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (window.localStorage.getItem(KEY)) return;
+    try {
+      if (window.localStorage.getItem(KEY)) return;
+    } catch {
+      return;
+    }
     function onPrompt(e: Event) {
       e.preventDefault();
       setEvt(e as BeforeInstallPromptEvent);
@@ -25,7 +29,11 @@ export function PWAInstallPrompt() {
 
   function dismiss() {
     setEvt(null);
-    window.localStorage.setItem(KEY, "1");
+    try {
+      window.localStorage.setItem(KEY, "1");
+    } catch {
+      // Install prompt dismissal is best-effort.
+    }
   }
 
   if (!evt) return null;

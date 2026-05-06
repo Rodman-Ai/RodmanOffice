@@ -73,7 +73,7 @@ The API exposes `WorkbookStore` (file-backed JSON or Postgres, picked by `DATABA
 
 ## Load-bearing for the differentiation thesis
 
-- **Plan-then-apply agent.** `services/api/src/ai/agent.ts` runs Claude Opus 4.7 with adaptive thinking and five tools (`set_cell`, `add_sheet`, `create_chart`, plus read-only `audit_formulas` and `forecast`). It returns plan steps for a client to review before edits land. The static Pages side panel uses BYOK browser chat; applyable plans require a hosted API.
+- **Plan-then-apply agent.** `services/api/src/ai/agent.ts` runs Claude Opus 4.7 with adaptive thinking and five tools (`set_cell`, `add_sheet`, `create_chart`, plus read-only `audit_formulas` and `forecast`). It returns plan steps for a client to review before edits land. The static Pages side panel uses BYOK browser chat; apply-capable plans require a hosted API.
 - **AI cell registry.** `=AI()` and friends are first-class formulas that share the recalc graph. Competitors generally bolt these on as side calls; ours are part of the sheet's evaluation order, with prompt caching for cost control.
 - **MCP-readiness.** Architectural decision (not yet implemented): the agent's tool surface is normalized so plugging in Model Context Protocol servers later is mostly a registry change in `services/api/src/ai/tools.ts`. Tracked as P1 #11.
 - **Excel-familiar chrome.** The live ribbon follows Excel's tab order without exposing no-op Draw, Automate, or Acrobat controls. Gaps are tracked in `excel-ribbon-backlog.md`; the side-panel intro remains the primary AI affordance.

@@ -751,7 +751,7 @@ export function App() {
             onClick={() => setPanelOpen((v) => !v)}
             title="Ask Claude"
           >
-            {/* Keep this visible when AI is disabled: it is an intentional setup affordance, not dead UI. */}
+            {/* Keep this visible for per-request BYOK setup; the key field lives in the panel. */}
             {panelOpen ? "Close panel" : "🤖 Ask Claude"}
           </button>
           <SaveIndicator state={saveState} />
@@ -1133,7 +1133,7 @@ function AboutDialog({
             </div>
             <div>
               <dt>AI</dt>
-              <dd>{aiEnabled ? "Hosted API configured; BYOK chat also available" : "BYOK chat available; formulas and applyable plans need a hosted API"}</dd>
+              <dd>{aiEnabled ? "Hosted API configured; BYOK chat also available" : "BYOK chat available; formulas and apply-capable plans need a hosted API"}</dd>
             </div>
           </dl>
         </div>

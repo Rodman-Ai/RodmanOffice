@@ -17,8 +17,12 @@ export function togglePin(id: string): boolean {
   if (pinned) pins.add(id);
   else pins.delete(id);
   if (typeof window !== "undefined") {
-    window.localStorage.setItem(KEY, JSON.stringify(Array.from(pins)));
-    window.dispatchEvent(new Event("leocrm:pins"));
+    try {
+      window.localStorage.setItem(KEY, JSON.stringify(Array.from(pins)));
+      window.dispatchEvent(new Event("leocrm:pins"));
+    } catch {
+      // Pins are convenience UI only; storage failures should not block the click.
+    }
   }
   return pinned;
 }

@@ -24,8 +24,12 @@ export function pushRecent(item: RecentItem) {
   if (typeof window === "undefined") return;
   const list = getRecents().filter((r) => r.id !== item.id);
   list.unshift(item);
-  window.localStorage.setItem(KEY, JSON.stringify(list.slice(0, MAX)));
-  window.dispatchEvent(new Event("leocrm:recents"));
+  try {
+    window.localStorage.setItem(KEY, JSON.stringify(list.slice(0, MAX)));
+    window.dispatchEvent(new Event("leocrm:recents"));
+  } catch {
+    // Recents are convenience UI only; storage-denied/quota errors should not break navigation.
+  }
 }
 
 export function onRecentsChange(handler: () => void) {

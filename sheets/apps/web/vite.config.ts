@@ -2,8 +2,8 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
 // Base path for the built app. Default `/` works for any-origin deploy and
-// for `vite preview`. For GitHub Pages project sites set VITE_BASE=/AiCell/
-// at build time (the included Pages workflow does this automatically).
+// for `vite preview`. In RodmanOffice Pages builds, the workflow sets
+// VITE_BASE=/RodmanOffice/sheets/ at build time.
 const base = process.env.VITE_BASE ?? "/";
 
 export default defineConfig({

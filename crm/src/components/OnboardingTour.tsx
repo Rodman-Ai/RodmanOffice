@@ -38,8 +38,12 @@ export function OnboardingTour() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (!window.localStorage.getItem(KEY)) {
-      // Slight delay so the rest of the UI mounts first.
+    try {
+      if (!window.localStorage.getItem(KEY)) {
+        // Slight delay so the rest of the UI mounts first.
+        setTimeout(() => setOpen(true), 350);
+      }
+    } catch {
       setTimeout(() => setOpen(true), 350);
     }
   }, []);
@@ -47,7 +51,11 @@ export function OnboardingTour() {
   function close() {
     setOpen(false);
     if (typeof window !== "undefined") {
-      window.localStorage.setItem(KEY, "1");
+      try {
+        window.localStorage.setItem(KEY, "1");
+      } catch {
+        // Onboarding dismissal is best-effort when browser storage is blocked.
+      }
     }
   }
 
