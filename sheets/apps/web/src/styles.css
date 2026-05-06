@@ -64,7 +64,7 @@ body,
 }
 
 /* ======================================================================
-   Excel-style header chrome — title bar + tabs + ribbon + formula bar.
+   Word-style header chrome — title bar + tabs + ribbon + formula bar.
    Mirrors the .tabs / .ribbon / .ribbon-panel / .group / .group-row /
    .group-label class names used by /word/ and /slides/ so the visual
    language stays consistent across the suite.
@@ -141,33 +141,35 @@ body,
 }
 .title-bar .ask-claude:hover { background: rgba(255, 255, 255, 0.28); }
 
-/* Tabs strip — plain text labels with a 2 px green underline on the
-   active tab. Matches Excel 2024 (no boxes / no fills). */
+/* Tabs strip — Word-style colored bar with a white active tab. */
 .tabs {
   display: flex;
-  background: #fff;
+  background: var(--primary);
+  color: #fff;
   flex-shrink: 0;
-  border-bottom: 1px solid var(--ribbon-border);
+  overflow-x: auto;
+  scrollbar-width: none;
 }
+.tabs::-webkit-scrollbar { display: none; }
 .tab {
   background: transparent;
   border: none;
-  color: #444;
+  color: rgba(255, 255, 255, 0.85);
   font-size: 13px;
-  padding: 7px 14px;
+  padding: 8px 18px;
   cursor: pointer;
   white-space: nowrap;
   font-family: inherit;
   border-bottom: 2px solid transparent;
 }
-.tab:hover { background: rgba(16, 124, 65, 0.06); color: #222; }
+.tab:hover { background: rgba(255, 255, 255, 0.08); color: #fff; }
 .tab.active {
-  color: #0b5a2f;
-  font-weight: 600;
-  border-bottom-color: var(--primary);
+  background: var(--tab-active);
+  color: var(--text);
+  border-bottom-color: var(--tab-active);
 }
 
-/* Ribbon body — off-white, fixed-ish height, group label band at bottom. */
+/* Ribbon body — off-white with Word-style grouped controls. */
 .ribbon {
   background: var(--ribbon-bg);
   border-bottom: 1px solid var(--ribbon-border);
@@ -180,111 +182,84 @@ body,
 .ribbon-panel {
   display: none;
   flex-wrap: wrap;
-  align-items: stretch;
+  align-items: flex-start;
   align-content: flex-start;
   row-gap: 4px;
-  padding: 4px 6px 0;
+  padding: 6px 8px;
   width: 100%;
   box-sizing: border-box;
-  min-height: 96px;
+  min-height: 88px;
+  max-height: 280px;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 .ribbon-panel.active { display: flex; }
+.group { min-height: 0; }
+
+@media (min-width: 721px) {
+  .group { padding: 4px 8px; }
+}
 
 .group {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  padding: 2px 8px 0;
+  padding: 4px 10px;
   border-right: 1px solid var(--ribbon-border);
   flex-shrink: 0;
 }
 .group-row {
-  display: flex; align-items: center; gap: 3px;
-  flex-wrap: wrap; margin-bottom: 2px;
+  display: flex; align-items: center; gap: 4px;
+  flex-wrap: wrap; margin-bottom: 4px;
 }
 .group-label {
-  font-size: 11px;
-  color: #605e5c;
-  text-align: center;
-  padding: 4px 4px 3px;
+  font-size: 11px; color: var(--muted);
+  text-align: center; margin-top: 2px;
 }
 
-/* Buttons — Fluent-style hover, 22 px icon-only or icon+label rows. */
+/* Buttons */
 .ribbon-btn {
   background: transparent;
   border: 1px solid transparent;
   color: var(--text);
-  padding: 2px 6px;
-  min-width: 24px; min-height: 22px;
-  border-radius: 2px;
-  cursor: pointer;
-  font-size: 12.5px;
-  font-family: inherit;
-  display: inline-flex; align-items: center; justify-content: center;
-  gap: 5px; white-space: nowrap;
-}
-.ribbon-btn:hover { background: #e5f1fb; border-color: #cce4f7; }
-.ribbon-btn.active {
-  background: rgba(16, 124, 65, 0.18);
-  border-color: rgba(16, 124, 65, 0.45);
-}
-.ribbon-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.ribbon-btn-icon { font-size: 13px; }
-.ribbon-btn-text { font-size: 12px; }
-
-/* Big button — icon over label, 32-px-ish, the canonical Clipboard /
-   Cells / Editing / Styles left column. */
-.ribbon-bigbtn {
-  background: transparent;
-  border: 1px solid transparent;
-  color: var(--text);
   padding: 4px 8px;
-  border-radius: 2px;
+  min-width: 30px; height: 30px;
+  border-radius: 3px;
   cursor: pointer;
-  font: inherit;
-  display: inline-flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  min-width: 52px;
-  min-height: 56px;
+  font-size: 13px; font-family: inherit;
+  display: inline-flex; align-items: center; justify-content: center;
+  gap: 4px; white-space: nowrap;
 }
-.ribbon-bigbtn:hover { background: #e5f1fb; border-color: #cce4f7; }
-.ribbon-bigbtn-icon { font-size: 22px; line-height: 1; }
-.ribbon-bigbtn-text { font-size: 11px; color: #444; }
+.ribbon-btn:hover { background: var(--hover); border-color: var(--ribbon-border); }
+.ribbon-btn.active,
+.ribbon-btn:active { background: var(--active); border-color: var(--ribbon-border); }
+.ribbon-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.ribbon-btn.wide { min-width: 90px; padding: 4px 10px; }
+.ribbon-btn-icon,
+.ribbon-btn-text { font-size: 13px; }
 
 /* Combo / select inputs in the ribbon. */
-.ribbon-combo {
+.select {
+  height: 28px;
+  padding: 2px 6px;
+  min-width: 110px;
   font-family: inherit;
-  font-size: 12px;
+  font-size: 13px;
   border: 1px solid var(--ribbon-border);
-  border-radius: 2px;
-  padding: 2px 4px;
+  border-radius: 3px;
   background: #fff;
   color: var(--text);
-  height: 22px;
 }
-.ribbon-combo.sm { width: 48px; }
+.select.sm { min-width: 56px; }
 
 /* Color pickers (font color, fill color). The visible character is
    the affordance; the real <input type=color> sits invisibly on top. */
-.ribbon-color {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+.ribbon-btn.color {
   position: relative;
-  width: 26px; height: 22px;
-  border: 1px solid transparent;
-  border-radius: 2px;
   cursor: pointer;
-  overflow: hidden;
   font-weight: 700;
-  font-size: 13px;
-  line-height: 1;
 }
-.ribbon-color:hover { background: #e5f1fb; border-color: #cce4f7; }
-.ribbon-color input[type="color"] {
+.ribbon-btn.color input[type="color"] {
   position: absolute; inset: 0;
   opacity: 0;
   width: 100%; height: 100%;

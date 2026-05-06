@@ -1,9 +1,6 @@
-// Excel-style ribbon for AiCell. Rebuilt to match the visual language of
-// /word/ and /slides/ (same .tabs / .ribbon / .ribbon-panel / .group /
-// .group-row / .group-label class names) but with Excel's green palette
-// and tab order (Home / Insert / Formulas / Data / Review / View / Help).
-// Per the design spec at
-// /root/.claude/plans/ready-lets-go-for-dapper-nest-agent-ab4327fbd543327df.md.
+// Word-style ribbon for AiCell. Uses the same .tabs / .ribbon /
+// .ribbon-panel / .group / .group-row / .group-label class names and
+// sizing language as RodmanWord, with Sheets' green palette.
 
 import { useState, type ReactNode } from "react";
 import type { CellFormat, NumberFormat } from "@aicell/shared";
@@ -124,7 +121,7 @@ export function Ribbon({ a }: { a: RibbonActions }) {
                 >
                   <u>U</u>
                 </Btn>
-                <label className="ribbon-color" title="Font color">
+                <label className="ribbon-btn color" title="Font color">
                   <span style={{ borderBottom: `2px solid ${fmt.color ?? "#dc2626"}` }}>A</span>
                   <input
                     type="color"
@@ -132,7 +129,7 @@ export function Ribbon({ a }: { a: RibbonActions }) {
                     onChange={(e) => a.patchFormat({ color: e.target.value })}
                   />
                 </label>
-                <label className="ribbon-color" title="Fill color">
+                <label className="ribbon-btn color" title="Fill color">
                   <span style={{ background: fmt.bg ?? "transparent", outline: "1px solid #ccc" }}>▆</span>
                   <input
                     type="color"
@@ -166,7 +163,7 @@ export function Ribbon({ a }: { a: RibbonActions }) {
             <Group label="Number">
               <Row>
                 <select
-                  className="ribbon-combo"
+                  className="select"
                   value={fmt.numberFmt ?? "general"}
                   onChange={(e) => a.patchFormat({ numberFmt: e.target.value as NumberFormat })}
                   title="Number format"
@@ -390,12 +387,12 @@ function BigBtn({ onClick, title, icon, label }: BtnProps) {
   return (
     <button
       type="button"
-      className="ribbon-bigbtn"
+      className="ribbon-btn wide"
       onClick={onClick}
       title={title || label}
     >
-      <span className="ribbon-bigbtn-icon">{icon}</span>
-      <span className="ribbon-bigbtn-text">{label}</span>
+      <span className="ribbon-btn-icon">{icon}</span>
+      <span className="ribbon-btn-text">{label}</span>
     </button>
   );
 }
