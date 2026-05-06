@@ -89,7 +89,10 @@
     <button class="tab" role="tab" data-tab="transitions">Transitions</button>
     <button class="tab" role="tab" data-tab="animations">Animations</button>
     <button class="tab" role="tab" data-tab="slideshow">Slide Show</button>
+    <button class="tab" role="tab" data-tab="record">Record</button>
+    <button class="tab" role="tab" data-tab="review">Review</button>
     <button class="tab" role="tab" data-tab="view">View</button>
+    <button class="tab" role="tab" data-tab="help">Help</button>
   </nav>
 
   <section class="ribbon" id="ribbon">
@@ -123,10 +126,13 @@
     <div class="ribbon-panel active" data-panel="home">
       <div class="group">
         <div class="group-row">
-          <button class="ribbon-btn" data-cmd="undo" title="Undo is not available yet" aria-label="Undo is not available yet" disabled>↺</button>
-          <button class="ribbon-btn" data-cmd="redo" title="Redo is not available yet" aria-label="Redo is not available yet" disabled>↻</button>
+          <button class="ribbon-btn wide" data-cmd="paste" title="Paste selected slide elements">Paste</button>
         </div>
-        <div class="group-label">Undo</div>
+        <div class="group-row">
+          <button class="ribbon-btn" data-cmd="cut" title="Cut selected slide elements">Cut</button>
+          <button class="ribbon-btn" data-cmd="copy" title="Copy selected slide elements">Copy</button>
+        </div>
+        <div class="group-label">Clipboard</div>
       </div>
 
       <div class="group">
@@ -135,10 +141,6 @@
           <button class="ribbon-btn" data-cmd="duplicateSlide" title="Duplicate slide">⎘</button>
           <button class="ribbon-btn" data-cmd="deleteSlide" title="Delete slide">🗑</button>
         </div>
-        <div class="group-label">Slides</div>
-      </div>
-
-      <div class="group">
         <div class="group-row">
           <select class="select" id="layoutSelect" title="Slide layout">
             <option value="title">Title slide</option>
@@ -148,7 +150,7 @@
             <option value="blank">Blank</option>
           </select>
         </div>
-        <div class="group-label">Layout</div>
+        <div class="group-label">Slides</div>
       </div>
 
       <div class="group">
@@ -191,19 +193,39 @@
           <button class="ribbon-btn" data-cmd="numberedList" title="Numbered list">1.</button>
           <button class="ribbon-btn" data-cmd="outdent" title="Decrease indent (Shift+Tab)">⇤</button>
           <button class="ribbon-btn" data-cmd="indent" title="Increase indent (Tab)">⇥</button>
-          <button class="ribbon-btn" data-cmd="insertLink" title="Hyperlink (Ctrl+K)">🔗</button>
         </div>
         <div class="group-label">Paragraph</div>
       </div>
 
       <div class="group">
         <div class="group-row">
+          <button class="ribbon-btn" data-cmd="insertShape" data-shape="rect" title="Rectangle">Rect</button>
+          <button class="ribbon-btn" data-cmd="insertShape" data-shape="ellipse" title="Ellipse">Oval</button>
+          <button class="ribbon-btn" data-cmd="insertShape" data-shape="triangle" title="Triangle">Tri</button>
+          <button class="ribbon-btn" data-cmd="insertShape" data-shape="line" title="Line">Line</button>
+          <button class="ribbon-btn" data-cmd="insertShape" data-shape="arrow" title="Arrow">Arrow</button>
+        </div>
+        <div class="group-row">
+          <input class="color-input" type="color" id="shapeFill" title="Shape fill" value="#b7472a" />
+        </div>
+        <div class="group-label">Drawing</div>
+      </div>
+
+      <div class="group">
+        <div class="group-row">
           <button class="ribbon-btn" data-cmd="bringForward" title="Bring forward">⤴</button>
           <button class="ribbon-btn" data-cmd="sendBackward" title="Send backward">⤵</button>
-          <button class="ribbon-btn" data-cmd="duplicateElement" title="Duplicate (Ctrl+D)">⎘</button>
-          <button class="ribbon-btn" data-cmd="deleteElement" title="Delete (Del)">✕</button>
         </div>
         <div class="group-label">Arrange</div>
+      </div>
+
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn" data-cmd="duplicateElement" title="Duplicate (Ctrl+D)">Duplicate</button>
+          <button class="ribbon-btn" data-cmd="deleteElement" title="Delete (Del)">Delete</button>
+          <button class="ribbon-btn" data-cmd="insertLink" title="Hyperlink (Ctrl+K)">Link</button>
+        </div>
+        <div class="group-label">Editing</div>
       </div>
 
       <!-- Image format — only meaningful when an image is selected -->
@@ -224,36 +246,57 @@
     <div class="ribbon-panel" data-panel="insert">
       <div class="group">
         <div class="group-row">
-          <button class="ribbon-btn wide" data-cmd="insertText">Text box</button>
+          <button class="ribbon-btn wide" data-cmd="newSlide" title="New slide">New Slide</button>
+        </div>
+        <div class="group-label">Slides</div>
+      </div>
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn wide" data-cmd="insertTable">Table</button>
+        </div>
+        <div class="group-label">Tables</div>
+      </div>
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn wide" data-cmd="insertImage">Pictures...</button>
+        </div>
+        <div class="group-label">Images</div>
+      </div>
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn" data-cmd="insertShape" data-shape="rect" title="Rectangle">Rect</button>
+          <button class="ribbon-btn" data-cmd="insertShape" data-shape="ellipse" title="Ellipse">Oval</button>
+          <button class="ribbon-btn" data-cmd="insertShape" data-shape="triangle" title="Triangle">Tri</button>
+          <button class="ribbon-btn" data-cmd="insertShape" data-shape="star" title="Star">Star</button>
+          <button class="ribbon-btn" data-cmd="insertShape" data-shape="line" title="Line">Line</button>
+          <button class="ribbon-btn" data-cmd="insertShape" data-shape="arrow" title="Arrow">Arrow</button>
+          <button class="ribbon-btn" data-cmd="insertShape" data-shape="callout" title="Callout">Callout</button>
+        </div>
+        <div class="group-label">Illustrations</div>
+      </div>
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn wide" data-cmd="insertLink" title="Hyperlink (Ctrl+K)">Link</button>
+        </div>
+        <div class="group-label">Links</div>
+      </div>
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn wide" data-cmd="askClaude">Review with Claude</button>
+        </div>
+        <div class="group-label">Comments</div>
+      </div>
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn wide" data-cmd="insertText">Text Box</button>
         </div>
         <div class="group-label">Text</div>
       </div>
       <div class="group">
         <div class="group-row">
-          <button class="ribbon-btn wide" data-cmd="insertImage">Picture…</button>
-          <button class="ribbon-btn wide" data-cmd="insertVideo">Video…</button>
-          <button class="ribbon-btn wide" data-cmd="insertTable">Table</button>
+          <button class="ribbon-btn wide" data-cmd="insertVideo">Video...</button>
         </div>
         <div class="group-label">Media</div>
-      </div>
-      <div class="group">
-        <div class="group-row">
-          <button class="ribbon-btn" data-cmd="insertShape" data-shape="rect" title="Rectangle">▭</button>
-          <button class="ribbon-btn" data-cmd="insertShape" data-shape="ellipse" title="Ellipse">○</button>
-          <button class="ribbon-btn" data-cmd="insertShape" data-shape="triangle" title="Triangle">△</button>
-          <button class="ribbon-btn" data-cmd="insertShape" data-shape="star" title="Star">★</button>
-          <button class="ribbon-btn" data-cmd="insertShape" data-shape="line" title="Line">─</button>
-          <button class="ribbon-btn" data-cmd="insertShape" data-shape="arrow" title="Arrow">→</button>
-          <button class="ribbon-btn" data-cmd="insertShape" data-shape="callout" title="Callout">💬</button>
-        </div>
-        <div class="group-label">Shapes</div>
-      </div>
-      <div class="group">
-        <div class="group-row">
-          <input class="color-input" type="color" id="shapeFill" title="Shape fill" value="#b7472a" />
-          <div class="theme-swatches" id="themeSwatches" title="Theme colors — click to set as the active fill"></div>
-        </div>
-        <div class="group-label">Fill</div>
       </div>
     </div>
 
@@ -265,12 +308,18 @@
       </div>
       <div class="group">
         <div class="group-row">
+          <div class="theme-swatches" id="themeSwatches" title="Theme colors - click to set as the active fill"></div>
+        </div>
+        <div class="group-label">Variants</div>
+      </div>
+      <div class="group">
+        <div class="group-row">
           <select class="select" id="slideSizeSelect" title="Slide size">
             <option value="16:9" selected>Widescreen 16:9</option>
             <option value="4:3">Standard 4:3</option>
           </select>
         </div>
-        <div class="group-label">Slide size</div>
+        <div class="group-label">Customize</div>
       </div>
     </div>
 
@@ -278,7 +327,7 @@
     <div class="ribbon-panel" data-panel="transitions">
       <div class="group">
         <div class="group-row" id="transitionStrip"><!-- populated by app.js --></div>
-        <div class="group-label">Transition</div>
+        <div class="group-label">Transition to This Slide</div>
       </div>
       <div class="group">
         <div class="group-row">
@@ -294,7 +343,7 @@
         <div class="group-row">
           <button class="ribbon-btn" data-cmd="setAnim" data-anim-kind="none" title="No animation">None</button>
         </div>
-        <div class="group-label">Off</div>
+        <div class="group-label">Animation</div>
       </div>
       <div class="group">
         <div class="group-row">
@@ -302,19 +351,19 @@
           <button class="ribbon-btn" data-cmd="setAnim" data-anim-kind="slideInLeft" title="Slide in from left">⇒ Slide in</button>
           <button class="ribbon-btn" data-cmd="setAnim" data-anim-kind="zoomIn" title="Zoom in">⊕ Zoom in</button>
         </div>
-        <div class="group-label">Entrance</div>
+        <div class="group-label">Animation</div>
       </div>
       <div class="group">
         <div class="group-row">
           <button class="ribbon-btn" data-cmd="setAnim" data-anim-kind="pulse" title="Emphasis pulse">↺ Pulse</button>
         </div>
-        <div class="group-label">Emphasis</div>
+        <div class="group-label">Advanced Animation</div>
       </div>
       <div class="group">
         <div class="group-row">
           <button class="ribbon-btn" data-cmd="setAnim" data-anim-kind="fadeOut" title="Fade out">Fade out</button>
         </div>
-        <div class="group-label">Exit</div>
+        <div class="group-label">Animation</div>
       </div>
       <div class="group">
         <div class="group-row">
@@ -341,16 +390,63 @@
         </div>
         <div class="group-label">Start show</div>
       </div>
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn wide" data-cmd="toggleNotes">Speaker notes</button>
+        </div>
+        <div class="group-label">Set Up</div>
+      </div>
+    </div>
+
+    <!-- Record -->
+    <div class="ribbon-panel" data-panel="record">
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn wide" data-cmd="presentFromStart">From Beginning</button>
+          <button class="ribbon-btn wide" data-cmd="presentFromCurrent">From Current Slide</button>
+        </div>
+        <div class="group-label">Record</div>
+      </div>
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn wide" data-cmd="exportPptx">Export .pptx</button>
+          <button class="ribbon-btn wide" data-cmd="exportPdf">Export PDF</button>
+        </div>
+        <div class="group-label">Export</div>
+      </div>
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn wide" data-cmd="showHelp">Learn More</button>
+        </div>
+        <div class="group-label">Help</div>
+      </div>
+    </div>
+
+    <!-- Review -->
+    <div class="ribbon-panel" data-panel="review">
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn wide" data-cmd="askClaude">Review with Claude</button>
+        </div>
+        <div class="group-label">Review</div>
+      </div>
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn wide" data-cmd="toggleNotes">Speaker notes</button>
+        </div>
+        <div class="group-label">Notes</div>
+      </div>
     </div>
 
     <!-- View -->
     <div class="ribbon-panel" data-panel="view">
       <div class="group">
         <div class="group-row">
-          <button class="ribbon-btn wide" data-cmd="toggleNotes">Toggle notes</button>
-          <button class="ribbon-btn wide" data-cmd="toggleSorter">Slide sorter</button>
+          <button class="ribbon-btn wide" data-cmd="viewNormal">Normal</button>
+          <button class="ribbon-btn wide" data-cmd="viewSorter">Slide Sorter</button>
+          <button class="ribbon-btn wide" data-cmd="toggleNotes">Notes</button>
         </div>
-        <div class="group-label">Views</div>
+        <div class="group-label">Presentation Views</div>
       </div>
       <div class="group">
         <div class="group-row">
@@ -360,6 +456,17 @@
           <button class="ribbon-btn" data-cmd="zoomFit" title="Fit to window">⤢</button>
         </div>
         <div class="group-label">Zoom</div>
+      </div>
+    </div>
+
+    <!-- Help -->
+    <div class="ribbon-panel" data-panel="help">
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn wide" data-cmd="showHelp">Keyboard Shortcuts</button>
+          <button class="ribbon-btn wide" data-cmd="askClaude">Ask Claude</button>
+        </div>
+        <div class="group-label">Help</div>
       </div>
     </div>
   </section>

@@ -8,11 +8,14 @@ step.
 ## Supported Workflows
 
 - Create, duplicate, reorder, and delete slides.
+- Use a PowerPoint-style ribbon layout: File, Home, Insert, Design, Transitions, Animations, Slide Show, Record, Review, View, and Help.
 - Edit text, shapes, images, videos, tables, notes, themes, transitions, and simple animations.
+- Cut, copy, and paste slide elements inside the deck.
 - Save/open the native `.json` deck format.
 - Import/export `.pptx` through the shared `../lib/slides/` engine.
 - Export PDF through the browser print path.
 - Present from the start or current slide.
+- Open Ask Claude from the title bar, Insert, Review, or Help.
 
 ## Storage
 
@@ -28,7 +31,8 @@ cache.
 
 ## Known Gaps
 
-- Undo and redo buttons are intentionally disabled until document history is implemented.
+- Undo and redo are not exposed in the ribbon until document history is implemented.
+- PowerPoint parity gaps are tracked in [`BACKLOG.md`](./BACKLOG.md); Draw and Acrobat are intentionally out of scope.
 - Native browser alerts/confirms remain in several destructive and import/export flows.
 - Imported deck text HTML is sanitized before render/save, but broader file validation and fixture tests still need coverage.
 

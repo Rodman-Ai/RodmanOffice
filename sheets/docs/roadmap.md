@@ -1,6 +1,7 @@
 # Phased Roadmap
 
-Feature numbers reference [`features.md`](./features.md).
+Feature numbers reference [`features.md`](./features.md). Excel-ribbon parity
+gaps are tracked in [`excel-ribbon-backlog.md`](./excel-ribbon-backlog.md).
 
 ## Status snapshot
 
@@ -41,8 +42,8 @@ Four feature sprints landed on top of the Phase-1 base. See [`SHIPPED.md`](./SHI
 - File: `apps/web/src/csv.ts`
 
 **Editing UX**
-- Menu bar (File · Edit · View · Insert · Format · Data · Help) with keyboard shortcuts
-- Format toolbar above the formula bar
+- Excel-style ribbon (File · Home · Insert · Page Layout · Formulas · Data · Review · View · Help) with keyboard shortcuts
+- Home ribbon formatting controls above the formula bar
 - Function picker (50 most-used functions, click-to-insert)
 - Audit-formulas panel (lists evaluation errors with click-to-jump)
 - TSV-correct copy/paste (Excel-style escaping; round-trip preserves embedded newlines/tabs/quotes)
@@ -68,7 +69,7 @@ Four feature sprints landed on top of the Phase-1 base. See [`SHIPPED.md`](./SHI
 **Charts** — features 36 (subset), 37 (via agent)
 - Recharts integration: bar / line / area / pie / scatter
 - Charts attached per-sheet, rendered in a strip below the grid
-- Created exclusively through the agent's `create_chart` tool today (no manual UI yet)
+- Created manually from the Insert ribbon or through the agent's `create_chart` tool
 - Files: `apps/web/src/Chart.tsx`, `apps/web/src/ChartStrip.tsx`
 
 ### 🚧 Explicitly deferred (NOT shipped)

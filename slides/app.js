@@ -883,6 +883,9 @@
 
   const COMMANDS = {
     newSlide: cmd_newSlide,
+    cut() { copySelectionToClipboard(true); },
+    copy() { copySelectionToClipboard(false); },
+    paste() { pasteFromClipboard(); },
     duplicateSlide() {
       const dup = D.duplicateSlide(deck, state.selectedSlideId);
       if (dup) state.selectedSlideId = dup.id;
@@ -1006,6 +1009,11 @@
       renderEditor(); scheduleSave();
     },
     insertImage() { $('#imageFileInput').click(); },
+    askClaude() {
+      const panel = $('#askClaudePanel');
+      if (panel?.hidden) $('#askClaudeBtn')?.click();
+      else ($('#askClaudeKey')?.value.trim() ? $('#askClaudeInput') : $('#askClaudeKey'))?.focus();
+    },
     insertVideo() {
       const url = window.prompt('Video URL — YouTube, Vimeo, or a direct .mp4 link:', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ');
       if (!url) return;
@@ -1133,6 +1141,14 @@
       state.viewMode = state.viewMode === 'sorter' ? 'normal' : 'sorter';
       renderEditor();
     },
+    viewNormal() {
+      state.viewMode = 'normal';
+      renderEditor();
+    },
+    viewSorter() {
+      state.viewMode = 'sorter';
+      renderEditor();
+    },
     zoomIn() { state.autoFit = false; state.zoom = Math.min(4, state.zoom + 0.1); layoutEditor(); },
     zoomOut() { state.autoFit = false; state.zoom = Math.max(0.1, state.zoom - 0.1); layoutEditor(); },
     zoomFit() { state.autoFit = true; layoutEditor(); },
@@ -1142,6 +1158,7 @@
       const idx = deck.slides.findIndex((s) => s.id === state.selectedSlideId);
       startPresent(Math.max(0, idx));
     },
+    showHelp() { showKeyboardHelp(); },
   };
 
   function currentEditingTextNode() {
@@ -1306,7 +1323,7 @@
     });
   }
   $('#presentBtn').addEventListener('click', () => startPresent(0));
-  $('#helpBtn').addEventListener('click', () => {
+  function showKeyboardHelp() {
     alert(
       'RodmanSlides keyboard shortcuts:\n\n' +
       'Ctrl/⌘ + N  — New slide\n' +
@@ -1317,7 +1334,8 @@
       'Esc (in present mode) — Exit\n' +
       'Arrow keys / Space (in present mode) — Navigate'
     );
-  });
+  }
+  $('#helpBtn').addEventListener('click', showKeyboardHelp);
 
   // ---------- Export to PDF (via window.print) ----------
   function exportToPdf() {

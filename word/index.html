@@ -97,23 +97,18 @@
     <button class="tab" role="tab" title="Double-click to collapse the ribbon" data-tab="file">File</button>
     <button class="tab active" role="tab" aria-selected="true" data-tab="home" title="Double-click to collapse the ribbon">Home</button>
     <button class="tab" role="tab" title="Double-click to collapse the ribbon" data-tab="insert">Insert</button>
-    <button class="tab" role="tab" title="Double-click to collapse the ribbon" data-tab="references">References</button>
+    <button class="tab" role="tab" title="Double-click to collapse the ribbon" data-tab="design">Design</button>
     <button class="tab" role="tab" title="Double-click to collapse the ribbon" data-tab="layout">Layout</button>
+    <button class="tab" role="tab" title="Double-click to collapse the ribbon" data-tab="references">References</button>
+    <button class="tab" role="tab" title="Double-click to collapse the ribbon" data-tab="mailings">Mailings</button>
     <button class="tab" role="tab" title="Double-click to collapse the ribbon" data-tab="review">Review</button>
     <button class="tab" role="tab" title="Double-click to collapse the ribbon" data-tab="view">View</button>
+    <button class="tab" role="tab" title="Double-click to collapse the ribbon" data-tab="help">Help</button>
   </nav>
 
   <section class="ribbon" id="ribbon">
     <!-- Home tab -->
     <div class="ribbon-panel active" data-panel="home">
-      <div class="group">
-        <div class="group-row">
-          <button class="ribbon-btn" data-cmd="undo" title="Undo (Ctrl+Z)"><span class="ico">↺</span></button>
-          <button class="ribbon-btn" data-cmd="redo" title="Redo (Ctrl+Y)"><span class="ico">↻</span></button>
-        </div>
-        <div class="group-label">Undo</div>
-      </div>
-
       <div class="group">
         <div class="group-row">
           <button class="ribbon-btn" id="cutBtn" title="Cut (Ctrl+X)">✂</button>
@@ -163,6 +158,14 @@
             <input type="color" id="hiliteColor" value="#ffff00" />
           </label>
           <button class="ribbon-btn" data-cmd="removeFormat" title="Clear formatting">⌫</button>
+          <select class="select sm" id="changeCase" title="Change case" aria-label="Change case">
+            <option value="">Aa Case...</option>
+            <option value="upper">UPPERCASE</option>
+            <option value="lower">lowercase</option>
+            <option value="title">Title Case</option>
+            <option value="sentence">Sentence case</option>
+            <option value="toggle">tOGGLE cASE</option>
+          </select>
         </div>
         <div class="group-label">Font</div>
       </div>
@@ -184,10 +187,6 @@
           </select>
           <button class="ribbon-btn" id="collapseToLevelBtn" title="Collapse outline to level N">⇕ Lvl</button>
         </div>
-        <div class="group-label">Lists</div>
-      </div>
-
-      <div class="group">
         <div class="group-row">
           <button class="ribbon-btn" data-cmd="justifyLeft" title="Align left (Ctrl+L)">⯇</button>
           <button class="ribbon-btn" data-cmd="justifyCenter" title="Center (Ctrl+E)">⯀</button>
@@ -203,14 +202,6 @@
             <option value="2">2.0</option>
             <option value="2.5">2.5</option>
             <option value="3">3.0</option>
-          </select>
-          <select class="select sm" id="paraSpacing" title="Paragraph spacing" aria-label="Paragraph spacing">
-            <option value="">¶ ↕</option>
-            <option value="0">None</option>
-            <option value="0.4">Compact</option>
-            <option value="0.8">Default</option>
-            <option value="1.2">Loose</option>
-            <option value="1.6">Roomy</option>
           </select>
         </div>
         <div class="group-label">Paragraph</div>
@@ -237,9 +228,18 @@
 
       <div class="group">
         <div class="group-row">
+          <button class="ribbon-btn" data-cmd="undo" title="Undo (Ctrl+Z)">↺</button>
+          <button class="ribbon-btn" data-cmd="redo" title="Redo (Ctrl+Y)">↻</button>
           <button class="ribbon-btn" id="findBtn" title="Find &amp; Replace (Ctrl+F)">🔍 Find</button>
         </div>
         <div class="group-label">Editing</div>
+      </div>
+
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn" id="dictateBtn" title="Voice dictation">🎙 Dictate</button>
+        </div>
+        <div class="group-label">Voice</div>
       </div>
     </div>
 
@@ -248,8 +248,8 @@
       <div class="group">
         <div class="group-row">
           <button class="ribbon-btn" id="coverPageBtn" title="Cover page">📄 Cover</button>
+          <button class="ribbon-btn" id="blankPageBtn" title="Blank page">Blank page</button>
           <button class="ribbon-btn" id="pageBreakBtn" title="Page break">¶ Page break</button>
-          <button class="ribbon-btn" id="sectionBreakBtn" title="Section break">§ Section</button>
         </div>
         <div class="group-label">Pages</div>
       </div>
@@ -284,14 +284,13 @@
             </div>
           </div>
           <button class="ribbon-btn" id="chartBtn" title="Chart from data">📊 Chart</button>
-          <button class="ribbon-btn" id="equationBtn" title="Equation">∑ Equation</button>
         </div>
         <div class="group-label">Illustrations</div>
       </div>
 
       <div class="group">
         <div class="group-row">
-          <button class="ribbon-btn" id="insertVideoBtn" title="YouTube / Vimeo">▶ Video</button>
+          <button class="ribbon-btn" id="insertVideoBtn" title="YouTube / Vimeo">Online Video</button>
           <button class="ribbon-btn" id="insertAudioBtn" title="Audio file">♪ Audio</button>
           <button class="ribbon-btn" id="insertIframeBtn" title="Iframe (sandboxed)">▥ Iframe</button>
           <button class="ribbon-btn" id="insertQrBtn" title="QR code">⊞ QR</button>
@@ -307,6 +306,13 @@
           <button class="ribbon-btn" id="bookmarksMenuBtn" title="Jump to bookmark">📚 ▾</button>
         </div>
         <div class="group-label">Links</div>
+      </div>
+
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn" id="commentBtn" title="Add comment">💬 Comment</button>
+        </div>
+        <div class="group-label">Comments</div>
       </div>
 
       <div class="group">
@@ -335,7 +341,7 @@
           <button class="ribbon-btn" id="dropCapBtn" title="Drop cap">A Drop cap</button>
           <button class="ribbon-btn" id="pullQuoteBtn" title="Pull quote">❝ Pull quote</button>
           <button class="ribbon-btn" id="codeBlockBtn" title="Code block">{ } Code</button>
-          <button class="ribbon-btn" id="watermarkBtn" title="Watermark">💧 Watermark</button>
+          <button class="ribbon-btn" id="quickPartsBtn" title="Quick parts">⚡ Quick</button>
           <button class="ribbon-btn" id="tabStopBtn" title="Tab stop with leader">⇥ Tab</button>
           <button class="ribbon-btn" id="loremBtn" title="Lorem ipsum">📝 Lorem</button>
           <button class="ribbon-btn" id="insertDateBtn" title="Calendar date">📅 Date</button>
@@ -346,6 +352,7 @@
 
       <div class="group">
         <div class="group-row">
+          <button class="ribbon-btn" id="equationBtn" title="Equation">∑ Equation</button>
           <button class="ribbon-btn" id="insertSymbolBtn" title="Symbols">Ω Symbol</button>
           <button class="ribbon-btn" id="insertEmojiBtn" title="Emoji">😀 Emoji</button>
         </div>
@@ -365,21 +372,30 @@
         <div class="group-label">Forms</div>
       </div>
 
+    </div>
+
+    <!-- Design tab -->
+    <div class="ribbon-panel" data-panel="design">
       <div class="group">
         <div class="group-row">
-          <button class="ribbon-btn" id="commentBtn" title="Add comment">💬 Comment</button>
-          <button class="ribbon-btn" id="quickPartsBtn" title="Quick parts">⚡ Quick</button>
-          <button class="ribbon-btn" id="dictateBtn" title="Voice dictation">🎙 Dictate</button>
-          <select class="select sm" id="changeCase" title="Change case" aria-label="Change case">
-            <option value="">Aa Case…</option>
-            <option value="upper">UPPERCASE</option>
-            <option value="lower">lowercase</option>
-            <option value="title">Title Case</option>
-            <option value="sentence">Sentence case</option>
-            <option value="toggle">tOGGLE cASE</option>
+          <button class="ribbon-btn" id="documentThemesBtn" title="Document themes">Themes</button>
+          <select class="select sm" id="paraSpacing" title="Paragraph spacing" aria-label="Paragraph spacing">
+            <option value="">Paragraph spacing...</option>
+            <option value="0">None</option>
+            <option value="0.4">Compact</option>
+            <option value="0.8">Default</option>
+            <option value="1.2">Loose</option>
+            <option value="1.6">Roomy</option>
           </select>
         </div>
-        <div class="group-label">Editing</div>
+        <div class="group-label">Document Formatting</div>
+      </div>
+
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn" id="watermarkBtn" title="Watermark">Watermark</button>
+        </div>
+        <div class="group-label">Page Background</div>
       </div>
     </div>
 
@@ -476,6 +492,7 @@
               <option value="3">3</option>
             </select>
           </label>
+          <button class="ribbon-btn" id="sectionBreakBtn" title="Section break">Breaks</button>
         </div>
         <div class="group-label">Page setup</div>
       </div>
@@ -512,6 +529,16 @@
       </div>
     </div>
 
+    <!-- Mailings tab -->
+    <div class="ribbon-panel" data-panel="mailings">
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn" id="mailMergeBtn" title="Mail merge">Start Mail Merge</button>
+        </div>
+        <div class="group-label">Start Mail Merge</div>
+      </div>
+    </div>
+
     <!-- Review tab -->
     <div class="ribbon-panel" data-panel="review">
       <div class="group">
@@ -521,6 +548,12 @@
           <button class="ribbon-btn" id="reviewWordCountBtn" title="Word count details">∑ Word count</button>
         </div>
         <div class="group-label">Proofing</div>
+      </div>
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn" id="readAloudBtn" title="Read aloud (text-to-speech)">Read Aloud</button>
+        </div>
+        <div class="group-label">Speech</div>
       </div>
       <div class="group">
         <div class="group-row">
@@ -688,13 +721,6 @@
 
       <div class="group">
         <div class="group-row">
-          <button class="ribbon-btn" id="readAloudBtn" title="Read aloud (text-to-speech)">🔊 Aloud</button>
-        </div>
-        <div class="group-label">Read</div>
-      </div>
-
-      <div class="group">
-        <div class="group-row">
           <label class="control switch">
             <input type="checkbox" id="spellToggle" checked />
             <span>Spell check</span>
@@ -724,6 +750,13 @@
 
       <div class="group">
         <div class="group-row">
+          <button class="ribbon-btn" id="viewPropertiesBtn" title="Document properties">Properties</button>
+        </div>
+        <div class="group-label">Properties</div>
+      </div>
+
+      <div class="group">
+        <div class="group-row">
           <label class="control switch">
             <input type="checkbox" id="trackChangesToggle" />
             <span>Track changes</span>
@@ -734,6 +767,17 @@
           </label>
         </div>
         <div class="group-label">Markup</div>
+      </div>
+    </div>
+
+    <!-- Help tab -->
+    <div class="ribbon-panel" data-panel="help">
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn" id="helpShortcutsBtn" title="Keyboard shortcuts">Help</button>
+          <button class="ribbon-btn" id="helpAboutBtn" title="About RodmanWord">About</button>
+        </div>
+        <div class="group-label">Help</div>
       </div>
     </div>
   </section>

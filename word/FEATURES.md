@@ -2,7 +2,8 @@
 
 Generated from the 98 capability banners in `app.js` plus the ribbon
 markup in `index.html`. Each entry: short description, source
-location, keyboard shortcut where applicable.
+location, keyboard shortcut where applicable. Microsoft Word parity gaps
+that are not exposed as working controls are tracked in `BACKLOG.md`.
 
 The big ones first, then the per-tab catalogue.
 
@@ -43,28 +44,36 @@ Source: `BACKSTAGE_SECTIONS` map in `app.js`.
 
 | Group | Buttons | Source |
 |---|---|---|
-| Undo | Undo (Ctrl+Z) · Redo (Ctrl+Y) | `data-cmd="undo"` / `redo` |
 | Clipboard | Cut · Copy · Paste · Format painter | `app.js` `// FEATURE: Cut / Copy / Paste`, `// FEATURE: Format painter` |
-| Font | family · size · B / I / U / S / sub / sup · font colour swatches · highlight swatches · clear formatting | `app.js` `// IMPROVEMENT: Color swatches palette + recent colors` |
-| Lists | Bulleted · Numbered · Multi-level (1.1.1) · Bullet style · Collapse-to-level | `app.js` `// FEATURE: Multi-level numbered lists`, `Section D — Lists & outlining` |
-| Paragraph | Align L / E / R / J · indent / outdent · line spacing · paragraph spacing | `app.js` `// FEATURE: Line / paragraph spacing controls` |
+| Font | family · size · B / I / U / S / sub / sup · font colour swatches · highlight swatches · clear formatting · change case | `app.js` `// IMPROVEMENT: Color swatches palette + recent colors` |
+| Paragraph | Bulleted · Numbered · Multi-level (1.1.1) · Bullet style · Collapse-to-level · Align L / E / R / J · indent / outdent · line spacing | `app.js` `// FEATURE: Multi-level numbered lists`, `Section D — Lists & outlining`, `// FEATURE: Line / paragraph spacing controls` |
 | Styles | Block style · Custom style · Manage styles | `app.js` `// FEATURE: Custom paragraph styles` |
-| Editing | Find & Replace (Ctrl+F) — regex, whole-word, scope, format filter, saved searches | `app.js` `// ---------- Find & Replace`, `Section J — Search advanced` |
+| Editing | Undo · Redo · Find & Replace (Ctrl+F) — regex, whole-word, scope, format filter, saved searches | `app.js` `// ---------- Find & Replace`, `Section J — Search advanced` |
+| Voice | Dictate | `app.js` `// FEATURE: Voice dictation` |
 
 ## Insert tab
 
 | Group | Buttons / dropdowns |
 |---|---|
-| Pages | Cover page · Page break · Section break |
+| Pages | Cover page · Blank page · Page break |
 | Tables | Table · Text→Table · Table→Text |
-| Illustrations | Picture · Pictures dropdown (Gallery / Carousel / Linked URL) · Shapes dropdown (Rectangle / Ellipse / Arrow / Text box) · Chart from CSV · Equation (LaTeX → MathML) |
+| Illustrations | Picture · Pictures dropdown (Gallery / Carousel / Linked URL) · Shapes dropdown (Rectangle / Ellipse / Arrow / Text box) · Chart from CSV |
 | Media | Video (YouTube / Vimeo) · Audio · Iframe · QR code · Code-39 barcode |
 | Links | Link (Ctrl+K) · Bookmark · Bookmarks dropdown |
+| Comments | Comment (threaded) |
 | Header & Footer | Header · Footer · Page number field · Field dropdown |
-| Text | Word art · Drop cap · Pull quote · Code block · Watermark · Tab stop · Lorem · Date · Hr |
-| Symbols | Symbol picker (categorised) · Emoji picker (categorised) |
+| Text | Word art · Drop cap · Pull quote · Code block · Quick parts · Tab stop · Lorem · Date · Hr |
+| Symbols | Equation (LaTeX → MathML) · Symbol picker (categorised) · Emoji picker (categorised) |
 | Forms | Text field · Checkbox · Dropdown · Date field · Number field · Form data CSV · Field codes |
-| Editing | Comment (threaded) · Quick parts · Dictate · Change case |
+
+## Design tab
+
+| Group | Controls |
+|---|---|
+| Document Formatting | Document themes · Paragraph spacing presets |
+| Page Background | Watermark |
+
+Source: `Section F — Templates, themes, branding`, `// FEATURE: Line / paragraph spacing controls`, `// IMPROVEMENT: DRAFT / CONFIDENTIAL watermark`.
 
 ## References tab
 
@@ -83,17 +92,26 @@ Source: `Section G — References & academic`, `// FEATURE: Citations + bibliogr
 | Group | Controls |
 |---|---|
 | Page | Size (Letter / A4 / Legal) · Orientation (Portrait / Landscape) |
-| Page setup | Margins (Normal / Narrow / Wide) · Columns (1 / 2 / 3) |
+| Page setup | Margins (Normal / Narrow / Wide) · Columns (1 / 2 / 3) · Breaks |
 | Flow | Line numbers · Hyphenation · Widow / orphan |
 | Numbering | Heading numbering scheme (1.1.1 / I.A.1 / A.1.a / 1) / off) · Restart numbering at this heading |
 
 Source: `Section B — Document model & styles depth (#11–#20)`.
+
+## Mailings tab
+
+| Group | Controls |
+|---|---|
+| Start Mail Merge | Mail merge modal for CSV + `{{Field}}` placeholders |
+
+Source: `// FEATURE: Mail merge ({{Field}} + CSV)`.
 
 ## Review tab
 
 | Group | Controls |
 |---|---|
 | Proofing | Spell check · Grammar · Word-count details |
+| Speech | Read aloud |
 | Comments | New · Pane · Resolve · Prev / Next |
 | Tracking | Track changes toggle · Show-markup filter (All / Insertions / Deletions / Comments only / None) · Reviewer filter · Reviewing pane |
 | Changes | Prev / Next · Accept / Reject · Accept-all / Reject-all |
@@ -111,10 +129,16 @@ Source: `// FEATURE: Review tab — restructure + 9 review-depth items (#1–#10
 | Theme | Light / Dark / Sepia / High contrast |
 | Show | Ruler · Navigation · Comments pane · Grammar pane |
 | Modes | Focus (F11) · Read · Full-screen · More dropdown (Outline edit · Two-page spread · Side-by-side reading · Mobile preview · Dyslexia preset) |
-| Read | Read aloud (TTS with voice picker, speed slider, Pause/Stop) |
 | Writing aids | Spell check · Auto-correct (smart quotes + typos + smart caps + Markdown auto-format + symbol shortcuts) · Smart Compose ghost text |
 | Macros | Record · Run macros |
+| Properties | Document properties |
 | Markup | Track changes · Restrict editing |
+
+## Help tab
+
+| Group | Controls |
+|---|---|
+| Help | Keyboard shortcuts · About RodmanWord |
 
 ## Status bar
 

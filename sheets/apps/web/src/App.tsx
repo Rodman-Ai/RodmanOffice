@@ -1,5 +1,5 @@
 import { lazy, Suspense, useState, useRef, useEffect, useCallback, type ChangeEvent } from "react";
-import { a1, type Cell, type Workbook, cellKey } from "@aicell/shared";
+import { a1, type Cell, type ChartType, type Workbook, cellKey } from "@aicell/shared";
 import { useWorkbook, newBlankWorkbook, type CellEdit } from "./useWorkbook";
 import { Grid } from "./Grid";
 import { SidePanel } from "./SidePanel";
@@ -58,6 +58,8 @@ export function App() {
   const [commentOpen, setCommentOpen] = useState(false);
   const [auditOpen, setAuditOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
+  const [showGridlines, setShowGridlines] = useState(true);
+  const [showHeadings, setShowHeadings] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const formulaInputRef = useRef<HTMLInputElement>(null);
   const formulaEditRef = useRef<{ row: number; col: number; raw: string } | null>(null);
@@ -400,6 +402,8 @@ export function App() {
       : isOffline
         ? `Demo mode (no backend) · ${baseStatus}`
         : baseStatus;
+  const chartRangeLabel = `${a1(norm.startRow, norm.startCol)}:${a1(norm.endRow, norm.endCol)}`;
+  const canInsertChart = norm.endRow > norm.startRow && norm.endCol > norm.startCol;
 
   function beginFormulaEdit(): void {
     formulaEditRef.current = {
@@ -443,6 +447,19 @@ export function App() {
     setTimeout(() => formulaInputRef.current?.focus(), 0);
   }, [api, anchor.row, anchor.col, selection]);
 
+  const insertChart = useCallback(
+    (type: ChartType) => {
+      if (!canInsertChart) return;
+      const title = `${type[0]!.toUpperCase()}${type.slice(1)} chart ${chartRangeLabel}`;
+      api.addChart(api.activeSheet.name, {
+        title,
+        type,
+        range: chartRangeLabel,
+      });
+    },
+    [api, canInsertChart, chartRangeLabel]
+  );
+
   const ribbonActions: RibbonActions = {
     newWorkbook: () => {
       api.replaceWorkbook(newBlankWorkbook(`wb-${Date.now()}`));
@@ -468,11 +485,17 @@ export function App() {
     openCommentModal: () => setCommentOpen(true),
     openFunctionPicker: () => setPickerOpen(true),
     insertSum,
+    canInsertChart,
+    insertChart,
     sortAsc: () => sortActiveSheetByColumn(anchor.col, true),
     sortDesc: () => sortActiveSheetByColumn(anchor.col, false),
     removeDuplicates: () => removeDuplicatesInColumn(anchor.col),
     panelOpen,
     togglePanel: () => setPanelOpen((v) => !v),
+    showGridlines,
+    toggleGridlines: () => setShowGridlines((v) => !v),
+    showHeadings,
+    toggleHeadings: () => setShowHeadings((v) => !v),
     openAudit: () => setAuditOpen(true),
     about: () => setAboutOpen(true),
   };
@@ -580,6 +603,8 @@ export function App() {
             onSelect={setSelection}
             onSortColumn={sortActiveSheetByColumn}
             onRemoveDupesInColumn={removeDuplicatesInColumn}
+            showGridlines={showGridlines}
+            showHeadings={showHeadings}
           />
           {hasCharts && (
             <Suspense fallback={null}>

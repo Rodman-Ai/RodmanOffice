@@ -88,9 +88,9 @@ How the leading products organize their chrome — and what AiCell takes from ea
 | **Sourcetable** | AI-first toolbar — prompt input is the primary affordance, conventional menus collapse behind a hamburger | Inverts the hierarchy: the AI input is louder than File/Edit. |
 | **Rows** (sunsetting) | Light menubar plus drag-to-canvas dashboard tools | Tuned for embed/share rather than data work; less to learn but less to do. |
 
-**Implication for AiCell.** A six-menu bar (File / Edit / View / Insert / Data / Help) is the lowest-friction option for users coming from Excel or Sheets — every command they reflexively reach for has a home. We **don't** copy Excel's ribbon (too heavy for a Phase-1 product) and we **don't** go full Quadratic (palette-only) because new users need a visible affordance.
+**Implication for AiCell.** RodmanSheets now uses an Excel-style ribbon (File / Home / Insert / Page Layout / Formulas / Data / Review / View / Help) while keeping the lighter RodmanOffice visual language. Draw, Automate, and Acrobat stay out of the live ribbon until their underlying behavior exists.
 
-The differentiator is what the menus point to: **Ask Claude is the loud primary action** (a blue button in the toolbar above the menus), the empty-state of the side panel tells users they can do anything from chat, and the only menu we invest UI uniquely in is **Insert → Function** — a 50-function picker with search and click-to-insert, because that's the one task where a list beats chat.
+The differentiator is what the ribbon points to: **Ask Claude is the loud primary action** in the title bar, the empty-state of the side panel tells users they can do anything from chat, and the Formulas/Help entry points keep the 50-function picker visible because that is one task where a list beats chat.
 
 ## Sources
 

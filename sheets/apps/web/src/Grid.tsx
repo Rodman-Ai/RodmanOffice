@@ -24,9 +24,19 @@ type Props = {
   onSelect: (sel: Range) => void;
   onSortColumn: (col: number, ascending: boolean) => void;
   onRemoveDupesInColumn: (col: number) => void;
+  showGridlines?: boolean;
+  showHeadings?: boolean;
 };
 
-export function Grid({ api, selection, onSelect, onSortColumn, onRemoveDupesInColumn }: Props) {
+export function Grid({
+  api,
+  selection,
+  onSelect,
+  onSortColumn,
+  onRemoveDupesInColumn,
+  showGridlines = true,
+  showHeadings = true,
+}: Props) {
   const { activeSheet, getRaw, getComputed, getCellFormat, getCellComment, setCell, version, setColWidth } = api;
   const parentRef = useRef<HTMLDivElement>(null);
   const [editing, setEditing] = useState<{ row: number; col: number; draft: string } | null>(null);
@@ -42,11 +52,13 @@ export function Grid({ api, selection, onSelect, onSortColumn, onRemoveDupesInCo
     [activeSheet.colWidths, draftWidth]
   );
 
+  const rowHeaderWidth = showHeadings ? ROW_HEADER_WIDTH : 0;
+
   const totalWidth = useCallback((): number => {
-    let w = ROW_HEADER_WIDTH;
+    let w = rowHeaderWidth;
     for (let c = 0; c < activeSheet.colCount; c++) w += widthOf(c);
     return w;
-  }, [activeSheet.colCount, widthOf])();
+  }, [activeSheet.colCount, rowHeaderWidth, widthOf])();
 
   const rowVirtualizer = useVirtualizer({
     count: activeSheet.rowCount,
@@ -261,12 +273,12 @@ export function Grid({ api, selection, onSelect, onSortColumn, onRemoveDupesInCo
 
   return (
     <div
-      className="grid-container"
+      className={`grid-container${showGridlines ? "" : " hide-gridlines"}`}
       ref={parentRef}
       tabIndex={0}
       onKeyDown={handleCellKeyDown}
     >
-      <div className="grid-header-row" style={{ width: totalWidth }}>
+      {showHeadings && <div className="grid-header-row" style={{ width: totalWidth }}>
         <div className="grid-col-header corner" />
         {Array.from({ length: activeSheet.colCount }).map((_, c) => (
           <div
@@ -328,7 +340,7 @@ export function Grid({ api, selection, onSelect, onSortColumn, onRemoveDupesInCo
             />
           </div>
         ))}
-      </div>
+      </div>}
       <div
         className="grid"
         style={{
@@ -348,13 +360,15 @@ export function Grid({ api, selection, onSelect, onSortColumn, onRemoveDupesInCo
                 width: totalWidth,
               }}
             >
-              <div
-                className="grid-row-header"
-                style={{ width: ROW_HEADER_WIDTH }}
-                onClick={() => onRowHeaderClick(r)}
-              >
-                {r + 1}
-              </div>
+              {showHeadings && (
+                <div
+                  className="grid-row-header"
+                  style={{ width: ROW_HEADER_WIDTH }}
+                  onClick={() => onRowHeaderClick(r)}
+                >
+                  {r + 1}
+                </div>
+              )}
               {Array.from({ length: activeSheet.colCount }).map((_, c) => (
                 <CellView
                   key={c}

@@ -1,9 +1,9 @@
-// Word-style ribbon for AiCell. Uses the same .tabs / .ribbon /
+// Word-style ribbon for RodmanSheets. Uses the shared .tabs / .ribbon /
 // .ribbon-panel / .group / .group-row / .group-label class names and
-// sizing language as RodmanWord, with Sheets' green palette.
+// sizing language, with Sheets' green palette.
 
 import { useState, type ReactNode } from "react";
-import type { CellFormat, NumberFormat } from "@aicell/shared";
+import type { CellFormat, ChartType, NumberFormat } from "@aicell/shared";
 
 export type RibbonActions = {
   // File
@@ -31,6 +31,8 @@ export type RibbonActions = {
   openCommentModal: () => void;
   openFunctionPicker: () => void;
   insertSum: () => void;
+  canInsertChart: boolean;
+  insertChart: (type: ChartType) => void;
   // Data
   sortAsc: () => void;
   sortDesc: () => void;
@@ -38,6 +40,10 @@ export type RibbonActions = {
   // View
   panelOpen: boolean;
   togglePanel: () => void;
+  showGridlines: boolean;
+  toggleGridlines: () => void;
+  showHeadings: boolean;
+  toggleHeadings: () => void;
   // Help
   openAudit: () => void;
   about: () => void;
@@ -52,11 +58,13 @@ const NUMBER_FORMATS: { key: NumberFormat; label: string }[] = [
   { key: "datetime", label: "Date & time" },
 ];
 
-type Tab = "home" | "insert" | "formulas" | "data" | "review" | "view" | "help";
+type Tab = "file" | "home" | "insert" | "pageLayout" | "formulas" | "data" | "review" | "view" | "help";
 
 const TABS: { id: Tab; label: string }[] = [
+  { id: "file", label: "File" },
   { id: "home", label: "Home" },
   { id: "insert", label: "Insert" },
+  { id: "pageLayout", label: "Page Layout" },
   { id: "formulas", label: "Formulas" },
   { id: "data", label: "Data" },
   { id: "review", label: "Review" },
@@ -84,17 +92,32 @@ export function Ribbon({ a }: { a: RibbonActions }) {
       </nav>
 
       <section className="ribbon" role="tabpanel">
+        {tab === "file" && (
+          <div className="ribbon-panel active">
+            <Group label="Workbook">
+              <Row>
+                <BigBtn icon="+" label="New" onClick={a.newWorkbook} />
+                <BigBtn icon="Open" label="Import" onClick={a.importFile} />
+              </Row>
+            </Group>
+            <Group label="Export">
+              <Row>
+                <BigBtn icon="CSV" label="Export CSV" onClick={a.exportCsv} />
+                <BigBtn icon="XLSX" label="Export XLSX" onClick={a.exportXlsx} />
+              </Row>
+            </Group>
+          </div>
+        )}
+
         {tab === "home" && (
           <div className="ribbon-panel active">
             <Group label="Clipboard">
               <Row>
-                <BigBtn icon="📋" label="Paste" onClick={a.paste} />
+                <BigBtn icon="Paste" label="Paste" onClick={a.paste} />
               </Row>
               <Row>
-                <Btn icon="✂" label="Cut" onClick={a.cut} title="Cut (⌘X)" />
-              </Row>
-              <Row>
-                <Btn icon="⎘" label="Copy" onClick={a.copy} title="Copy (⌘C)" />
+                <Btn icon="Cut" label="Cut" onClick={a.cut} title="Cut" />
+                <Btn icon="Copy" label="Copy" onClick={a.copy} title="Copy" />
               </Row>
             </Group>
 
@@ -103,21 +126,21 @@ export function Ribbon({ a }: { a: RibbonActions }) {
                 <Btn
                   active={!!fmt.bold}
                   onClick={() => a.patchFormat({ bold: !fmt.bold })}
-                  title="Bold (⌘B)"
+                  title="Bold"
                 >
                   <b>B</b>
                 </Btn>
                 <Btn
                   active={!!fmt.italic}
                   onClick={() => a.patchFormat({ italic: !fmt.italic })}
-                  title="Italic (⌘I)"
+                  title="Italic"
                 >
                   <i>I</i>
                 </Btn>
                 <Btn
                   active={!!fmt.underline}
                   onClick={() => a.patchFormat({ underline: !fmt.underline })}
-                  title="Underline (⌘U)"
+                  title="Underline"
                 >
                   <u>U</u>
                 </Btn>
@@ -130,7 +153,7 @@ export function Ribbon({ a }: { a: RibbonActions }) {
                   />
                 </label>
                 <label className="ribbon-btn color" title="Fill color">
-                  <span style={{ background: fmt.bg ?? "transparent", outline: "1px solid #ccc" }}>▆</span>
+                  <span style={{ background: fmt.bg ?? "transparent", outline: "1px solid #ccc" }}>Fill</span>
                   <input
                     type="color"
                     value={fmt.bg ?? "#ffffff"}
@@ -146,17 +169,17 @@ export function Ribbon({ a }: { a: RibbonActions }) {
                   active={fmt.align === "left"}
                   onClick={() => a.patchFormat({ align: fmt.align === "left" ? undefined : "left" })}
                   title="Align left"
-                >⇤</Btn>
+                >Left</Btn>
                 <Btn
                   active={fmt.align === "center"}
                   onClick={() => a.patchFormat({ align: fmt.align === "center" ? undefined : "center" })}
                   title="Align center"
-                >↔</Btn>
+                >Center</Btn>
                 <Btn
                   active={fmt.align === "right"}
                   onClick={() => a.patchFormat({ align: fmt.align === "right" ? undefined : "right" })}
                   title="Align right"
-                >⇥</Btn>
+                >Right</Btn>
               </Row>
             </Group>
 
@@ -177,38 +200,40 @@ export function Ribbon({ a }: { a: RibbonActions }) {
               <Row>
                 <Btn onClick={() => a.patchFormat({ numberFmt: "currency" })} title="Currency">$</Btn>
                 <Btn onClick={() => a.patchFormat({ numberFmt: "percent" })} title="Percent">%</Btn>
-                <Btn onClick={() => a.patchFormat({ numberFmt: "number" })} title="Comma separated">, </Btn>
+                <Btn onClick={() => a.patchFormat({ numberFmt: "number" })} title="Comma separated">,</Btn>
               </Row>
             </Group>
 
             <Group label="Styles">
               <Row>
-                <BigBtn icon="🎨" label="Conditional" onClick={a.openConditionalFormat} />
+                <BigBtn icon="CF" label="Conditional Formatting" onClick={a.openConditionalFormat} />
               </Row>
               <Row>
-                <Btn icon="⌫" label="Clear" onClick={a.clearFormat} title="Clear formatting" />
+                <Btn icon="Clear" label="Clear Formats" onClick={a.clearFormat} title="Clear formatting" />
               </Row>
             </Group>
 
             <Group label="Cells">
               <Row>
-                <Btn icon="＋" label="Insert sheet" onClick={a.addSheet} />
+                <Btn icon="+" label="Insert Sheet" onClick={a.addSheet} />
               </Row>
               <Row>
-                <Btn icon="🗑" label="Clear contents" onClick={a.clearSelection} title="Delete contents (Del)" />
+                <Btn icon="Del" label="Clear Contents" onClick={a.clearSelection} title="Delete contents" />
               </Row>
             </Group>
 
             <Group label="Editing">
               <Row>
-                <BigBtn icon="Σ" label="AutoSum" onClick={a.insertSum} title="Insert SUM at the active cell" />
+                <Btn icon="Undo" label="Undo" onClick={a.undo} disabled={!a.canUndo} />
+                <Btn icon="Redo" label="Redo" onClick={a.redo} disabled={!a.canRedo} />
               </Row>
               <Row>
-                <Btn icon="🔍" label="Find &amp; Select" onClick={a.openFindReplace} title="Find &amp; replace (⌘F)" />
+                <BigBtn icon="SUM" label="AutoSum" onClick={a.insertSum} title="Insert SUM at the active cell" />
               </Row>
               <Row>
-                <Btn icon="↑" label="Sort A→Z" onClick={a.sortAsc} title="Sort ascending by selected column" />
-                <Btn icon="↓" label="Sort Z→A" onClick={a.sortDesc} title="Sort descending by selected column" />
+                <Btn icon="Find" label="Find & Select" onClick={a.openFindReplace} title="Find and replace" />
+                <Btn icon="AZ" label="Sort A-Z" onClick={a.sortAsc} title="Sort ascending by selected column" />
+                <Btn icon="ZA" label="Sort Z-A" onClick={a.sortDesc} title="Sort descending by selected column" />
               </Row>
             </Group>
           </div>
@@ -218,29 +243,34 @@ export function Ribbon({ a }: { a: RibbonActions }) {
           <div className="ribbon-panel active">
             <Group label="Tables">
               <Row>
-                <BigBtn icon="📑" label="New sheet" onClick={a.addSheet} />
+                <BigBtn icon="Sheet" label="New Sheet" onClick={a.addSheet} />
               </Row>
             </Group>
-            <Group label="Functions">
+            <Group label="Charts">
               <Row>
-                <BigBtn icon="ƒₓ" label="Function…" onClick={a.openFunctionPicker} title="Insert function (⇧F3)" />
+                <Btn icon="Bar" label="Bar" onClick={() => a.insertChart("bar")} disabled={!a.canInsertChart} />
+                <Btn icon="Line" label="Line" onClick={() => a.insertChart("line")} disabled={!a.canInsertChart} />
+                <Btn icon="Area" label="Area" onClick={() => a.insertChart("area")} disabled={!a.canInsertChart} />
               </Row>
               <Row>
-                <Btn icon="Σ" label="Sum" onClick={a.insertSum} />
+                <Btn icon="Pie" label="Pie" onClick={() => a.insertChart("pie")} disabled={!a.canInsertChart} />
+                <Btn icon="Scatter" label="Scatter" onClick={() => a.insertChart("scatter")} disabled={!a.canInsertChart} />
               </Row>
             </Group>
             <Group label="Comments">
               <Row>
-                <BigBtn icon="💬" label="Comment" onClick={a.openCommentModal} />
+                <BigBtn icon="Comment" label="Comment" onClick={a.openCommentModal} />
               </Row>
             </Group>
-            <Group label="Files">
+          </div>
+        )}
+
+        {tab === "pageLayout" && (
+          <div className="ribbon-panel active">
+            <Group label="Sheet Options">
               <Row>
-                <Btn icon="📂" label="Import…" onClick={a.importFile} />
-              </Row>
-              <Row>
-                <Btn icon="↓" label="Export CSV" onClick={a.exportCsv} />
-                <Btn icon="↓" label="Export XLSX" onClick={a.exportXlsx} />
+                <Toggle checked={a.showGridlines} label="Gridlines" onChange={a.toggleGridlines} />
+                <Toggle checked={a.showHeadings} label="Headings" onChange={a.toggleHeadings} />
               </Row>
             </Group>
           </div>
@@ -248,17 +278,15 @@ export function Ribbon({ a }: { a: RibbonActions }) {
 
         {tab === "formulas" && (
           <div className="ribbon-panel active">
-            <Group label="Function library">
+            <Group label="Function Library">
               <Row>
-                <BigBtn icon="ƒₓ" label="Insert function" onClick={a.openFunctionPicker} title="Browse all functions (⇧F3)" />
-              </Row>
-              <Row>
-                <Btn icon="Σ" label="AutoSum" onClick={a.insertSum} />
+                <BigBtn icon="fx" label="Insert Function" onClick={a.openFunctionPicker} title="Browse all functions" />
+                <BigBtn icon="SUM" label="AutoSum" onClick={a.insertSum} />
               </Row>
             </Group>
-            <Group label="Auditing">
+            <Group label="Formula Auditing">
               <Row>
-                <BigBtn icon="🔎" label="Audit formulas" onClick={a.openAudit} />
+                <BigBtn icon="Audit" label="Audit Formulas" onClick={a.openAudit} />
               </Row>
             </Group>
           </div>
@@ -266,20 +294,20 @@ export function Ribbon({ a }: { a: RibbonActions }) {
 
         {tab === "data" && (
           <div className="ribbon-panel active">
-            <Group label="Get data">
+            <Group label="Get Data">
               <Row>
-                <BigBtn icon="📂" label="Import file" onClick={a.importFile} />
+                <BigBtn icon="Import" label="Import File" onClick={a.importFile} />
               </Row>
             </Group>
-            <Group label="Sort &amp; filter">
+            <Group label="Sort & Filter">
               <Row>
-                <Btn icon="↑" label="Sort A→Z" onClick={a.sortAsc} />
-                <Btn icon="↓" label="Sort Z→A" onClick={a.sortDesc} />
+                <Btn icon="AZ" label="Sort A-Z" onClick={a.sortAsc} />
+                <Btn icon="ZA" label="Sort Z-A" onClick={a.sortDesc} />
               </Row>
             </Group>
-            <Group label="Data tools">
+            <Group label="Data Tools">
               <Row>
-                <Btn icon="⊟" label="Remove duplicates" onClick={a.removeDuplicates} />
+                <Btn icon="Dedupe" label="Remove Duplicates" onClick={a.removeDuplicates} />
               </Row>
             </Group>
           </div>
@@ -289,12 +317,17 @@ export function Ribbon({ a }: { a: RibbonActions }) {
           <div className="ribbon-panel active">
             <Group label="Comments">
               <Row>
-                <BigBtn icon="💬" label="New comment" onClick={a.openCommentModal} />
+                <BigBtn icon="Comment" label="New Comment" onClick={a.openCommentModal} />
+              </Row>
+            </Group>
+            <Group label="Performance">
+              <Row>
+                <BigBtn icon="Audit" label="Audit Formulas" onClick={a.openAudit} />
               </Row>
             </Group>
             <Group label="Find">
               <Row>
-                <Btn icon="🔍" label="Find &amp; replace" onClick={a.openFindReplace} title="⌘F" />
+                <Btn icon="Find" label="Find & Replace" onClick={a.openFindReplace} />
               </Row>
             </Group>
           </div>
@@ -304,17 +337,23 @@ export function Ribbon({ a }: { a: RibbonActions }) {
           <div className="ribbon-panel active">
             <Group label="Show">
               <Row>
+                <Toggle checked={a.showGridlines} label="Gridlines" onChange={a.toggleGridlines} />
+                <Toggle checked={a.showHeadings} label="Headings" onChange={a.toggleHeadings} />
+              </Row>
+            </Group>
+            <Group label="AI Panel">
+              <Row>
                 <Btn
                   active={a.panelOpen}
                   onClick={a.togglePanel}
-                  icon="🤖"
-                  label="Ask Claude panel"
+                  icon="Claude"
+                  label="Ask Claude"
                 />
               </Row>
             </Group>
             <Group label="Workbook">
               <Row>
-                <Btn icon="＋" label="New" onClick={a.newWorkbook} />
+                <Btn icon="New" label="New Workbook" onClick={a.newWorkbook} />
               </Row>
             </Group>
           </div>
@@ -324,15 +363,15 @@ export function Ribbon({ a }: { a: RibbonActions }) {
           <div className="ribbon-panel active">
             <Group label="Help">
               <Row>
-                <BigBtn icon="ƒₓ" label="Function reference" onClick={a.openFunctionPicker} />
+                <BigBtn icon="fx" label="Function Reference" onClick={a.openFunctionPicker} />
               </Row>
               <Row>
-                <Btn icon="🔎" label="Audit formulas" onClick={a.openAudit} />
+                <Btn icon="Audit" label="Audit Formulas" onClick={a.openAudit} />
               </Row>
             </Group>
             <Group label="About">
               <Row>
-                <Btn icon="ⓘ" label="About RodmanSheets" onClick={a.about} />
+                <Btn icon="Info" label="About RodmanSheets" onClick={a.about} />
               </Row>
             </Group>
           </div>
@@ -341,8 +380,6 @@ export function Ribbon({ a }: { a: RibbonActions }) {
     </>
   );
 }
-
-// ---------- tiny presentational primitives — match Word/Slides class names ----------
 
 function Group({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -383,16 +420,34 @@ function Btn({ onClick, title, active, disabled, icon, label, children }: BtnPro
   );
 }
 
-function BigBtn({ onClick, title, icon, label }: BtnProps) {
+function BigBtn({ onClick, title, icon, label, disabled }: BtnProps) {
   return (
     <button
       type="button"
       className="ribbon-btn wide"
       onClick={onClick}
       title={title || label}
+      disabled={disabled}
     >
       <span className="ribbon-btn-icon">{icon}</span>
       <span className="ribbon-btn-text">{label}</span>
     </button>
+  );
+}
+
+function Toggle({
+  checked,
+  label,
+  onChange,
+}: {
+  checked: boolean;
+  label: string;
+  onChange: () => void;
+}) {
+  return (
+    <label className="ribbon-toggle">
+      <input type="checkbox" checked={checked} onChange={onChange} />
+      <span>{label}</span>
+    </label>
   );
 }

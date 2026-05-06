@@ -513,6 +513,17 @@
     queueAutosave();
   });
 
+  $('#blankPageBtn')?.addEventListener('click', () => {
+    restoreSelection();
+    document.execCommand(
+      'insertHTML',
+      false,
+      '<hr class="page-break" contenteditable="false"/><p><br/></p>' +
+      '<hr class="page-break" contenteditable="false"/><p><br/></p>'
+    );
+    queueAutosave();
+  });
+
   // Table modal
   const tableModal = $('#tableModal');
   $('#insertTableBtn').addEventListener('click', () => {
@@ -2727,6 +2738,8 @@ ${editor.innerHTML}
     if (cell || row.length) { row.push(cell); rows.push(row); }
     return rows;
   }
+
+  $('#mailMergeBtn')?.addEventListener('click', () => openModal($('#mailMergeModal')));
 
   $('#runMergeBtn').addEventListener('click', () => {
     const csv = $('#mergeCsv').value;
@@ -5553,6 +5566,11 @@ ${editor.innerHTML}
       grid.appendChild(c);
     });
   }
+
+  $('#documentThemesBtn')?.addEventListener('click', () => {
+    renderThemesGrid();
+    openModal($('#themesModal'));
+  });
 
   $('#applyCustomThemeBtn')?.addEventListener('click', () => {
     applyTheme({
@@ -9747,6 +9765,8 @@ ${editor.innerHTML}
   // FEATURE: Keyboard shortcuts cheatsheet
   // ============================================================
   $('#helpBtn').addEventListener('click', () => openModal($('#shortcutsModal')));
+  $('#helpShortcutsBtn')?.addEventListener('click', () => openModal($('#shortcutsModal')));
+  $('#helpAboutBtn')?.addEventListener('click', () => openModal($('#aboutModal')));
   document.addEventListener('keydown', (e) => {
     if (e.key === '?' && e.shiftKey && !e.ctrlKey && !e.metaKey) {
       const tag = (document.activeElement && document.activeElement.tagName || '').toLowerCase();
@@ -9855,6 +9875,8 @@ ${editor.innerHTML}
       '<div class="row"><span>Last edit</span><span>' + new Date().toLocaleString() + '</span></div>';
     openModal(propsModal);
   }
+
+  $('#viewPropertiesBtn')?.addEventListener('click', () => openPropsModal());
 
   $('#savePropsBtn').addEventListener('click', () => {
     docProps = {

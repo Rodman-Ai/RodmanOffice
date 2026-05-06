@@ -1,6 +1,9 @@
 # 100 Features
 
 The AiCell backlog. Numbered 1–100 so the roadmap can reference them by ID.
+Excel-ribbon parity gaps from the reference screenshots are tracked separately
+in [`excel-ribbon-backlog.md`](./excel-ribbon-backlog.md), with Draw and
+Acrobat intentionally out of scope.
 
 ## Core spreadsheet engine (1–15)
 1. Virtualized canvas grid (10M+ rows, 16K+ cols)

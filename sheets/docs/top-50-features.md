@@ -140,7 +140,7 @@ The features that close 5-figure deals and prevent customer churn at scale.
 
 ## Sprint history
 
-- **Pre-1** (`4296b06`) — Menu bar, function picker, undo/redo, copy/paste, exports, Ask-Claude empty-state intro.
+- **Pre-1** (`4296b06`) — Initial menu bar, function picker, undo/redo, copy/paste, exports, Ask-Claude empty-state intro.
 - **Sprint 1** (`4e3770c`) — P0 #1 (range selection), #5 (column resize), #10 (shortcuts).
 - **Sprint 2** (`99941ad`) — P0 #2 (cell formatting), #3 (find & replace).
 - **Sprint 3** (`a4bbc8d`) — P0 #6 (conditional formatting), #8 (cell comments).
@@ -156,7 +156,7 @@ The features that close 5-figure deals and prevent customer churn at scale.
 
 ## What we deliberately don't do
 
-- **Match Excel's ribbon** — too heavy for our user base, conflicts with the Ask-Claude-first thesis. The 6-menu bar shipped on `main` is the deliberate ceiling for chrome.
+- **Expose no-op Excel chrome** — the live ribbon now follows Excel's layout, but missing Draw/Acrobat/Automate behavior and other parity gaps stay in `excel-ribbon-backlog.md` until they are real.
 - **Build a marketplace before product-market fit** — feature #91 in `features.md` (smart templates marketplace) is gated until enterprise tier ships.
 - **Ship every chart type up front** — start with bar/line/area/pie/scatter (already there) + heatmap, treemap, sankey, candlestick (P2 #36); leave the long tail for community plug-ins.
 - **Reinvent formula syntax** — HyperFormula gives us 400+ Excel-compatible functions for free; we only add custom ones that are genuinely AI-flavored or platform-specific (`=AI`, `=FETCH`, `=SIMILAR`).

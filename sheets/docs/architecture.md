@@ -55,8 +55,7 @@ The API exposes `WorkbookStore` (file-backed JSON or Postgres, picked by `DATABA
 
 | Feature | Primary file(s) |
 |---|---|
-| Menu bar | `apps/web/src/MenuBar.tsx`, mounted by `App.tsx` |
-| Format toolbar | `apps/web/src/FormatToolbar.tsx` |
+| Ribbon | `apps/web/src/Ribbon.tsx`, mounted by `App.tsx` |
 | Function picker | `apps/web/src/FunctionPicker.tsx` + `apps/web/src/functions.ts` |
 | Find & replace | `apps/web/src/FindReplace.tsx` |
 | Conditional formatting | `apps/web/src/ConditionalFormatModal.tsx` + `apps/web/src/conditional.ts` |
@@ -66,7 +65,7 @@ The API exposes `WorkbookStore` (file-backed JSON or Postgres, picked by `DATABA
 | Undo / redo / history | `apps/web/src/useWorkbook.ts` |
 | Imports / exports | `apps/web/src/csv.ts` |
 | Sheet tabs | `apps/web/src/SheetTabs.tsx` |
-| Charts | `apps/web/src/Chart.tsx` + `apps/web/src/ChartStrip.tsx` |
+| Charts | `apps/web/src/Chart.tsx` + `apps/web/src/ChartStrip.tsx`, created manually from the Insert ribbon or by the hosted agent |
 | Ask Claude side panel | `apps/web/src/SidePanel.tsx` for BYOK browser chat; `services/api/src/ai/agent.ts`, `tools.ts` for hosted plan-then-apply |
 | AI cell functions | `packages/calc/src/ai-plugin.ts`, `services/api/src/ai/cell.ts` |
 | Cross-package types | `packages/shared/src/index.ts` |
@@ -77,7 +76,7 @@ The API exposes `WorkbookStore` (file-backed JSON or Postgres, picked by `DATABA
 - **Plan-then-apply agent.** `services/api/src/ai/agent.ts` runs Claude Opus 4.7 with adaptive thinking and five tools (`set_cell`, `add_sheet`, `create_chart`, plus read-only `audit_formulas` and `forecast`). It returns plan steps for a client to review before edits land. The static Pages side panel uses BYOK browser chat; applyable plans require a hosted API.
 - **AI cell registry.** `=AI()` and friends are first-class formulas that share the recalc graph. Competitors generally bolt these on as side calls; ours are part of the sheet's evaluation order, with prompt caching for cost control.
 - **MCP-readiness.** Architectural decision (not yet implemented): the agent's tool surface is normalized so plugging in Model Context Protocol servers later is mostly a registry change in `services/api/src/ai/tools.ts`. Tracked as P1 #11.
-- **Stay-skinny chrome.** A six-menu bar, not a ribbon. Investment goes into the `Insert → Function` picker and the side-panel intro instead — the places where chat is genuinely worse than UI.
+- **Excel-familiar chrome.** The live ribbon follows Excel's tab order without exposing no-op Draw, Automate, or Acrobat controls. Gaps are tracked in `excel-ribbon-backlog.md`; the side-panel intro remains the primary AI affordance.
 
 ## Boundary lines (what each piece never touches)
 

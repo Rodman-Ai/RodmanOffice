@@ -16,20 +16,20 @@ docs/              Strategy docs (competitor analysis, features, roadmap)
 ## What's built
 
 - **Grid UX**: virtualized scroll, multi-sheet workbooks, range selection (drag, shift+arrows, click row/col headers for whole row/col), per-column resize, column-header chevron with sort and remove-duplicates.
-- **Menus**: File · Edit · View · Insert · Format · Data · Help, with keyboard shortcuts (⌘Z / ⌘⇧Z, ⌘C / ⌘X / ⌘V, ⌘B / ⌘I / ⌘U, ⌘F, ⌘A, ⌘/, ⌘; , ⌘⇧;, ⇧F3, Cmd+Home/End).
+- **Ribbon**: Excel-style File · Home · Insert · Page Layout · Formulas · Data · Review · View · Help tabs using the shared RodmanOffice green visual language; Draw, Automate, and Acrobat are not live tabs.
 - **Editing**: full undo/redo (snapshot history, 100 steps), copy/cut/paste with TSV expansion, find & replace (case-sensitive, replace-all as one undo step), CSV/XLSX import + export.
-- **Formatting**: cell-format model (bold, italic, underline, alignment, text/fill colors, number formats — General / Number / Currency / Percent / Date / Datetime), format toolbar above the formula bar.
+- **Formatting**: cell-format model (bold, italic, underline, alignment, text/fill colors, number formats — General / Number / Currency / Percent / Date / Datetime), exposed through the Home ribbon.
 - **Conditional formatting**: 9 condition types (>, ≥, <, ≤, =, ≠, between, contains, empty/non-empty) × 5 preset styles, applied to ranges and resolved per-cell at render time.
 - **Comments**: per-cell text with a corner indicator and hover tooltip.
-- **Function picker**: Insert → Function… opens a searchable modal of the 50 most-used spreadsheet functions, click-to-insert.
+- **Function picker**: Formulas/Help → Insert Function / Function Reference opens a searchable modal of the 50 most-used spreadsheet functions, click-to-insert.
 - **Audit panel**: Help → Audit formulas walks every formula in every sheet, lists evaluation errors, click a cell ref to jump.
 - **Formulas**: ~400 Excel-compatible functions via HyperFormula.
 - **AI cell functions**: `=AI`, `=CLASSIFY`, `=EXTRACT`, `=SUMMARIZE`, `=TRANSLATE`, `=SENTIMENT`, `=FORMULA` (Claude Haiku 4.5 with prompt caching).
 - **Hosted AI endpoints**: the API service contains Claude Haiku 4.5 cell functions and a Claude Opus 4.7 plan-then-apply agent (set_cell / add_sheet / create_chart plus read-only audit/forecast helpers). The side panel supports per-request BYOK chat in static demo mode.
-- **Charts**: bar / line / area / pie / scatter via Recharts, attached per-sheet.
+- **Charts**: bar / line / area / pie / scatter via Recharts, attached per-sheet and insertable from a selected range.
 - **Persistence**: file-based store by default; Postgres adapter when `DATABASE_URL` is set.
 
-See [`docs/SHIPPED.md`](docs/SHIPPED.md) for the per-sprint changelog, [`docs/architecture.md`](docs/architecture.md) for how the pieces fit together, and [`docs/roadmap.md`](docs/roadmap.md) for "shipped vs. deferred". Big deferred items: freeze panes, data-validation dropdown, Yjs real-time collab, Python/SQL/JS code cells, DB/SaaS connectors, voice, MCP, full enterprise/SSO.
+See [`docs/SHIPPED.md`](docs/SHIPPED.md) for the per-sprint changelog, [`docs/architecture.md`](docs/architecture.md) for how the pieces fit together, [`docs/roadmap.md`](docs/roadmap.md) for "shipped vs. deferred", and [`docs/excel-ribbon-backlog.md`](docs/excel-ribbon-backlog.md) for screenshot-derived Excel ribbon parity gaps. Big deferred items: freeze panes, data-validation dropdown, Yjs real-time collab, Python/SQL/JS code cells, DB/SaaS connectors, voice, MCP, full enterprise/SSO.
 
 ## Local development
 

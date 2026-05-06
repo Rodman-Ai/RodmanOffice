@@ -1,6 +1,6 @@
 # Function reference
 
-The 50 most-used spreadsheet functions, all available in AiCell out of the box (powered by HyperFormula). Use **Insert → Function…** in the app to search and insert any of these.
+The 50 most-used spreadsheet functions, all available in AiCell out of the box (powered by HyperFormula). Use **Formulas → Insert Function** or **Help → Function Reference** in the app to search and insert any of these.
 
 ## Math & Stats
 

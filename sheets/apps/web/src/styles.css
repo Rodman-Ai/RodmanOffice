@@ -267,6 +267,29 @@ body,
   cursor: pointer;
 }
 
+.ribbon-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 30px;
+  padding: 3px 8px;
+  border: 1px solid var(--ribbon-border);
+  border-radius: 4px;
+  background: #fff;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.ribbon-toggle:hover {
+  background: var(--hover);
+}
+
+.ribbon-toggle input {
+  margin: 0;
+  accent-color: var(--primary);
+}
+
 .ribbon-empty {
   font-size: 12px;
   font-style: italic;
@@ -447,6 +470,17 @@ body,
 
 .grid-col-header:hover .col-chevron {
   opacity: 1;
+}
+
+.grid-container.hide-gridlines .grid-row,
+.grid-container.hide-gridlines .grid-header-row {
+  border-bottom-color: transparent;
+}
+
+.grid-container.hide-gridlines .grid-cell,
+.grid-container.hide-gridlines .grid-row-header,
+.grid-container.hide-gridlines .grid-col-header {
+  border-right-color: transparent;
 }
 
 .col-chevron:hover {
