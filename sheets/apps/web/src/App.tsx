@@ -16,6 +16,7 @@ import {
   type Range,
 } from "./clipboard";
 import { listWorkbooks, loadWorkbook, saveWorkbook, getHealth, isOffline } from "./api";
+import type { FunctionCategory } from "./functions";
 
 const ChartStrip = lazy(() => import("./ChartStrip").then((m) => ({ default: m.ChartStrip })));
 const FunctionPicker = lazy(() => import("./FunctionPicker").then((m) => ({ default: m.FunctionPicker })));
@@ -25,6 +26,11 @@ const CommentModal = lazy(() => import("./CommentModal").then((m) => ({ default:
 const AuditPanel = lazy(() => import("./AuditPanel").then((m) => ({ default: m.AuditPanel })));
 
 const AUTOSAVE_DEBOUNCE_MS = 800;
+const REPO_URL = "https://github.com/Rodman-Ai/RodmanOffice";
+const SUPPORT_URL = `${REPO_URL}/issues/new?labels=support`;
+const FEEDBACK_URL = `${REPO_URL}/issues/new?labels=feedback`;
+
+type HelpTopic = "whatsNew" | "training" | "install";
 
 type SaveState =
   | { kind: "idle" }
@@ -53,11 +59,14 @@ export function App() {
   const [aiEnabled, setAiEnabled] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerCategory, setPickerCategory] = useState<FunctionCategory | null>(null);
   const [findOpen, setFindOpen] = useState(false);
   const [cfOpen, setCfOpen] = useState(false);
   const [commentOpen, setCommentOpen] = useState(false);
   const [auditOpen, setAuditOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
+  const [statsOpen, setStatsOpen] = useState(false);
+  const [helpTopic, setHelpTopic] = useState<HelpTopic | null>(null);
   const [showGridlines, setShowGridlines] = useState(true);
   const [showHeadings, setShowHeadings] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -483,7 +492,10 @@ export function App() {
     openConditionalFormat: () => setCfOpen(true),
     addSheet: api.addSheet,
     openCommentModal: () => setCommentOpen(true),
-    openFunctionPicker: () => setPickerOpen(true),
+    openFunctionPicker: (category = null) => {
+      setPickerCategory(category);
+      setPickerOpen(true);
+    },
     insertSum,
     canInsertChart,
     insertChart,
@@ -497,6 +509,13 @@ export function App() {
     showHeadings,
     toggleHeadings: () => setShowHeadings((v) => !v),
     openAudit: () => setAuditOpen(true),
+    openWorkbookStats: () => setStatsOpen(true),
+    openWhatsNew: () => setHelpTopic("whatsNew"),
+    openTraining: () => setHelpTopic("training"),
+    openSupport: () => window.open(SUPPORT_URL, "_blank", "noopener,noreferrer"),
+    openFeedback: () => window.open(FEEDBACK_URL, "_blank", "noopener,noreferrer"),
+    openCommunity: () => window.open(REPO_URL, "_blank", "noopener,noreferrer"),
+    openInstallHelp: () => setHelpTopic("install"),
     about: () => setAboutOpen(true),
   };
   const hasCharts = (api.activeSheet.charts?.length ?? 0) > 0;
@@ -635,6 +654,7 @@ export function App() {
       {pickerOpen && (
         <Suspense fallback={null}>
           <FunctionPicker
+            initialCategory={pickerCategory}
             onClose={() => setPickerOpen(false)}
             onPick={(entry) => {
               setPickerOpen(false);
@@ -692,6 +712,18 @@ export function App() {
           />
         </Suspense>
       )}
+      {statsOpen && (
+        <WorkbookStatsDialog
+          workbook={api.workbook}
+          onClose={() => setStatsOpen(false)}
+        />
+      )}
+      {helpTopic && (
+        <SheetsHelpDialog
+          topic={helpTopic}
+          onClose={() => setHelpTopic(null)}
+        />
+      )}
       {aboutOpen && (
         <AboutDialog
           aiEnabled={aiEnabled}
@@ -699,6 +731,152 @@ export function App() {
           onClose={() => setAboutOpen(false)}
         />
       )}
+    </div>
+  );
+}
+
+function WorkbookStatsDialog({
+  workbook,
+  onClose,
+}: {
+  workbook: Workbook;
+  onClose: () => void;
+}) {
+  useReturnFocusOnClose();
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const stats = workbook.sheets.reduce(
+    (acc, sheet) => {
+      const populated = Object.entries(sheet.cells).filter(([, cell]) =>
+        Boolean(cell.raw || cell.comment || cell.format)
+      );
+      acc.cells += populated.length;
+      acc.formulas += populated.filter(([, cell]) => cell.raw.trim().startsWith("=")).length;
+      acc.comments += populated.filter(([, cell]) => Boolean(cell.comment?.text)).length;
+      acc.charts += sheet.charts?.length ?? 0;
+      acc.conditionalRules += sheet.conditionalRules?.length ?? 0;
+      for (const [key] of populated) {
+        const [rowText = "", colText = ""] = key.split(",");
+        const row = Number(rowText);
+        const col = Number(colText);
+        if (Number.isFinite(row) && Number.isFinite(col)) {
+          acc.maxRow = Math.max(acc.maxRow, row);
+          acc.maxCol = Math.max(acc.maxCol, col);
+        }
+      }
+      return acc;
+    },
+    { cells: 0, formulas: 0, comments: 0, charts: 0, conditionalRules: 0, maxRow: -1, maxCol: -1 }
+  );
+  const usedRange = stats.maxRow >= 0 && stats.maxCol >= 0
+    ? `A1:${a1(stats.maxRow, stats.maxCol)}`
+    : "Empty";
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div
+        className="modal workbook-stats-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="statsTitle"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <header className="modal-header">
+          <span id="statsTitle">Workbook statistics</span>
+          <button type="button" onClick={onClose} aria-label="Close">Ã—</button>
+        </header>
+        <dl className="workbook-stats-grid">
+          <div><dt>Sheets</dt><dd>{workbook.sheets.length}</dd></div>
+          <div><dt>Used range</dt><dd>{usedRange}</dd></div>
+          <div><dt>Populated cells</dt><dd>{stats.cells}</dd></div>
+          <div><dt>Formulas</dt><dd>{stats.formulas}</dd></div>
+          <div><dt>Comments</dt><dd>{stats.comments}</dd></div>
+          <div><dt>Charts</dt><dd>{stats.charts}</dd></div>
+          <div><dt>Conditional rules</dt><dd>{stats.conditionalRules}</dd></div>
+        </dl>
+        <footer className="modal-footer">
+          <span className="modal-hint">Counts include every sheet in this workbook.</span>
+        </footer>
+      </div>
+    </div>
+  );
+}
+
+function SheetsHelpDialog({
+  topic,
+  onClose,
+}: {
+  topic: HelpTopic;
+  onClose: () => void;
+}) {
+  useReturnFocusOnClose();
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const content = {
+    whatsNew: {
+      title: "What's new in RodmanSheets",
+      body: [
+        "Excel-style ribbon groups with File, Page Layout, Formulas, Data, Review, View, and Help.",
+        "Manual chart insertion from the selected range.",
+        "Function category shortcuts and workbook statistics.",
+        "BYOK Ask Claude chat in the static GitHub Pages demo.",
+      ],
+    },
+    training: {
+      title: "RodmanSheets training",
+      body: [
+        "Select a range before using Insert > Charts to create a chart.",
+        "Use Formulas > Insert Function or the category shortcuts to insert formulas.",
+        "Use Review > Audit Formulas to jump to formula errors.",
+        "Use View or Page Layout to toggle gridlines and headings for the current session.",
+      ],
+    },
+    install: {
+      title: "Install RodmanSheets",
+      body: [
+        "RodmanOffice is a browser app and can be installed from your browser's app menu when supported.",
+        "Look for Install app, Add to home screen, or Create shortcut in the browser menu.",
+        "Installed mode still uses the same local files, browser storage, and GitHub Pages demo behavior.",
+      ],
+    },
+  }[topic];
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div
+        className="modal help-topic-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="helpTopicTitle"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <header className="modal-header">
+          <span id="helpTopicTitle">{content.title}</span>
+          <button type="button" onClick={onClose} aria-label="Close">Ã—</button>
+        </header>
+        <div className="help-topic-body">
+          <ul>
+            {content.body.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        </div>
+        <footer className="modal-footer">
+          <span className="modal-hint">Esc closes this dialog.</span>
+        </footer>
+      </div>
     </div>
   );
 }

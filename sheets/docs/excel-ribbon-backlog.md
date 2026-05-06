@@ -49,8 +49,6 @@ large subsystem or integration.
 
 | Feature | Effort | Notes |
 |---|---:|---|
-| Recently used and category-specific function galleries | S | Function picker exists; ribbon category shortcuts are not exposed. |
-| More Functions menu | S | Can route into the existing function picker with filters. |
 | Name Manager, Define Name, Use in Formula, Create from Selection | M | Needs named-range model and structured reference integration. |
 | Trace precedents/dependents and remove arrows | L | Needs dependency graph visualization over the grid. |
 | Show formulas | M | Needs grid-level formula display mode. |
@@ -76,7 +74,6 @@ large subsystem or integration.
 | Feature | Effort | Notes |
 |---|---:|---|
 | Spelling and thesaurus | M | Needs local or service-backed language tooling. |
-| Workbook statistics | S | Could summarize sheets, formulas, charts, comments, and used range. |
 | Check performance | M | Formula audit exists; performance-specific diagnostics are deferred. |
 | Accessibility checker | L | Needs semantic workbook checks and issue remediation UI. |
 | Translate | M | Needs hosted or BYOK translation workflow beyond formula functions. |
@@ -107,9 +104,5 @@ large subsystem or integration.
 
 ## Help
 
-| Feature | Effort | Notes |
-|---|---:|---|
-| Contact support and feedback | S | Needs configured destination. |
-| Show training and What's New | S | Needs content source. |
-| Community and blog links | S | Needs public URLs. |
-| Mobile app prompt | S | Not relevant unless replaced with RodmanOffice install/help content. |
+All screenshot-derived Help tab quick links are exposed. Richer guided training
+content can be added later, but it is no longer tracked as Excel ribbon parity.

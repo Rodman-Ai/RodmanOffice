@@ -404,6 +404,7 @@
       <div class="group">
         <div class="group-row">
           <button class="ribbon-btn" id="insertTocBtn" title="Insert table of contents">📑 TOC</button>
+          <button class="ribbon-btn" id="updateTocBtn" title="Update table of contents">Update TOC</button>
           <button class="ribbon-btn" id="listOfFiguresBtn" title="List of figures / tables / equations">📃 Lists</button>
         </div>
         <div class="group-label">Contents</div>
@@ -534,6 +535,15 @@
       <div class="group">
         <div class="group-row">
           <button class="ribbon-btn" id="mailMergeBtn" title="Mail merge">Start Mail Merge</button>
+          <select class="select sm" id="mergeFieldSelect" title="Insert merge field" disabled>
+            <option value="">Insert Field...</option>
+          </select>
+        </div>
+        <div class="group-row">
+          <label class="control switch">
+            <input type="checkbox" id="highlightMergeFieldsToggle" />
+            <span>Highlight fields</span>
+          </label>
         </div>
         <div class="group-label">Start Mail Merge</div>
       </div>
@@ -685,6 +695,10 @@
             <span>Ruler</span>
           </label>
           <label class="control switch">
+            <input type="checkbox" id="gridlinesToggle" />
+            <span>Gridlines</span>
+          </label>
+          <label class="control switch">
             <input type="checkbox" id="outlineToggle" />
             <span>Navigation</span>
           </label>
@@ -775,9 +789,24 @@
       <div class="group">
         <div class="group-row">
           <button class="ribbon-btn" id="helpShortcutsBtn" title="Keyboard shortcuts">Help</button>
-          <button class="ribbon-btn" id="helpAboutBtn" title="About RodmanWord">About</button>
+          <button class="ribbon-btn" id="helpWhatsNewBtn" title="What's new">What's New</button>
+          <button class="ribbon-btn" id="helpTrainingBtn" title="Training">Training</button>
         </div>
         <div class="group-label">Help</div>
+      </div>
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn" id="helpSupportBtn" title="Contact support">Contact Support</button>
+          <button class="ribbon-btn" id="helpFeedbackBtn" title="Send feedback">Feedback</button>
+        </div>
+        <div class="group-label">Support</div>
+      </div>
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn" id="helpInstallBtn" title="Install app">Install App</button>
+          <button class="ribbon-btn" id="helpAboutBtn" title="About RodmanWord">About</button>
+        </div>
+        <div class="group-label">About</div>
       </div>
     </div>
   </section>
@@ -1006,6 +1035,20 @@
         </table>
       </div>
       <footer><button class="btn primary" data-close-modal>Got it</button></footer>
+    </div>
+  </div>
+
+  <!-- Help topic dialog -->
+  <div class="modal" id="helpInfoModal" hidden>
+    <div class="modal-card lg">
+      <header><h3 id="helpInfoTitle">RodmanWord help</h3>
+        <button class="icon-btn" data-close-modal aria-label="Close">✕</button>
+      </header>
+      <div class="modal-body" id="helpInfoBody"></div>
+      <footer>
+        <button class="btn" id="helpInfoActionBtn" hidden>Open link</button>
+        <button class="btn primary" data-close-modal>Close</button>
+      </footer>
     </div>
   </div>
 

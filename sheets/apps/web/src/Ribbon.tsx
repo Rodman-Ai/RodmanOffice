@@ -4,6 +4,7 @@
 
 import { useState, type ReactNode } from "react";
 import type { CellFormat, ChartType, NumberFormat } from "@aicell/shared";
+import type { FunctionCategory } from "./functions";
 
 export type RibbonActions = {
   // File
@@ -29,7 +30,7 @@ export type RibbonActions = {
   // Insert
   addSheet: () => void;
   openCommentModal: () => void;
-  openFunctionPicker: () => void;
+  openFunctionPicker: (category?: FunctionCategory | null) => void;
   insertSum: () => void;
   canInsertChart: boolean;
   insertChart: (type: ChartType) => void;
@@ -46,6 +47,13 @@ export type RibbonActions = {
   toggleHeadings: () => void;
   // Help
   openAudit: () => void;
+  openWorkbookStats: () => void;
+  openWhatsNew: () => void;
+  openTraining: () => void;
+  openSupport: () => void;
+  openFeedback: () => void;
+  openCommunity: () => void;
+  openInstallHelp: () => void;
   about: () => void;
 };
 
@@ -280,8 +288,18 @@ export function Ribbon({ a }: { a: RibbonActions }) {
           <div className="ribbon-panel active">
             <Group label="Function Library">
               <Row>
-                <BigBtn icon="fx" label="Insert Function" onClick={a.openFunctionPicker} title="Browse all functions" />
+                <BigBtn icon="fx" label="Insert Function" onClick={() => a.openFunctionPicker(null)} title="Browse all functions" />
                 <BigBtn icon="SUM" label="AutoSum" onClick={a.insertSum} />
+              </Row>
+              <Row>
+                <Btn icon="Math" label="Math" onClick={() => a.openFunctionPicker("Math & Stats")} />
+                <Btn icon="Logic" label="Logic" onClick={() => a.openFunctionPicker("Logic")} />
+                <Btn icon="Lookup" label="Lookup" onClick={() => a.openFunctionPicker("Lookup & Reference")} />
+              </Row>
+              <Row>
+                <Btn icon="Text" label="Text" onClick={() => a.openFunctionPicker("Text")} />
+                <Btn icon="Date" label="Date" onClick={() => a.openFunctionPicker("Date & Time")} />
+                <Btn icon="More" label="More Functions" onClick={() => a.openFunctionPicker(null)} />
               </Row>
             </Group>
             <Group label="Formula Auditing">
@@ -325,6 +343,11 @@ export function Ribbon({ a }: { a: RibbonActions }) {
                 <BigBtn icon="Audit" label="Audit Formulas" onClick={a.openAudit} />
               </Row>
             </Group>
+            <Group label="Statistics">
+              <Row>
+                <BigBtn icon="Stats" label="Workbook Statistics" onClick={a.openWorkbookStats} />
+              </Row>
+            </Group>
             <Group label="Find">
               <Row>
                 <Btn icon="Find" label="Find & Replace" onClick={a.openFindReplace} />
@@ -363,14 +386,26 @@ export function Ribbon({ a }: { a: RibbonActions }) {
           <div className="ribbon-panel active">
             <Group label="Help">
               <Row>
-                <BigBtn icon="fx" label="Function Reference" onClick={a.openFunctionPicker} />
+                <BigBtn icon="fx" label="Function Reference" onClick={() => a.openFunctionPicker(null)} />
+                <BigBtn icon="New" label="What's New" onClick={a.openWhatsNew} />
               </Row>
               <Row>
                 <Btn icon="Audit" label="Audit Formulas" onClick={a.openAudit} />
+                <Btn icon="Learn" label="Training" onClick={a.openTraining} />
+              </Row>
+            </Group>
+            <Group label="Support">
+              <Row>
+                <Btn icon="Help" label="Contact Support" onClick={a.openSupport} />
+                <Btn icon="Feedback" label="Feedback" onClick={a.openFeedback} />
+              </Row>
+              <Row>
+                <Btn icon="Community" label="Community" onClick={a.openCommunity} />
               </Row>
             </Group>
             <Group label="About">
               <Row>
+                <Btn icon="Install" label="Install App" onClick={a.openInstallHelp} />
                 <Btn icon="Info" label="About RodmanSheets" onClick={a.about} />
               </Row>
             </Group>

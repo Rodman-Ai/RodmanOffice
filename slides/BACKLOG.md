@@ -47,7 +47,6 @@ subsystem or external integration.
 
 | Feature | Effort | Notes |
 |---|---:|---|
-| Transition preview button | S | Needs a local preview path without starting full presentation mode. |
 | Advanced transition gallery | M | Current transition set is intentionally small. |
 | Effect options | M | Needs per-transition parameters. |
 | Sound, duration, and advance-slide timing | M | Duration is stored but runtime currently uses fixed CSS timings. |
@@ -56,7 +55,6 @@ subsystem or external integration.
 
 | Feature | Effort | Notes |
 |---|---:|---|
-| Animation preview button | S | Needs one-element replay in the editor. |
 | Animation pane | M | Needs visible list of element animations. |
 | Add animation and effect options | M | Current animation command replaces animation state. |
 | Trigger menu and animation painter | M | Trigger exists as a select; richer PowerPoint flows are deferred. |
@@ -108,7 +106,4 @@ subsystem or external integration.
 
 | Feature | Effort | Notes |
 |---|---:|---|
-| Contact support and feedback | S | Needs configured destination. |
-| Show training and What's New | S | Needs content source. |
-| Mobile app prompt | S | Not relevant unless replaced with RodmanOffice install/help content. |
 | Teams and Share integrations | L | Requires hosted identity/integration surface. |

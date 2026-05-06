@@ -57,7 +57,6 @@ large subsystem or format model work.
 | Endnotes | M | Footnotes exist; endnotes need separate collection and rendering. |
 | Manage Sources | M | Current citations are lightweight. |
 | Citation provider switching | M | Needs provider abstraction beyond local source records. |
-| Update TOC/table buttons | S | Current generated fields update through the live-field engine, but explicit update controls are not exposed. |
 | Table of Authorities | L | Requires legal citation model and marked authorities. |
 
 ## Mailings
@@ -68,9 +67,7 @@ large subsystem or format model work.
 | Labels | M | Needs label sheet templates and repeated layout. |
 | Recipient list manager | M | Current mail merge accepts pasted CSV only. |
 | Edit recipient list | M | Needs table UI for CSV rows. |
-| Highlight merge fields | S | Could visually mark `{{Field}}` placeholders. |
 | Address block and greeting line | M | Needs field mapping helpers. |
-| Insert merge field dropdown | S | Can be powered by parsed CSV headers after a source is loaded. |
 | Rules, Match Fields, Update Labels | M | Requires richer merge source state. |
 | Preview results and find recipient | M | Needs preview mode before download. |
 | Check for errors | M | Needs validation pass over template and recipients. |
@@ -90,7 +87,6 @@ large subsystem or format model work.
 | Feature | Effort | Notes |
 |---|---:|---|
 | Print Layout / Web Layout / Outline / Draft view modes | L | Current modes are focus/read/full plus advanced reader options. |
-| Gridlines | S | Could be an editor overlay toggle. |
 | Side-to-side page movement | M | Needs multi-page viewport model. |
 | New Window / Arrange All / Split / Switch Windows | L | Browser app needs multi-window document session support. |
 | SharePoint properties | L | Requires SharePoint integration. |
@@ -99,8 +95,4 @@ large subsystem or format model work.
 
 | Feature | Effort | Notes |
 |---|---:|---|
-| What's New | S | Needs release-note source. |
-| Contact Support | S | Needs support URL/mail target. |
-| Feedback | S | Needs feedback destination. |
-| Show Training | M | Needs training content. |
-| Get Word Mobile App equivalent | S | Likely not relevant unless replaced with RodmanOffice install help. |
+| Advanced training content | M | Current Help tab has a starter training guide; richer guided tutorials remain deferred. |

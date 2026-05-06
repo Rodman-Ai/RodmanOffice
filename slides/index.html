@@ -326,6 +326,12 @@
     <!-- Transitions -->
     <div class="ribbon-panel" data-panel="transitions">
       <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn wide" data-cmd="previewTransition" title="Preview this slide transition">Preview</button>
+        </div>
+        <div class="group-label">Preview</div>
+      </div>
+      <div class="group">
         <div class="group-row" id="transitionStrip"><!-- populated by app.js --></div>
         <div class="group-label">Transition to This Slide</div>
       </div>
@@ -339,6 +345,12 @@
 
     <!-- Animations -->
     <div class="ribbon-panel" data-panel="animations">
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn wide" data-cmd="previewAnimation" title="Preview the selected animation">Preview</button>
+        </div>
+        <div class="group-label">Preview</div>
+      </div>
       <div class="group">
         <div class="group-row">
           <button class="ribbon-btn" data-cmd="setAnim" data-anim-kind="none" title="No animation">None</button>
@@ -464,9 +476,24 @@
       <div class="group">
         <div class="group-row">
           <button class="ribbon-btn wide" data-cmd="showHelp">Keyboard Shortcuts</button>
+          <button class="ribbon-btn wide" data-cmd="showWhatsNew">What's New</button>
+          <button class="ribbon-btn wide" data-cmd="showTraining">Training</button>
           <button class="ribbon-btn wide" data-cmd="askClaude">Ask Claude</button>
         </div>
         <div class="group-label">Help</div>
+      </div>
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn wide" data-cmd="contactSupport">Contact Support</button>
+          <button class="ribbon-btn wide" data-cmd="sendFeedback">Feedback</button>
+        </div>
+        <div class="group-label">Support</div>
+      </div>
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn wide" data-cmd="showInstallHelp">Install App</button>
+        </div>
+        <div class="group-label">Mobile</div>
       </div>
     </div>
   </section>
@@ -507,6 +534,20 @@
   <input type="file" id="imageFileInput" accept="image/*" hidden />
   <input type="file" id="deckFileInput" accept="application/json,.json" hidden />
   <input type="file" id="pptxFileInput" accept=".pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation" hidden />
+
+  <div class="help-modal" id="helpInfoModal" hidden role="dialog" aria-modal="true" aria-labelledby="helpInfoTitle">
+    <div class="help-modal-card">
+      <header>
+        <h3 id="helpInfoTitle">RodmanSlides help</h3>
+        <button class="icon-btn" id="helpInfoCloseBtn" type="button" aria-label="Close help">×</button>
+      </header>
+      <div class="help-modal-body" id="helpInfoBody"></div>
+      <footer>
+        <button class="ribbon-btn wide" id="helpInfoActionBtn" type="button" hidden>Open link</button>
+        <button class="ribbon-btn wide" id="helpInfoDoneBtn" type="button">Close</button>
+      </footer>
+    </div>
+  </div>
 
   <script type="module">
     // Bridge the shared /lib/slides/ PPTX engine onto window.RodmanSlidesIO

@@ -708,6 +708,72 @@ label.adjust select {
 }
 .status-bar .status-spacer { flex: 1; }
 
+.help-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  background: rgba(20, 20, 20, 0.38);
+  padding: 20px;
+}
+
+.help-modal[hidden] {
+  display: none;
+}
+
+.help-modal-card {
+  width: min(560px, 92vw);
+  max-height: min(520px, 86vh);
+  display: flex;
+  flex-direction: column;
+  background: var(--pane-bg);
+  color: var(--text);
+  border: 1px solid var(--pane-border);
+  border-radius: 6px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.28);
+}
+
+.help-modal-card header,
+.help-modal-card footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--pane-border);
+}
+
+.help-modal-card footer {
+  justify-content: flex-end;
+  border-top: 1px solid var(--pane-border);
+  border-bottom: 0;
+}
+
+.help-modal-card h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.help-modal-card header .icon-btn {
+  margin-left: auto;
+}
+
+.help-modal-body {
+  overflow: auto;
+  padding: 14px 16px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.help-modal-body ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.help-modal-body li + li {
+  margin-top: 8px;
+}
+
 /* Present mode ------------------------------------------------------------- */
 .present-overlay {
   position: fixed; inset: 0;

@@ -1,15 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { FUNCTIONS, FUNCTION_CATEGORIES, type FunctionEntry } from "./functions";
+import { FUNCTIONS, FUNCTION_CATEGORIES, type FunctionCategory, type FunctionEntry } from "./functions";
 import { useReturnFocusOnClose } from "./useReturnFocusOnClose";
 
 type Props = {
+  initialCategory?: FunctionCategory | null;
   onPick: (entry: FunctionEntry) => void;
   onClose: () => void;
 };
 
-export function FunctionPicker({ onPick, onClose }: Props) {
+export function FunctionPicker({ initialCategory = null, onPick, onClose }: Props) {
   useReturnFocusOnClose();
   const [query, setQuery] = useState("");
+  const [category, setCategory] = useState<FunctionCategory | null>(initialCategory);
   const [activeIdx, setActiveIdx] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -19,13 +21,16 @@ export function FunctionPicker({ onPick, onClose }: Props) {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return FUNCTIONS;
-    return FUNCTIONS.filter(
+    const categoryMatches = category
+      ? FUNCTIONS.filter((f) => f.category === category)
+      : FUNCTIONS;
+    if (!q) return categoryMatches;
+    return categoryMatches.filter(
       (f) =>
         f.name.toLowerCase().includes(q) ||
         f.summary.toLowerCase().includes(q)
     );
-  }, [query]);
+  }, [category, query]);
 
   useEffect(() => {
     if (activeIdx >= filtered.length) setActiveIdx(0);
@@ -47,9 +52,34 @@ export function FunctionPicker({ onPick, onClose }: Props) {
         onClick={(e) => e.stopPropagation()}
       >
         <header className="modal-header">
-          <span>Insert function</span>
+          <span>{category ? `${category} functions` : "Insert function"}</span>
           <button onClick={onClose} aria-label="Close">×</button>
         </header>
+        <div className="function-picker-categories" aria-label="Function categories">
+          <button
+            type="button"
+            className={category === null ? "active" : ""}
+            onClick={() => {
+              setCategory(null);
+              setActiveIdx(0);
+            }}
+          >
+            All
+          </button>
+          {FUNCTION_CATEGORIES.map((cat) => (
+            <button
+              key={cat}
+              type="button"
+              className={category === cat ? "active" : ""}
+              onClick={() => {
+                setCategory(cat);
+                setActiveIdx(0);
+              }}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
         <div className="function-picker-search">
           <input
             ref={inputRef}

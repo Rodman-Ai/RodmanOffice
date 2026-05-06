@@ -25,6 +25,9 @@
   const T = window.RodmanThemes;
   const R = window.RodmanRender;
   const P = window.RodmanPresent;
+  const HELP_REPO_URL = 'https://github.com/Rodman-Ai/RodmanOffice';
+  const HELP_SUPPORT_URL = HELP_REPO_URL + '/issues/new?labels=support';
+  const HELP_FEEDBACK_URL = HELP_REPO_URL + '/issues/new?labels=feedback';
 
   // ---------- State ----------
   let deck = D.load() || D.newDeck();
@@ -62,6 +65,13 @@
   // ---------- Helpers ----------
   function $(sel, root) { return (root || document).querySelector(sel); }
   function $$(sel, root) { return Array.from((root || document).querySelectorAll(sel)); }
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
 
   function initAskClaudePanel() {
     const button = $('#askClaudeBtn');
@@ -358,6 +368,51 @@
         scheduleSave();
       });
       strip.appendChild(card);
+    });
+  }
+
+  function transitionPreviewFrames(kind) {
+    if (kind === 'fade') return [{ opacity: 0 }, { opacity: 1 }];
+    if (kind === 'push') return [{ transform: 'translateX(60px)' }, { transform: 'translateX(0)' }];
+    if (kind === 'wipe') return [{ clipPath: 'inset(0 100% 0 0)' }, { clipPath: 'inset(0 0 0 0)' }];
+    if (kind === 'zoom') return [{ opacity: 0, transform: 'scale(0.94)' }, { opacity: 1, transform: 'scale(1)' }];
+    return [{ opacity: 0.55 }, { opacity: 1 }];
+  }
+
+  function animationPreviewFrames(kind) {
+    if (kind === 'fadeIn') return [{ opacity: 0 }, { opacity: 1 }];
+    if (kind === 'fadeOut') return [{ opacity: 1 }, { opacity: 0 }];
+    if (kind === 'slideInLeft') return [{ opacity: 0, transform: 'translateX(-60px)' }, { opacity: 1, transform: 'translateX(0)' }];
+    if (kind === 'zoomIn') return [{ opacity: 0, transform: 'scale(0.6)' }, { opacity: 1, transform: 'scale(1)' }];
+    if (kind === 'pulse') return [{ transform: 'scale(1)' }, { transform: 'scale(1.08)' }, { transform: 'scale(1)' }];
+    return [{ opacity: 0.55 }, { opacity: 1 }];
+  }
+
+  function previewTransitionOnCanvas() {
+    if (state.viewMode === 'sorter') {
+      state.viewMode = 'normal';
+      renderEditor();
+    }
+    if (!stageShadowEl) renderEditor();
+    const slide = activeSlide();
+    const kind = slide.transition?.kind || 'none';
+    const duration = Math.max(150, Math.min(2000, slide.transition?.durationMs || 400));
+    stageShadowEl.getAnimations().forEach((anim) => anim.cancel());
+    stageShadowEl.animate(transitionPreviewFrames(kind), { duration, easing: 'ease' });
+  }
+
+  function previewSelectedAnimations() {
+    const els = selectedElements().filter((el) => el.animation && el.animation.kind !== 'none');
+    if (!els.length) {
+      alert('Select an element with an animation first.');
+      return;
+    }
+    els.forEach((el) => {
+      const node = findElementNode(el.id);
+      if (!node) return;
+      const duration = Math.max(100, Math.min(2000, el.animation.durationMs || 500));
+      node.getAnimations().forEach((anim) => anim.cancel());
+      node.animate(animationPreviewFrames(el.animation.kind), { duration, easing: 'ease' });
     });
   }
 
@@ -1077,6 +1132,8 @@
       paintTransitionStrip();
       scheduleSave();
     },
+    previewTransition: previewTransitionOnCanvas,
+    previewAnimation: previewSelectedAnimations,
 
     // File / deck
     newDeck() {
@@ -1159,6 +1216,31 @@
       startPresent(Math.max(0, idx));
     },
     showHelp() { showKeyboardHelp(); },
+    showWhatsNew() {
+      showHelpTopic("What's new in RodmanSlides", [
+        'PowerPoint-style ribbon groups with Record, Review, View, and Help tabs.',
+        'Click or tap selected text boxes to edit text.',
+        'Transition and animation preview buttons in the editor.',
+        'BYOK Ask Claude chat for slide structure, notes, and review prompts.',
+      ]);
+    },
+    showTraining() {
+      showHelpTopic('RodmanSlides training', [
+        'Use Home or Insert to add text, shapes, images, videos, and tables.',
+        'Use Design to apply deck themes and theme colors.',
+        'Use Transitions and Animations to add motion, then Preview before presenting.',
+        'Use Slide Show to present from the beginning or the current slide.',
+      ]);
+    },
+    contactSupport() { openHelpLink(HELP_SUPPORT_URL); },
+    sendFeedback() { openHelpLink(HELP_FEEDBACK_URL); },
+    showInstallHelp() {
+      showHelpTopic('Install RodmanSlides', [
+        'RodmanOffice can be installed from your browser when installable web apps are supported.',
+        'Look for Install app, Add to home screen, or Create shortcut in the browser menu.',
+        'Installed mode keeps the same local deck behavior and GitHub Pages demo limits.',
+      ], { label: 'Open RodmanOffice', url: HELP_REPO_URL });
+    },
   };
 
   function currentEditingTextNode() {
@@ -1336,6 +1418,40 @@
     );
   }
   $('#helpBtn').addEventListener('click', showKeyboardHelp);
+
+  function openHelpLink(url) {
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }
+
+  function showHelpTopic(title, items, action) {
+    const modal = $('#helpInfoModal');
+    const titleEl = $('#helpInfoTitle');
+    const body = $('#helpInfoBody');
+    const actionBtn = $('#helpInfoActionBtn');
+    if (!modal || !titleEl || !body || !actionBtn) return;
+    titleEl.textContent = title;
+    body.innerHTML = '<ul>' + items.map((item) => '<li>' + escapeHtml(item) + '</li>').join('') + '</ul>';
+    if (action) {
+      actionBtn.hidden = false;
+      actionBtn.textContent = action.label;
+      actionBtn.onclick = () => openHelpLink(action.url);
+    } else {
+      actionBtn.hidden = true;
+      actionBtn.onclick = null;
+    }
+    modal.hidden = false;
+  }
+
+  function closeHelpTopic() {
+    const modal = $('#helpInfoModal');
+    if (modal) modal.hidden = true;
+  }
+
+  $('#helpInfoCloseBtn')?.addEventListener('click', closeHelpTopic);
+  $('#helpInfoDoneBtn')?.addEventListener('click', closeHelpTopic);
+  $('#helpInfoModal')?.addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) closeHelpTopic();
+  });
 
   // ---------- Export to PDF (via window.print) ----------
   function exportToPdf() {

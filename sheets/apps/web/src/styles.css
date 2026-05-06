@@ -1410,6 +1410,31 @@ body,
   max-width: 90vw;
 }
 
+.function-picker-categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px 14px 0;
+}
+
+.function-picker-categories button {
+  border: 1px solid var(--aicell-border);
+  border-radius: 4px;
+  background: #fff;
+  color: var(--aicell-text);
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+.function-picker-categories button.active,
+.function-picker-categories button:hover {
+  border-color: var(--primary);
+  background: var(--hover);
+  color: var(--primary-dark);
+}
+
 .function-picker-search {
   display: flex;
   align-items: center;
@@ -1494,7 +1519,61 @@ body,
   margin-top: 2px;
 }
 
+.workbook-stats-modal {
+  width: 480px;
+  max-width: 90vw;
+}
+
+.workbook-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 16px;
+}
+
+.workbook-stats-grid > div {
+  border: 1px solid var(--aicell-border);
+  border-radius: 6px;
+  padding: 10px;
+  background: #fff;
+}
+
+.workbook-stats-grid dt {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--aicell-header-fg);
+  text-transform: uppercase;
+}
+
+.workbook-stats-grid dd {
+  margin: 4px 0 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--aicell-text);
+}
+
 /* Side panel — Ask Claude empty-state intro */
+.help-topic-modal {
+  width: 520px;
+  max-width: 90vw;
+}
+
+.help-topic-body {
+  padding: 16px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.help-topic-body ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.help-topic-body li + li {
+  margin-top: 8px;
+}
+
 .panel-intro {
   background: #e6f4ea;
   border: 1px solid #b9e2c4;

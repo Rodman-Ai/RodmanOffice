@@ -645,6 +645,30 @@ body.fullscreen-editor .rodmanoffice-back { display: none; }
   word-wrap: break-word;
 }
 
+body.word-gridlines .editor {
+  background-image:
+    linear-gradient(rgba(43, 87, 154, 0.13) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(43, 87, 154, 0.13) 1px, transparent 1px);
+  background-size: 0.25in 0.25in;
+}
+
+.editor .rwd-merge-field {
+  background: rgba(43, 87, 154, 0.14);
+  border: 1px solid rgba(43, 87, 154, 0.32);
+  border-radius: 3px;
+  padding: 0 2px;
+}
+
+#helpInfoBody ul {
+  margin: 0;
+  padding-left: 20px;
+  line-height: 1.5;
+}
+
+#helpInfoBody li + li {
+  margin-top: 8px;
+}
+
 .editor :where(h1, h2, h3, h4) {
   font-family: 'Segoe UI', system-ui, sans-serif;
   color: var(--primary);

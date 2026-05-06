@@ -674,6 +674,11 @@
     $('#ruler').classList.toggle('hidden', !rulerToggle.checked);
     savePrefs();
   });
+  const gridlinesToggle = $('#gridlinesToggle');
+  gridlinesToggle?.addEventListener('change', () => {
+    document.body.classList.toggle('word-gridlines', gridlinesToggle.checked);
+    savePrefs();
+  });
 
   // ============================================================
   // IMPROVEMENT: Spell-check toggle
@@ -2070,6 +2075,7 @@ ${editor.innerHTML}
     const prefs = {
       darkMode: darkMode.checked,
       ruler: rulerToggle.checked,
+      gridlines: !!gridlinesToggle?.checked,
       outline: outlineVisible,
       zoom: zoom.value,
       pageSize: pageSize.value,
@@ -2089,6 +2095,10 @@ ${editor.innerHTML}
     if (prefs.ruler === false) {
       rulerToggle.checked = false;
       $('#ruler').classList.add('hidden');
+    }
+    if (prefs.gridlines) {
+      if (gridlinesToggle) gridlinesToggle.checked = true;
+      document.body.classList.add('word-gridlines');
     }
     if (prefs.zoom) {
       zoom.value = prefs.zoom;
@@ -2739,7 +2749,82 @@ ${editor.innerHTML}
     return rows;
   }
 
-  $('#mailMergeBtn')?.addEventListener('click', () => openModal($('#mailMergeModal')));
+  const mergeFieldSelect = $('#mergeFieldSelect');
+  const highlightMergeFieldsToggle = $('#highlightMergeFieldsToggle');
+
+  function mergeHeadersFromCsv() {
+    const csv = $('#mergeCsv')?.value || '';
+    const rows = parseCsv(csv).filter((r) => r.some((c) => c.trim()));
+    return rows.length ? rows[0].map((h) => h.trim()).filter(Boolean) : [];
+  }
+
+  function refreshMergeFieldSelect() {
+    if (!mergeFieldSelect) return;
+    const headers = mergeHeadersFromCsv();
+    mergeFieldSelect.innerHTML = '<option value="">Insert Field...</option>' +
+      headers.map((h) => '<option value="' + escapeHtml(h) + '">' + escapeHtml(h) + '</option>').join('');
+    mergeFieldSelect.disabled = headers.length === 0;
+  }
+
+  function unwrapMergeFieldHighlights() {
+    editor.querySelectorAll('.rwd-merge-field').forEach((node) => {
+      node.replaceWith(document.createTextNode(node.textContent || ''));
+    });
+  }
+
+  function highlightMergeFields(on) {
+    unwrapMergeFieldHighlights();
+    if (!on) {
+      queueAutosave();
+      return;
+    }
+    const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT, {
+      acceptNode(node) {
+        if (!/\{\{\s*[^{}]+\s*\}\}/.test(node.nodeValue || '')) return NodeFilter.FILTER_REJECT;
+        if (node.parentElement?.closest('.rwd-merge-field')) return NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_ACCEPT;
+      },
+    });
+    const nodes = [];
+    while (walker.nextNode()) nodes.push(walker.currentNode);
+    nodes.forEach((node) => {
+      const frag = document.createDocumentFragment();
+      const text = node.nodeValue || '';
+      let last = 0;
+      text.replace(/\{\{\s*([^{}]+?)\s*\}\}/g, (match, field, offset) => {
+        if (offset > last) frag.appendChild(document.createTextNode(text.slice(last, offset)));
+        const span = document.createElement('span');
+        span.className = 'rwd-merge-field';
+        span.dataset.field = field.trim();
+        span.textContent = match;
+        frag.appendChild(span);
+        last = offset + match.length;
+        return match;
+      });
+      if (last < text.length) frag.appendChild(document.createTextNode(text.slice(last)));
+      node.replaceWith(frag);
+    });
+    queueAutosave();
+  }
+
+  $('#mergeCsv')?.addEventListener('input', refreshMergeFieldSelect);
+  $('#mailMergeBtn')?.addEventListener('click', () => {
+    refreshMergeFieldSelect();
+    openModal($('#mailMergeModal'));
+  });
+  mergeFieldSelect?.addEventListener('change', (e) => {
+    const field = e.target.value;
+    e.target.value = '';
+    if (!field) return;
+    restoreSelection();
+    document.execCommand('insertText', false, '{{' + field + '}}');
+    if (highlightMergeFieldsToggle?.checked) highlightMergeFields(true);
+    queueAutosave();
+  });
+  highlightMergeFieldsToggle?.addEventListener('change', (e) => {
+    highlightMergeFields(e.target.checked);
+  });
+  refreshMergeFieldSelect();
 
   $('#runMergeBtn').addEventListener('click', () => {
     const csv = $('#mergeCsv').value;
@@ -3058,29 +3143,43 @@ ${editor.innerHTML}
   // IMPROVEMENT: Auto-TOC inserted at cursor
   // ============================================================
   const insertTocBtn = $('#insertTocBtn');
-  if (insertTocBtn) {
-    insertTocBtn.addEventListener('click', () => {
-      const headings = editor.querySelectorAll('h1, h2, h3');
-      if (!headings.length) {
-        toast('Add some headings first', 'info');
-        return;
-      }
-      // Remove any prior TOC inserted by us
-      const old = editor.querySelector('.rwd-toc');
-      if (old) old.remove();
-      let html = '<div class="rwd-toc"><h3>Table of contents</h3><ol>';
-      headings.forEach((h, i) => {
-        if (!h.id) h.id = 'rwd-h-' + i;
-        html += '<li class="lvl-' + h.tagName.charAt(1) + '">' +
-          '<a href="#' + h.id + '">' + escapeHtml(h.textContent || '') + '</a></li>';
-      });
-      html += '</ol></div><p><br/></p>';
-      restoreSelection();
-      document.execCommand('insertHTML', false, html);
-      queueAutosave();
-      toast('Inserted table of contents', 'success');
+  const updateTocBtn = $('#updateTocBtn');
+  function buildTocHtml() {
+    const headings = Array.from(editor.querySelectorAll('h1, h2, h3'))
+      .filter((h) => !h.closest('.rwd-toc'));
+    if (!headings.length) return '';
+    let html = '<div class="rwd-toc"><h3>Table of contents</h3><ol>';
+    headings.forEach((h, i) => {
+      if (!h.id) h.id = 'rwd-h-' + i;
+      html += '<li class="lvl-' + h.tagName.charAt(1) + '">' +
+        '<a href="#' + h.id + '">' + escapeHtml(h.textContent || '') + '</a></li>';
     });
+    return html + '</ol></div>';
   }
+  function insertOrUpdateToc(insertAtCursor) {
+    const html = buildTocHtml();
+    if (!html) {
+      toast('Add some headings first', 'info');
+      return;
+    }
+    const old = editor.querySelector('.rwd-toc');
+    if (old) {
+      old.outerHTML = html;
+      queueAutosave();
+      toast('Updated table of contents', 'success');
+      return;
+    }
+    if (!insertAtCursor) {
+      toast('Insert a table of contents first', 'info');
+      return;
+    }
+    restoreSelection();
+    document.execCommand('insertHTML', false, html + '<p><br/></p>');
+    queueAutosave();
+    toast('Inserted table of contents', 'success');
+  }
+  insertTocBtn?.addEventListener('click', () => insertOrUpdateToc(true));
+  updateTocBtn?.addEventListener('click', () => insertOrUpdateToc(false));
 
   // ============================================================
   // IMPROVEMENT: Footnotes (auto-numbered)
@@ -9764,8 +9863,48 @@ ${editor.innerHTML}
   // ============================================================
   // FEATURE: Keyboard shortcuts cheatsheet
   // ============================================================
+  const HELP_REPO_URL = 'https://github.com/Rodman-Ai/RodmanOffice';
+  const HELP_SUPPORT_URL = HELP_REPO_URL + '/issues/new?labels=support';
+  const HELP_FEEDBACK_URL = HELP_REPO_URL + '/issues/new?labels=feedback';
+  function openHelpLink(url) {
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }
+  function showHelpTopic(title, items, action) {
+    $('#helpInfoTitle').textContent = title;
+    $('#helpInfoBody').innerHTML = '<ul>' + items.map((item) => '<li>' + escapeHtml(item) + '</li>').join('') + '</ul>';
+    const actionBtn = $('#helpInfoActionBtn');
+    if (action) {
+      actionBtn.hidden = false;
+      actionBtn.textContent = action.label;
+      actionBtn.onclick = () => openHelpLink(action.url);
+    } else {
+      actionBtn.hidden = true;
+      actionBtn.onclick = null;
+    }
+    openModal($('#helpInfoModal'));
+  }
   $('#helpBtn').addEventListener('click', () => openModal($('#shortcutsModal')));
   $('#helpShortcutsBtn')?.addEventListener('click', () => openModal($('#shortcutsModal')));
+  $('#helpWhatsNewBtn')?.addEventListener('click', () => showHelpTopic("What's new in RodmanWord", [
+    'Microsoft Word-style ribbon layout with grouped File, Home, Insert, Design, Layout, References, Mailings, Review, View, and Help tabs.',
+    'Explicit table-of-contents update controls.',
+    'Mail merge field insertion and field highlighting.',
+    'View gridlines for easier page alignment.',
+    'BYOK Ask Claude chat in the static GitHub Pages demo.',
+  ]));
+  $('#helpTrainingBtn')?.addEventListener('click', () => showHelpTopic('RodmanWord training', [
+    'Use References > TOC to insert a table of contents, then Update TOC after editing headings.',
+    'Use Mailings > Start Mail Merge, paste CSV data, and insert merge fields from the ribbon.',
+    'Use View > Gridlines when laying out objects, tables, and page content.',
+    'Use Review tools for spelling, comments, word count, and read-aloud workflows.',
+  ]));
+  $('#helpSupportBtn')?.addEventListener('click', () => openHelpLink(HELP_SUPPORT_URL));
+  $('#helpFeedbackBtn')?.addEventListener('click', () => openHelpLink(HELP_FEEDBACK_URL));
+  $('#helpInstallBtn')?.addEventListener('click', () => showHelpTopic('Install RodmanWord', [
+    'RodmanOffice can be installed from your browser when installable web apps are supported.',
+    'Look for Install app, Add to home screen, or Create shortcut in the browser menu.',
+    'Installed mode keeps the same local document behavior and GitHub Pages demo limits.',
+  ], { label: 'Open RodmanOffice', url: HELP_REPO_URL }));
   $('#helpAboutBtn')?.addEventListener('click', () => openModal($('#aboutModal')));
   document.addEventListener('keydown', (e) => {
     if (e.key === '?' && e.shiftKey && !e.ctrlKey && !e.metaKey) {
