@@ -140,7 +140,6 @@
           <button class="ribbon-btn wide" data-cmd="newSlide" title="New slide">+ New Slide</button>
           <button class="ribbon-btn" data-cmd="duplicateSlide" title="Duplicate slide">⎘</button>
           <button class="ribbon-btn" data-cmd="deleteSlide" title="Delete slide">🗑</button>
-        </div>
           <button class="ribbon-btn" data-cmd="resetSlideLayout" title="Reset slide to the selected layout">Reset</button>
         </div>
         <div class="group-row">
@@ -313,12 +312,20 @@
       <div class="group">
         <div class="group-row">
           <button class="ribbon-btn wide" data-cmd="insertText">Text Box</button>
+          <button class="ribbon-btn wide" data-cmd="insertWordArt">WordArt</button>
+        </div>
+        <div class="group-row">
+          <button class="ribbon-btn" data-cmd="insertSymbol" title="Insert symbol">Symbol</button>
+          <button class="ribbon-btn" data-cmd="insertEquation" title="Insert equation text">Equation</button>
+          <button class="ribbon-btn" data-cmd="insertHeaderFooter" title="Add footer text to all slides">Footer</button>
+          <button class="ribbon-btn" data-cmd="insertSlideNumbers" title="Add slide numbers to all slides">#</button>
         </div>
         <div class="group-label">Text</div>
       </div>
       <div class="group">
         <div class="group-row">
           <button class="ribbon-btn wide" data-cmd="insertVideo">Video...</button>
+          <button class="ribbon-btn wide" data-cmd="insertAudio">Audio...</button>
         </div>
         <div class="group-label">Media</div>
       </div>
@@ -370,6 +377,13 @@
           <label class="control switch">
             <input type="checkbox" id="advanceOnClick" checked />
             <span>On click</span>
+          </label>
+          <label class="control switch">
+            <input type="checkbox" id="advanceAfterToggle" />
+            <span>After</span>
+          </label>
+          <label class="adjust">Seconds
+            <input type="number" id="advanceAfterSeconds" min="0.5" max="120" step="0.5" value="5.0">
           </label>
         </div>
         <div class="group-label">Timing</div>
@@ -436,6 +450,7 @@
         <div class="group-row">
           <button class="ribbon-btn wide" data-cmd="presentFromStart">From beginning</button>
           <button class="ribbon-btn wide" data-cmd="presentFromCurrent">From current</button>
+          <button class="ribbon-btn wide" data-cmd="customSlideShow">Custom show</button>
         </div>
         <div class="group-label">Start show</div>
       </div>
@@ -500,12 +515,37 @@
       </div>
       <div class="group">
         <div class="group-row">
+          <label class="control switch">
+            <input type="checkbox" id="showRulerToggle" />
+            <span>Ruler</span>
+          </label>
+          <label class="control switch">
+            <input type="checkbox" id="showGridlinesToggle" />
+            <span>Gridlines</span>
+          </label>
+          <label class="control switch">
+            <input type="checkbox" id="showGuidesToggle" />
+            <span>Guides</span>
+          </label>
+        </div>
+        <div class="group-label">Show</div>
+      </div>
+      <div class="group">
+        <div class="group-row">
           <button class="ribbon-btn" data-cmd="zoomOut" title="Zoom out">−</button>
           <span id="zoomDisplay" class="zoom-display">100%</span>
           <button class="ribbon-btn" data-cmd="zoomIn" title="Zoom in">+</button>
           <button class="ribbon-btn" data-cmd="zoomFit" title="Fit to window">⤢</button>
         </div>
         <div class="group-label">Zoom</div>
+      </div>
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn active" data-cmd="setColorMode" data-color-mode="color" title="Color view">Color</button>
+          <button class="ribbon-btn" data-cmd="setColorMode" data-color-mode="grayscale" title="Grayscale view">Gray</button>
+          <button class="ribbon-btn" data-cmd="setColorMode" data-color-mode="bw" title="Black and white view">B/W</button>
+        </div>
+        <div class="group-label">Color</div>
       </div>
     </div>
 

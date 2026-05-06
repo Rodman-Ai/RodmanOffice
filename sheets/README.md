@@ -17,10 +17,10 @@ docs/              Strategy docs (competitor analysis, features, roadmap)
 
 - **Grid UX**: virtualized scroll, multi-sheet workbooks, range selection (drag, shift+arrows, click row/col headers for whole row/col), per-column resize, column-header chevron with sort and remove-duplicates.
 - **Ribbon**: Excel-style File · Home · Insert · Page Layout · Formulas · Data · Review · View · Help tabs using the shared RodmanOffice green visual language; Draw, Automate, and Acrobat are not live tabs.
-- **Editing**: full undo/redo (snapshot history, 100 steps), copy/cut/paste with TSV expansion, find & replace (case-sensitive, replace-all as one undo step), CSV/XLSX import + export.
+- **Editing**: full undo/redo (snapshot history, 100 steps), copy/cut/paste and paste-values with TSV expansion, find & replace (case-sensitive, replace-all as one undo step), CSV/XLSX import + export.
 - **Formatting**: cell-format model (bold, italic, underline, alignment, text/fill colors, number formats — General / Number / Currency / Percent / Date / Datetime), exposed through the Home ribbon.
 - **Conditional formatting**: 9 condition types (>, ≥, <, ≤, =, ≠, between, contains, empty/non-empty) × 5 preset styles, applied to ranges and resolved per-cell at render time.
-- **Comments**: per-cell text with a corner indicator and hover tooltip.
+- **Comments**: per-cell text with a corner indicator, hover tooltip, and Review-ribbon clear command.
 - **Function picker**: Formulas/Help → Insert Function / Function Reference opens a searchable modal of the 50 most-used spreadsheet functions, click-to-insert.
 - **Audit panel**: Help → Audit formulas walks every formula in every sheet, lists evaluation errors, click a cell ref to jump.
 - **Formulas**: ~400 Excel-compatible functions via HyperFormula.

@@ -12,7 +12,7 @@ large subsystem or integration.
 
 | Feature | Effort | Notes |
 |---|---:|---|
-| Paste dropdown variants | M | Needs paste-special options such as values, formulas, formatting, transpose, and text import behavior. |
+| Paste dropdown variants | M | Basic Paste and Paste Values controls exist; formulas, formatting, transpose, and import-preview variants remain deferred. |
 | Advanced format painter | M | Basic copied-format state and target range application exist; repeat/multi-paint behavior remains deferred. |
 | Advanced font formatting | M | Basic font family and font size controls exist; export fidelity and richer font lists remain deferred. |
 | Advanced borders and border presets | M | Basic all-sides border toggle exists; edge-specific presets remain deferred. |
@@ -33,7 +33,7 @@ large subsystem or integration.
 | Recommended charts and richer chart menus | M | Manual chart insertion exists; recommendations and chart galleries are deferred. |
 | Sparklines | M | Needs in-cell mini-chart renderer. |
 | Slicers and timelines | L | Depends on Tables/Pivots/filter model. |
-| Links, text boxes, and symbols | M | Needs richer cell/object/link model. |
+| Links, text boxes, and symbols | M | Basic URL and symbol insertion into the active cell exists; clickable link behavior and object/text-box layers remain deferred. |
 
 ## Page Layout
 
@@ -77,7 +77,7 @@ large subsystem or integration.
 | Advanced performance diagnostics | M | Check Performance opens workbook statistics; performance-specific hot spots are deferred. |
 | Accessibility checker | L | Needs semantic workbook checks and issue remediation UI. |
 | Translate | M | Needs hosted or BYOK translation workflow beyond formula functions. |
-| Show changes and threaded comment navigation | L | Needs collaboration/version history and comment-thread model. |
+| Show changes and threaded comment navigation | L | New/Clear Comment commands exist; collaboration history and threaded comment navigation remain deferred. |
 | Notes | M | Needs a separate note type or migration from current comments. |
 | Protect sheet/workbook and allow edit ranges | L | Requires permissions/locking model and export semantics. |
 | Ink controls | L | Requires drawing layer; Draw ribbon remains out of scope. |

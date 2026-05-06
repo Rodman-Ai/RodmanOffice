@@ -29,10 +29,10 @@ subsystem or external integration.
 | Charts | M | Needs chart model or shared chart engine for presentation elements. |
 | Zoom, action buttons, and richer links | M | Current hyperlink support is basic. |
 | True comments | L | Current Review entry opens Ask Claude; comment threads need a separate model. |
-| Header & Footer | M | Needs slide/date/footer/number placeholders and export mapping. |
-| WordArt | M | Needs text effect model. |
-| Symbols and equations | M | Needs symbol/equation picker and text insertion/export behavior. |
-| Media variants | M | Audio, embedded media controls, captions, and provider handling are deferred. |
+| Advanced Header & Footer | M | Basic footer text and slide-number insertion exist; date/header placeholders and export mapping remain deferred. |
+| Advanced WordArt | M | Basic styled WordArt text insertion exists; richer text effects remain deferred. |
+| Symbols and equations | M | Basic prompt-based symbol/equation text insertion exists; picker UI and rendered equation export remain deferred. |
+| Media variants | M | Video and direct audio URL insertion exist; captions, camera, and richer provider handling are deferred. |
 
 ## Design
 
@@ -49,7 +49,7 @@ subsystem or external integration.
 |---|---:|---|
 | Advanced transition gallery | M | Current transition set is intentionally small. |
 | Effect options | M | Needs per-transition parameters. |
-| Sound and advanced advance-slide timing | M | Duration and on-click controls exist; sound and automatic advance timing remain deferred. |
+| Sound and advanced advance-slide timing | M | Duration, on-click, and automatic advance timing exist; transition sounds and richer effect timing remain deferred. |
 
 ## Animations
 
@@ -64,7 +64,7 @@ subsystem or external integration.
 
 | Feature | Effort | Notes |
 |---|---:|---|
-| Custom slide show | M | Needs named subsets and show order. |
+| Custom slide show | M | One-off custom shows by slide-number ranges exist; named subsets and reusable show order remain deferred. |
 | Rehearse with coach and rehearse timings | L | Requires recording/timing pipeline. |
 | Set Up Slide Show | M | Needs show options model. |
 | Advanced hide slide | M | Hidden-slide flag and presentation skipping exist; custom-show and print/export options remain deferred. |
@@ -97,8 +97,8 @@ subsystem or external integration.
 |---|---:|---|
 | Outline, Notes Page, and Reading View | M | Normal and Slide Sorter exist; these views need separate render modes. |
 | Slide, Handout, and Notes masters | L | Needs master slide model. |
-| Ruler, gridlines, and guides toggles | M | Snap guides exist during drag; persistent overlays are deferred. |
-| Color / grayscale / black-and-white views | M | Needs preview filters and print/export behavior. |
+| Advanced ruler, gridlines, and guides | M | Persistent editor overlays now exist; snapping, settings, and print/export behavior remain deferred. |
+| Advanced color / grayscale / black-and-white views | M | Editor preview filters now exist; print/export behavior remains deferred. |
 | Window management | L | Browser app needs multi-window/session support. |
 | Macros | L | Needs script runtime and safety model. |
 

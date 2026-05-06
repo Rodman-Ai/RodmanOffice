@@ -58,6 +58,15 @@
     };
   }
 
+  function newAudioElement({ x, y, w, h, src }) {
+    return {
+      id: newId('el'),
+      kind: 'audio',
+      x, y, w, h,
+      src,
+    };
+  }
+
   function newTableElement({ x, y, w, h, rows, cols, cells }) {
     const r = rows || 3;
     const c = cols || 3;
@@ -283,6 +292,6 @@
     findSlide, findElement, removeElement,
     bringForward, sendBackward,
     cloneElement,
-    newVideoElement, newTableElement,
+    newVideoElement, newAudioElement, newTableElement,
   };
 })();

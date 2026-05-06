@@ -71,6 +71,7 @@
     let idx = firstVisibleFrom(startIndex, 1);
     if (idx < 0) idx = 0;
     let prevStage = null;
+    let advanceTimer = null;
 
     function applyTheme() {
       window.RodmanThemes.applyToStage(overlay, deck.theme);
@@ -79,6 +80,7 @@
     function showSlide(targetIdx, transitionKind) {
       const slide = deck.slides[targetIdx];
       if (!slide) return;
+      clearTimeout(advanceTimer);
 
       const stage = document.createElement('div');
       stage.className = 'present-stage';
@@ -155,6 +157,10 @@
       prevStage = stage;
       controls.querySelector('.pc-counter').textContent =
         `${targetIdx + 1} / ${deck.slides.length}`;
+      if (slide.advanceAfterMs) {
+        const ms = Math.max(500, Math.min(120000, slide.advanceAfterMs));
+        advanceTimer = setTimeout(() => go(1), ms);
+      }
       broadcastSync();
     }
 
@@ -171,6 +177,7 @@
     }
 
     function exit() {
+      clearTimeout(advanceTimer);
       window.removeEventListener('keydown', onKey);
       controls.removeEventListener('click', onCtrlClick);
       overlay.removeEventListener('click', onOverlayClick);

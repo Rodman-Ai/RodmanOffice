@@ -215,9 +215,33 @@ export function App() {
     api.setCellsOnSheetBatch(api.activeSheet.name, edits);
   }, [api, anchor.row, anchor.col]);
 
+  const onPasteValues = useCallback(async () => {
+    await onPaste();
+  }, [onPaste]);
+
   const onClearSelection = useCallback(() => {
     clearRange();
   }, [clearRange]);
+
+  const clearCommentsInSelection = useCallback(() => {
+    const norm = normalizeRange(selection);
+    const edits: CellEdit[] = [];
+    for (let r = norm.startRow; r <= norm.endRow; r++) {
+      for (let c = norm.startCol; c <= norm.endCol; c++) {
+        const key = cellKey(r, c);
+        const existing = api.activeSheet.cells[key];
+        if (!existing?.comment) continue;
+        const next: Cell = { ...existing };
+        delete next.comment;
+        edits.push({
+          row: r,
+          col: c,
+          cell: next.raw === "" && !next.format ? null : next,
+        });
+      }
+    }
+    api.setCellsOnSheetBatch(api.activeSheet.name, edits);
+  }, [api, selection]);
 
   const applyFormatPatch = useCallback(
     (patch: Partial<CellFormat>) => {
@@ -539,6 +563,64 @@ export function App() {
     [api, canInsertChart, chartRangeLabel]
   );
 
+  const uniqueSheetName = useCallback(
+    (proposed: string): string => {
+      const base = proposed.trim() || "Sheet";
+      const taken = new Set(api.workbook.sheets.map((sheet) => sheet.name));
+      if (!taken.has(base)) return base;
+      for (let n = 2; n < 1000; n++) {
+        const candidate = `${base} (${n})`;
+        if (!taken.has(candidate)) return candidate;
+      }
+      return `${base} (${Date.now()})`;
+    },
+    [api.workbook.sheets]
+  );
+
+  const uniqueRenameSheetName = useCallback(
+    (proposed: string): string => {
+      const base = proposed.trim() || api.activeSheet.name;
+      const taken = new Set(
+        api.workbook.sheets
+          .filter((sheet) => sheet.id !== api.activeSheet.id)
+          .map((sheet) => sheet.name)
+      );
+      if (!taken.has(base)) return base;
+      for (let n = 2; n < 1000; n++) {
+        const candidate = `${base} (${n})`;
+        if (!taken.has(candidate)) return candidate;
+      }
+      return `${base} (${Date.now()})`;
+    },
+    [api.activeSheet.id, api.activeSheet.name, api.workbook.sheets]
+  );
+
+  const duplicateSheet = useCallback(() => {
+    const copy = structuredClone(api.activeSheet);
+    copy.id = `sheet-${Date.now()}`;
+    copy.name = uniqueSheetName(`${api.activeSheet.name} Copy`);
+    api.loadSheet(copy);
+  }, [api, uniqueSheetName]);
+
+  const renameSheet = useCallback(() => {
+    const next = window.prompt("Sheet name:", api.activeSheet.name);
+    if (next === null) return;
+    const name = uniqueRenameSheetName(next);
+    api.loadSheet({ ...api.activeSheet, name });
+  }, [api, uniqueRenameSheetName]);
+
+  const insertSymbol = useCallback(() => {
+    const symbol = window.prompt("Symbol to insert:", "©");
+    if (symbol === null) return;
+    api.setCell(anchor.row, anchor.col, symbol || "©");
+  }, [api, anchor.row, anchor.col]);
+
+  const insertLink = useCallback(() => {
+    const url = window.prompt("URL to insert:", "https://");
+    if (url === null) return;
+    api.setCell(anchor.row, anchor.col, url);
+  }, [api, anchor.row, anchor.col]);
+
   const ribbonActions: RibbonActions = {
     newWorkbook: () => {
       api.replaceWorkbook(newBlankWorkbook(`wb-${Date.now()}`));
@@ -554,6 +636,7 @@ export function App() {
     cut: () => void onCut(),
     copy: () => void onCopy(),
     paste: () => void onPaste(),
+    pasteValues: () => void onPasteValues(),
     startFormatPainter,
     formatPainterActive: formatPainter !== null,
     clearSelection: onClearSelection,
@@ -603,7 +686,12 @@ export function App() {
       });
     },
     addSheet: api.addSheet,
+    duplicateSheet,
+    renameSheet,
+    insertSymbol,
+    insertLink,
     openCommentModal: () => setCommentOpen(true),
+    clearComments: clearCommentsInSelection,
     openFunctionPicker: (category = null) => {
       setPickerCategory(category);
       setPickerOpen(true);

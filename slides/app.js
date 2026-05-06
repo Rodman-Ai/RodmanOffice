@@ -39,6 +39,10 @@
     autoFit: true,
     viewMode: 'normal', // 'normal' | 'sorter'
     showNotes: false,
+    showRuler: false,
+    showGridlines: false,
+    showGuides: false,
+    viewColorMode: 'color',
     transitionPreview: null, // string, last clicked transition card
     isEditingText: false,
   };
@@ -81,6 +85,25 @@
     return text.toLowerCase().replace(/\b[\p{L}\p{N}'-]+/gu, (word) =>
       word.charAt(0).toUpperCase() + word.slice(1)
     );
+  }
+
+  function parseSlideSelection(input, slideCount) {
+    const seen = new Set();
+    String(input).split(',').forEach((part) => {
+      const chunk = part.trim();
+      if (!chunk) return;
+      const range = chunk.match(/^(\d+)\s*-\s*(\d+)$/);
+      if (range) {
+        const start = Math.max(1, Math.min(slideCount, Number(range[1])));
+        const end = Math.max(1, Math.min(slideCount, Number(range[2])));
+        const step = start <= end ? 1 : -1;
+        for (let n = start; step > 0 ? n <= end : n >= end; n += step) seen.add(n - 1);
+        return;
+      }
+      const n = Number(chunk);
+      if (Number.isInteger(n) && n >= 1 && n <= slideCount) seen.add(n - 1);
+    });
+    return [...seen];
   }
 
   function initAskClaudePanel() {
@@ -294,16 +317,29 @@
   });
 
   // ---------- Tabs ----------
+  function activateRibbonTab(tabId) {
+    const nextTab = $(`.tab[data-tab="${tabId}"]`) || $('.tab[data-tab="home"]');
+    if (!nextTab) return;
+    const nextId = nextTab.dataset.tab || 'home';
+    $$('.tab').forEach((t) => {
+      const active = t === nextTab;
+      t.classList.toggle('active', active);
+      if (active) t.setAttribute('aria-selected', 'true');
+      else t.removeAttribute('aria-selected');
+    });
+    $$('.ribbon-panel').forEach((p) => {
+      const active = p.dataset.panel === nextId;
+      p.classList.toggle('active', active);
+      p.hidden = !active;
+    });
+  }
+
   document.addEventListener('click', (e) => {
     const tab = e.target.closest('.tab');
     if (!tab) return;
-    $$('.tab').forEach((t) => { t.classList.remove('active'); t.removeAttribute('aria-selected'); });
-    $$('.ribbon-panel').forEach((p) => p.classList.remove('active'));
-    tab.classList.add('active');
-    tab.setAttribute('aria-selected', 'true');
-    const panel = $(`.ribbon-panel[data-panel="${tab.dataset.tab}"]`);
-    if (panel) panel.classList.add('active');
+    activateRibbonTab(tab.dataset.tab);
   });
+  activateRibbonTab($('.tab.active')?.dataset.tab || 'home');
 
   // ---------- Theme strip ----------
   function paintThemeStrip() {
@@ -549,16 +585,68 @@
     if (transitionDuration) transitionDuration.value = ((slide.transition?.durationMs || 400) / 1000).toFixed(1);
     const advanceOnClick = $('#advanceOnClick');
     if (advanceOnClick) advanceOnClick.checked = slide.advanceOnClick !== false;
+    const advanceAfterToggle = $('#advanceAfterToggle');
+    if (advanceAfterToggle) advanceAfterToggle.checked = Boolean(slide.advanceAfterMs);
+    const advanceAfterSeconds = $('#advanceAfterSeconds');
+    if (advanceAfterSeconds) advanceAfterSeconds.value = ((slide.advanceAfterMs || 5000) / 1000).toFixed(1);
     R.renderSlide(stageEl, slide, {
       editable: true,
       selectedId: state.selectedElementId,
       selectedIds: state.selectedElementIds,
     });
+    syncViewControls();
+    renderViewOverlays();
     layoutEditor();
     if (state.showNotes) {
       $('#notesArea').value = slide.notes || '';
     }
     syncImageFormatPanel();
+  }
+
+  function syncViewControls() {
+    const ruler = $('#showRulerToggle');
+    const gridlines = $('#showGridlinesToggle');
+    const guides = $('#showGuidesToggle');
+    if (ruler) ruler.checked = state.showRuler;
+    if (gridlines) gridlines.checked = state.showGridlines;
+    if (guides) guides.checked = state.showGuides;
+    $$('.ribbon-btn[data-color-mode]').forEach((btn) => {
+      btn.classList.toggle('active', btn.dataset.colorMode === state.viewColorMode);
+    });
+  }
+
+  function renderViewOverlays() {
+    if (!stageEl || !stageShadowEl) return;
+    stageShadowEl.classList.toggle('view-grayscale', state.viewColorMode === 'grayscale');
+    stageShadowEl.classList.toggle('view-bw', state.viewColorMode === 'bw');
+    let layer = stageEl.querySelector('.view-overlay-layer');
+    if (!layer) {
+      layer = document.createElement('div');
+      layer.className = 'view-overlay-layer';
+      stageEl.appendChild(layer);
+    }
+    layer.innerHTML = '';
+    layer.hidden = !(state.showRuler || state.showGridlines || state.showGuides);
+    if (layer.hidden) return;
+    if (state.showGridlines) {
+      const grid = document.createElement('div');
+      grid.className = 'view-gridlines';
+      layer.appendChild(grid);
+    }
+    if (state.showGuides) {
+      ['v-50', 'h-50', 'v-33', 'v-67', 'h-33', 'h-67'].forEach((cls) => {
+        const guide = document.createElement('div');
+        guide.className = 'view-guide ' + cls;
+        layer.appendChild(guide);
+      });
+    }
+    if (state.showRuler) {
+      const top = document.createElement('div');
+      top.className = 'view-ruler top';
+      const left = document.createElement('div');
+      left.className = 'view-ruler left';
+      layer.append(top, left);
+    }
   }
 
   function layoutEditor() {
@@ -884,9 +972,9 @@
       return;
     }
 
-    // Video placeholder: dblclick re-prompts for URL.
-    if (el.kind === 'video') {
-      const url = window.prompt('Video URL:', el.src || '');
+    // Media placeholders: dblclick re-prompts for URL.
+    if (el.kind === 'video' || el.kind === 'audio') {
+      const url = window.prompt(el.kind === 'audio' ? 'Audio URL:' : 'Video URL:', el.src || '');
       if (url === null) return;
       el.src = url;
       renderEditor(); scheduleSave();
@@ -1189,6 +1277,90 @@
       setSelection([slide.elements[slide.elements.length - 1].id], slide.elements[slide.elements.length - 1].id);
       renderEditor(); scheduleSave();
     },
+    insertWordArt() {
+      const text = window.prompt('WordArt text:', 'Big idea');
+      if (text === null) return;
+      const slide = activeSlide();
+      slide.elements.push(D.newTextElement({
+        x: 260, y: 250, w: 760, h: 140,
+        html: escapeHtml(text || 'WordArt'),
+        role: 'free',
+        fontSize: 60,
+        fontWeight: 800,
+        align: 'center',
+        color: '#b7472a',
+      }));
+      const elId = slide.elements[slide.elements.length - 1].id;
+      setSelection([elId], elId);
+      renderEditor(); scheduleSave();
+    },
+    insertSymbol() {
+      const symbol = window.prompt('Symbol to insert:', '©');
+      if (symbol === null) return;
+      const slide = activeSlide();
+      slide.elements.push(D.newTextElement({
+        x: 560, y: 260, w: 160, h: 120,
+        html: escapeHtml(symbol || '©'),
+        role: 'free',
+        fontSize: 72,
+        fontWeight: 400,
+        align: 'center',
+      }));
+      const elId = slide.elements[slide.elements.length - 1].id;
+      setSelection([elId], elId);
+      renderEditor(); scheduleSave();
+    },
+    insertEquation() {
+      const equation = window.prompt('Equation text:', 'E = mc²');
+      if (equation === null) return;
+      const slide = activeSlide();
+      slide.elements.push(D.newTextElement({
+        x: 320, y: 300, w: 640, h: 90,
+        html: escapeHtml(equation || 'E = mc²'),
+        role: 'free',
+        fontSize: 40,
+        fontWeight: 400,
+        align: 'center',
+        fontFamily: 'Georgia, serif',
+      }));
+      const elId = slide.elements[slide.elements.length - 1].id;
+      setSelection([elId], elId);
+      renderEditor(); scheduleSave();
+    },
+    insertHeaderFooter() {
+      const text = window.prompt('Footer text to apply to all slides:', deck.title || 'RodmanSlides');
+      if (text === null) return;
+      deck.slides.forEach((slide) => {
+        slide.elements = slide.elements.filter((el) => el.role !== 'footer');
+        if (text) {
+          slide.elements.push(D.newTextElement({
+            x: 80, y: 668, w: 860, h: 32,
+            html: escapeHtml(text),
+            role: 'footer',
+            fontSize: 16,
+            fontWeight: 400,
+            align: 'left',
+            color: '#64748b',
+          }));
+        }
+      });
+      renderSlideList(); renderEditor(); scheduleSave();
+    },
+    insertSlideNumbers() {
+      deck.slides.forEach((slide, idx) => {
+        slide.elements = slide.elements.filter((el) => el.role !== 'slideNumber');
+        slide.elements.push(D.newTextElement({
+          x: 1120, y: 668, w: 80, h: 32,
+          html: String(idx + 1),
+          role: 'slideNumber',
+          fontSize: 16,
+          fontWeight: 400,
+          align: 'right',
+          color: '#64748b',
+        }));
+      });
+      renderSlideList(); renderEditor(); scheduleSave();
+    },
     insertImage() { $('#imageFileInput').click(); },
     askClaude() {
       const panel = $('#askClaudePanel');
@@ -1201,6 +1373,17 @@
       const slide = activeSlide();
       slide.elements.push(D.newVideoElement({
         x: 240, y: 160, w: 800, h: 450, src: url,
+      }));
+      const elId = slide.elements[slide.elements.length - 1].id;
+      setSelection([elId], elId);
+      renderEditor(); scheduleSave();
+    },
+    insertAudio() {
+      const url = window.prompt('Audio URL — direct .mp3, .wav, or .ogg link:', 'https://');
+      if (!url) return;
+      const slide = activeSlide();
+      slide.elements.push(D.newAudioElement({
+        x: 360, y: 310, w: 560, h: 90, src: url,
       }));
       const elId = slide.elements[slide.elements.length - 1].id;
       setSelection([elId], elId);
@@ -1352,6 +1535,26 @@
       state.viewMode = 'sorter';
       renderEditor();
     },
+    toggleRuler() {
+      state.showRuler = !state.showRuler;
+      syncViewControls();
+      renderViewOverlays();
+    },
+    toggleGridlines() {
+      state.showGridlines = !state.showGridlines;
+      syncViewControls();
+      renderViewOverlays();
+    },
+    toggleGuides() {
+      state.showGuides = !state.showGuides;
+      syncViewControls();
+      renderViewOverlays();
+    },
+    setColorMode(btn) {
+      state.viewColorMode = btn.dataset.colorMode || 'color';
+      syncViewControls();
+      renderViewOverlays();
+    },
     zoomIn() { state.autoFit = false; state.zoom = Math.min(4, state.zoom + 0.1); layoutEditor(); },
     zoomOut() { state.autoFit = false; state.zoom = Math.max(0.1, state.zoom - 0.1); layoutEditor(); },
     zoomFit() { state.autoFit = true; layoutEditor(); },
@@ -1360,6 +1563,21 @@
     presentFromCurrent() {
       const idx = deck.slides.findIndex((s) => s.id === state.selectedSlideId);
       startPresent(Math.max(0, idx));
+    },
+    customSlideShow() {
+      const input = window.prompt('Slides to show (for example: 1,3-5):', '1-' + deck.slides.length);
+      if (!input) return;
+      const indexes = parseSlideSelection(input, deck.slides.length);
+      if (!indexes.length) {
+        alert('No valid slide numbers found.');
+        return;
+      }
+      const customDeck = { ...deck, slides: indexes.map((i) => deck.slides[i]).filter(Boolean) };
+      P.start({
+        deck: customDeck,
+        startIndex: 0,
+        onExit() { renderEditor(); },
+      });
     },
     showHelp() { showKeyboardHelp(); },
     showWhatsNew() {
@@ -1569,6 +1787,37 @@
   $('#advanceOnClick')?.addEventListener('change', (e) => {
     activeSlide().advanceOnClick = e.target.checked;
     scheduleSave();
+  });
+  $('#advanceAfterToggle')?.addEventListener('change', (e) => {
+    const slide = activeSlide();
+    if (e.target.checked) {
+      const seconds = Math.max(0.5, Math.min(120, Number($('#advanceAfterSeconds')?.value) || 5));
+      slide.advanceAfterMs = Math.round(seconds * 1000);
+    } else {
+      delete slide.advanceAfterMs;
+    }
+    scheduleSave();
+  });
+  $('#advanceAfterSeconds')?.addEventListener('change', (e) => {
+    const seconds = Math.max(0.5, Math.min(120, Number(e.target.value) || 5));
+    e.target.value = seconds.toFixed(1);
+    const slide = activeSlide();
+    if ($('#advanceAfterToggle')?.checked) {
+      slide.advanceAfterMs = Math.round(seconds * 1000);
+      scheduleSave();
+    }
+  });
+  $('#showRulerToggle')?.addEventListener('change', (e) => {
+    state.showRuler = e.target.checked;
+    renderViewOverlays();
+  });
+  $('#showGridlinesToggle')?.addEventListener('change', (e) => {
+    state.showGridlines = e.target.checked;
+    renderViewOverlays();
+  });
+  $('#showGuidesToggle')?.addEventListener('change', (e) => {
+    state.showGuides = e.target.checked;
+    renderViewOverlays();
   });
 
   // ---------- Status bar ----------

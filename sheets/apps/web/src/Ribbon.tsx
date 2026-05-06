@@ -20,6 +20,7 @@ export type RibbonActions = {
   cut: () => void;
   copy: () => void;
   paste: () => void;
+  pasteValues: () => void;
   startFormatPainter: () => void;
   formatPainterActive: boolean;
   clearSelection: () => void;
@@ -35,7 +36,12 @@ export type RibbonActions = {
   deleteCols: () => void;
   // Insert
   addSheet: () => void;
+  duplicateSheet: () => void;
+  renameSheet: () => void;
+  insertSymbol: () => void;
+  insertLink: () => void;
   openCommentModal: () => void;
+  clearComments: () => void;
   openFunctionPicker: (category?: FunctionCategory | null) => void;
   insertSum: () => void;
   recalculate: () => void;
@@ -136,6 +142,7 @@ export function Ribbon({ a }: { a: RibbonActions }) {
                 <BigBtn icon="Paste" label="Paste" onClick={a.paste} />
               </Row>
               <Row>
+                <Btn icon="123" label="Paste Values" onClick={a.pasteValues} title="Paste plain values" />
                 <Btn icon="Cut" label="Cut" onClick={a.cut} title="Cut" />
                 <Btn icon="Copy" label="Copy" onClick={a.copy} title="Copy" />
                 <Btn
@@ -320,6 +327,8 @@ export function Ribbon({ a }: { a: RibbonActions }) {
             <Group label="Tables">
               <Row>
                 <BigBtn icon="Sheet" label="New Sheet" onClick={a.addSheet} />
+                <BigBtn icon="Copy" label="Duplicate Sheet" onClick={a.duplicateSheet} />
+                <BigBtn icon="Name" label="Rename Sheet" onClick={a.renameSheet} />
               </Row>
             </Group>
             <Group label="Charts">
@@ -336,6 +345,12 @@ export function Ribbon({ a }: { a: RibbonActions }) {
             <Group label="Comments">
               <Row>
                 <BigBtn icon="Comment" label="Comment" onClick={a.openCommentModal} />
+              </Row>
+            </Group>
+            <Group label="Text">
+              <Row>
+                <Btn icon="Link" label="Link" onClick={a.insertLink} title="Insert a URL in the active cell" />
+                <Btn icon="Ω" label="Symbol" onClick={a.insertSymbol} title="Insert a symbol in the active cell" />
               </Row>
             </Group>
           </div>
@@ -410,6 +425,7 @@ export function Ribbon({ a }: { a: RibbonActions }) {
             <Group label="Comments">
               <Row>
                 <BigBtn icon="Comment" label="New Comment" onClick={a.openCommentModal} />
+                <BigBtn icon="Clear" label="Clear Comments" onClick={a.clearComments} />
               </Row>
             </Group>
             <Group label="Performance">
@@ -453,6 +469,8 @@ export function Ribbon({ a }: { a: RibbonActions }) {
             <Group label="Workbook">
               <Row>
                 <Btn icon="New" label="New Workbook" onClick={a.newWorkbook} />
+                <Btn icon="Copy" label="Duplicate Sheet" onClick={a.duplicateSheet} />
+                <Btn icon="Name" label="Rename Sheet" onClick={a.renameSheet} />
               </Row>
             </Group>
           </div>

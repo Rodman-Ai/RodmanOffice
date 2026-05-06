@@ -9,12 +9,13 @@ step.
 
 - Create, duplicate, reorder, and delete slides.
 - Use a PowerPoint-style ribbon layout: File, Home, Insert, Design, Transitions, Animations, Slide Show, Record, Review, View, and Help.
-- Edit text, shapes, images, videos, tables, notes, themes, transitions, and simple animations.
+- Edit text, shapes, images, video/audio embeds, tables, notes, footers, slide numbers, themes, transitions, and simple animations.
 - Cut, copy, and paste slide elements inside the deck.
 - Save/open the native `.json` deck format.
 - Import/export `.pptx` through the shared `../lib/slides/` engine.
 - Export PDF through the browser print path.
-- Present from the start or current slide.
+- Present from the start, current slide, or a one-off custom slide range, with optional automatic slide advance timing.
+- Use View controls for ruler, gridlines, guides, color, grayscale, and black-and-white editor previews.
 - Open Ask Claude from the title bar, Insert, Review, or Help.
 
 ## Storage

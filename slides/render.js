@@ -106,6 +106,8 @@
       renderImageInto(wrap, el);
     } else if (el.kind === 'video') {
       renderVideoInto(wrap, el);
+    } else if (el.kind === 'audio') {
+      renderAudioInto(wrap, el);
     } else if (el.kind === 'table') {
       renderTableInto(wrap, el);
     }
@@ -333,6 +335,36 @@
       fontSize: '14px', fontFamily: 'system-ui, sans-serif',
     });
     wrap.appendChild(ph);
+  }
+
+  function renderAudioInto(wrap, el) {
+    const src = el.src || '';
+    const audio = document.createElement('audio');
+    audio.controls = true;
+    audio.src = src;
+    Object.assign(audio.style, {
+      width: '100%',
+      height: '100%',
+      display: 'block',
+      background: '#111827',
+      borderRadius: '10px',
+      padding: '16px',
+      boxSizing: 'border-box',
+    });
+    if (!src) {
+      const ph = document.createElement('div');
+      ph.className = 'video-placeholder';
+      ph.textContent = 'Click to set an audio URL';
+      Object.assign(ph.style, {
+        width: '100%', height: '100%',
+        display: 'grid', placeItems: 'center',
+        background: '#111827', color: '#fff',
+        borderRadius: '10px', fontSize: '20px',
+      });
+      wrap.appendChild(ph);
+      return;
+    }
+    wrap.appendChild(audio);
   }
 
   function renderTableInto(wrap, el) {
