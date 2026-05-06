@@ -16,32 +16,27 @@ concurrency:
   group: "pages"
   cancel-in-progress: true
 
-# Opt into Node 24 for all third-party JS actions (silences the
-# Node 20 deprecation warning emitted by the runner).
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
-
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
         with:
           package_json_file: sheets/package.json
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: 24
           cache: pnpm
           cache-dependency-path: sheets/pnpm-lock.yaml
 
       - name: Cache npm (LeoCRM)
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.npm
           key: ${{ runner.os }}-npm-${{ hashFiles('crm/package-lock.json') }}
@@ -82,7 +77,7 @@ jobs:
           cp -r sheets/apps/web/dist _site/sheets
 
       - name: Setup Pages
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v6
         # Force Pages source = "GitHub Actions" on every run. If the
         # site was created with "Deploy from a branch", this flips it
         # so the workflow's _site artifact is what actually gets served
@@ -92,7 +87,7 @@ jobs:
           enablement: true
 
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: _site
 
@@ -109,4 +104,4 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5

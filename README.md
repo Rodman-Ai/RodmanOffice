@@ -59,7 +59,7 @@ RodmanOffice/
 GitHub Pages, via `.github/workflows/pages.yml`. Pushes to `main`
 publish the suite. The workflow:
 
-1. Sets up pnpm and Node 20 (with caches for both `pnpm` and `~/.npm`).
+1. Sets up pnpm and Node 24 (with caches for both `pnpm` and `~/.npm`).
 2. Installs `crm/`'s npm dependencies and `sheets/`'s pnpm workspace.
 3. Builds LeoCRM with `NEXT_PUBLIC_BASE_PATH=/RodmanOffice/crm` →
    `crm/out/`.
