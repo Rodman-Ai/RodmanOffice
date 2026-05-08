@@ -9,16 +9,23 @@ canvas, and parser APIs.
 
 | Family | Reads | Writes |
 |---|---|---|
-| Documents | DOCX, PDF, RTF, ODT, EPUB, Markdown, HTML, TXT | DOCX, PDF, RTF, ODT, EPUB, Markdown, HTML, TXT, AsciiDoc, LaTeX, JSON, YAML, MediaWiki, reStructuredText, Org-mode, DocBook, FictionBook |
-| Spreadsheets | XLSX, XLS, CSV, TSV, JSON | XLSX, CSV, TSV, PSV, JSON, NDJSON, HTML, Markdown, Excel 2003 XML, ODS, PDF |
-| Images | PNG, JPEG, GIF, BMP, WebP, SVG, PSD, PSB, ICO, TIFF (browser-dependent), PDF (any page) | PNG, JPEG, WebP, PSD, BMP, ICO, PPM, TGA, CBZ, PDF (Photoshop-compatible) |
+| Documents | DOCX, PDF, RTF, ODT, EPUB, Markdown, HTML, TXT | DOCX, PDF, RTF, ODT, EPUB, Markdown, HTML, TXT, AsciiDoc, LaTeX, JSON, YAML, MediaWiki, reStructuredText, Org-mode, DocBook, FictionBook, PPTX, ODP |
+| Spreadsheets | XLSX, XLS, CSV, TSV, JSON, NDJSON, YAML, HTML tables, Markdown tables, vCard, iCalendar | XLSX, CSV, TSV, PSV, JSON, NDJSON, HTML, Markdown, Excel 2003 XML, ODS, vCard, iCalendar, PDF |
+| Slides | PPTX | PPTX, ODP, PDF, DOCX, Markdown, HTML, TXT |
+| Images | PNG, JPEG, GIF, BMP, WebP, SVG, PSD, PSB, ICO, TIFF (browser-dependent), PDF (any page) | PNG, JPEG, WebP, PSD, BMP, ICO, PPM, TGA, TIFF, CBZ, PDF (Photoshop-compatible) |
 
 Cross-family bridges:
 
 - Spreadsheet → PDF (rasterized as HTML tables).
 - Image source → PDF (single-page, JPEG-wrapped).
-- PDF → image: any PDF rasterizes to PNG/JPEG/WebP/PSD/BMP/ICO/PPM/TGA.
+- PDF → image: any PDF rasterizes to PNG/JPEG/WebP/PSD/BMP/ICO/PPM/TGA/TIFF.
 - PDF → CBZ: every PDF page rasterizes into a comic-book ZIP archive.
+- HTML/Markdown source → spreadsheet: tables in the document become
+  CSV/TSV/XLSX/JSON/ODS rows.
+- Document → PPTX/ODP: H1 (or H2 fallback) splits the document into
+  slides; each section becomes one slide with a title and body text frame.
+- PPTX → DOCX/PDF/Markdown/HTML/TXT: deck text content is concatenated
+  with H2 slide-title separators and run through the document writer.
 
 ## Shared Engines
 
@@ -65,6 +72,9 @@ node --check converter/worker.js
 node --check lib/docs/interop.js
 node --check lib/sheets/csv.js
 node --check lib/sheets/serializers.js
+node --check lib/sheets/vcard.js
+node --check lib/sheets/icalendar.js
 node --check lib/images/image-io.js
 node --check lib/images/cbz.js
+node --check lib/slides/pptx.js
 ```

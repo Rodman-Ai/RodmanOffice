@@ -14,6 +14,7 @@ import { createQueue, downloadBlob, emitZip } from './bulk.js';
 import * as docs from '../lib/docs/index.js';
 import * as images from '../lib/images/index.js';
 import * as sheets from '../lib/sheets/index.js';
+import * as slides from '../lib/slides/index.js';
 
 const dropZone   = document.getElementById('dropZone');
 const fileInput  = document.getElementById('fileInput');
@@ -129,8 +130,61 @@ async function writeDocFromHtml(html, target, name) {
     case 'org':  return TXT_ENC.encode(docs.orgExport(html, title));
     case 'dbk':  return TXT_ENC.encode(docs.docbookExport(html, title));
     case 'fb2':  return TXT_ENC.encode(docs.fb2Export(html, title));
+    case 'odp':  return docs.odpExport(html, title);
+    case 'pptx': {
+      const blob = slides.savePptx(htmlToDeck(html, title));
+      return blobToBytes(blob);
+    }
     default: throw new Error(`Unsupported document output: .${target.ext}`);
   }
+}
+
+// Split a document HTML string at H1 (falling back to H2) to make
+// one slide per top-level section. The first slide takes the doc
+// title if no H1 is found before the first paragraph.
+function htmlToDeck(html, title) {
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html;
+  const headingTag = tmp.querySelector('h1') ? 'H1' : (tmp.querySelector('h2') ? 'H2' : null);
+  const slidesOut = [];
+  let bucket = { title: title || 'Slide', body: '' };
+  if (!headingTag) {
+    bucket.body = tmp.innerHTML;
+    slidesOut.push(bucket);
+  } else {
+    Array.from(tmp.childNodes).forEach((n) => {
+      if (n.nodeType === 1 && n.tagName === headingTag) {
+        if (bucket.body || slidesOut.length === 0) slidesOut.push(bucket);
+        bucket = { title: n.textContent || 'Slide', body: '' };
+      } else {
+        bucket.body += n.outerHTML || (n.nodeValue || '');
+      }
+    });
+    if (bucket.body || !slidesOut.length) slidesOut.push(bucket);
+  }
+  return {
+    title,
+    slides: slidesOut.map((s) => ({
+      elements: [
+        {
+          id: `t-${Math.random().toString(36).slice(2, 8)}`,
+          kind: 'text',
+          x: 40, y: 40, w: 1200, h: 80,
+          html: `<b>${escapeHtml(s.title)}</b>`,
+          role: 'free', fontSize: 36, fontWeight: 700, align: 'left',
+          color: null, fontFamily: null,
+        },
+        {
+          id: `b-${Math.random().toString(36).slice(2, 8)}`,
+          kind: 'text',
+          x: 40, y: 140, w: 1200, h: 540,
+          html: s.body || '<p></p>',
+          role: 'free', fontSize: 20, fontWeight: 400, align: 'left',
+          color: null, fontFamily: null,
+        },
+      ],
+    })),
+  };
 }
 
 // Decode bytes as UTF-8 and strip a leading BOM. UTF-16 BOMs get a
@@ -227,6 +281,10 @@ async function encodeCanvasToTarget(canvas, target, name) {
     const buf = await images.encodeTGA(canvas).arrayBuffer();
     return { bytes: buf, mime: target.mime };
   }
+  if (target.ext === 'tif' || target.ext === 'tiff') {
+    const buf = await images.encodeTIFF(canvas).arrayBuffer();
+    return { bytes: buf, mime: target.mime };
+  }
   if (target.ext === 'cbz') {
     const blob = await images.encodeCbzFromCanvas(canvas);
     const buf = await blob.arrayBuffer();
@@ -287,10 +345,67 @@ function isImageTarget(target) {
   if (!target) return false;
   switch (target.ext) {
     case 'png': case 'jpg': case 'webp': case 'psd':
-    case 'bmp': case 'ico': case 'ppm': case 'tga': case 'cbz':
+    case 'bmp': case 'ico': case 'ppm': case 'tga':
+    case 'tif': case 'tiff': case 'cbz':
       return true;
     default: return false;
   }
+}
+
+function isSpreadsheetTarget(target) {
+  if (!target) return false;
+  switch (target.ext) {
+    case 'xlsx': case 'csv': case 'tsv': case 'psv':
+    case 'json': case 'ndjson': case 'ods':
+    case 'vcf': case 'ics':
+      return true;
+    default: return false;
+  }
+}
+
+// ---------- Slides family (PPTX read; document targets via HTML) ----------
+//
+// PPTX → document family: walk the imported deck, concat each text
+// element's html into a flat HTML body with <h2> slide titles, and
+// hand it to the existing document writer. This means PPTX → DOCX,
+// PDF, MD, HTML, TXT all work without any new writers.
+// PPTX → PPTX is a no-op pass-through.
+
+async function runSlides(source, target) {
+  if (target.ext === 'pptx') {
+    // Pass-through. The user picked the same format on both sides.
+    return { bytes: source.bytes, mime: target.mime };
+  }
+  const deck = await slides.loadPptx(source.bytes);
+  const html = deckToHtml(deck);
+  const bytes = await writeDocFromHtml(html, target, source.name);
+  return { bytes: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), mime: target.mime };
+}
+
+function deckToHtml(deck) {
+  let html = '';
+  if (deck.title) html += `<h1>${escapeHtml(deck.title)}</h1>`;
+  for (const slide of deck.slides || []) {
+    let firstText = true;
+    for (const el of slide.elements || []) {
+      if (el.kind !== 'text') continue;
+      if (firstText) {
+        // Emit the first text element's first paragraph as the slide
+        // title heading, the rest as body.
+        const tmp = document.createElement('div');
+        tmp.innerHTML = el.html || '';
+        const first = tmp.firstChild;
+        const titleText = first ? (first.textContent || '').trim() : '';
+        if (titleText) html += `<h2>${escapeHtml(titleText)}</h2>`;
+        if (first) first.remove();
+        html += tmp.innerHTML;
+        firstText = false;
+      } else {
+        html += el.html || '';
+      }
+    }
+  }
+  return html || '<p>(empty deck)</p>';
 }
 
 // ---------- Spreadsheet family (worker for native; main thread for PDF) ----------
@@ -325,19 +440,27 @@ async function runSheet(source, target) {
     case 'md':     bytes = sheets.exportWorkbookAsMarkdown(wb); break;
     case 'xml':    bytes = sheets.exportWorkbookAsExcelXml(wb); break;
     case 'ods':    bytes = sheets.exportWorkbookAsOds(wb); break;
+    case 'vcf':    bytes = sheets.exportWorkbookAsVcard(wb); break;
+    case 'ics':    bytes = sheets.exportWorkbookAsIcal(wb); break;
     default: throw new Error(`Unsupported spreadsheet output: .${target.ext}`);
   }
   const buf = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
   return { bytes: buf, mime: target.mime };
 }
 
-// Choose the right spreadsheet importer: TSV and JSON inputs need
-// dedicated parsers, anything else flows through importSpreadsheet
-// (which handles XLSX/CSV by extension).
+// Choose the right spreadsheet importer: TSV/JSON/NDJSON/YAML/HTML/MD/
+// VCF/ICS inputs need dedicated parsers, anything else flows through
+// importSpreadsheet (which handles XLSX/CSV by extension).
 function importSpreadsheetAny(source) {
   const ext = (source.name.split('.').pop() || '').toLowerCase();
   if (ext === 'tsv') return sheets.parseTsvWorkbook(decodeText(source.bytes), source.name);
   if (ext === 'json') return sheets.parseJsonWorkbook(decodeText(source.bytes), source.name);
+  if (ext === 'ndjson' || ext === 'jsonl') return sheets.parseNdjsonWorkbook(decodeText(source.bytes), source.name);
+  if (ext === 'yaml' || ext === 'yml') return sheets.parseYamlWorkbook(decodeText(source.bytes), source.name);
+  if (ext === 'html' || ext === 'htm') return sheets.parseHtmlTablesWorkbook(decodeText(source.bytes), source.name);
+  if (ext === 'md' || ext === 'markdown') return sheets.parseMarkdownTablesWorkbook(decodeText(source.bytes), source.name);
+  if (ext === 'vcf') return sheets.parseVcardWorkbook(decodeText(source.bytes), source.name);
+  if (ext === 'ics') return sheets.parseIcalWorkbook(decodeText(source.bytes), source.name);
   return sheets.importSpreadsheet(source.bytes, source.name);
 }
 
@@ -588,11 +711,18 @@ async function convertAll() {
       const sourceExt = (source.name.split('.').pop() || '').toLowerCase();
       if (sourceExt === 'pdf' && isImageTarget(item.target)) {
         output = await runPdfAsImage(source, item.target);
+      } else if (item.detected.family === 'document' &&
+                 (sourceExt === 'html' || sourceExt === 'htm' || sourceExt === 'md' || sourceExt === 'markdown') &&
+                 isSpreadsheetTarget(item.target)) {
+        // Bridge: HTML/MD source carrying tables → spreadsheet target.
+        // runSheet → importSpreadsheetAny picks the right table reader.
+        output = await runSheet({ ...source, family: 'spreadsheet' }, item.target);
       } else {
         switch (item.detected.family) {
           case 'document':    output = await runDoc(source, item.target); break;
           case 'spreadsheet': output = await runSheet(source, item.target); break;
           case 'image':       output = await runImage(source, item.target); break;
+          case 'slides':      output = await runSlides(source, item.target); break;
           default: throw new Error('Unknown family: ' + item.detected.family);
         }
       }

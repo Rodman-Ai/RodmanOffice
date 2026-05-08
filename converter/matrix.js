@@ -23,6 +23,9 @@ const DOC_OUTPUTS = [
   { ext: 'org',  mime: 'text/x-org', label: 'Org-mode (.org)' },
   { ext: 'dbk',  mime: 'application/docbook+xml', label: 'DocBook (.dbk)' },
   { ext: 'fb2',  mime: 'application/x-fictionbook+xml', label: 'FictionBook (.fb2)' },
+  // Cross-family bridges into the presentation engines.
+  { ext: 'pptx', mime: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', label: 'PowerPoint (.pptx)' },
+  { ext: 'odp',  mime: 'application/vnd.oasis.opendocument.presentation', label: 'OpenDocument presentation (.odp)' },
 ];
 
 const SHEET_OUTPUTS = [
@@ -38,6 +41,11 @@ const SHEET_OUTPUTS = [
   { ext: 'md',   mime: 'text/markdown', label: 'Markdown tables (.md)' },
   { ext: 'xml',  mime: 'application/vnd.ms-excel.sheet.xml', label: 'Excel 2003 XML (.xml)' },
   { ext: 'ods',  mime: 'application/vnd.oasis.opendocument.spreadsheet', label: 'OpenDocument (.ods)' },
+  // Contact / calendar bridges. Read paths live alongside these
+  // outputs so a .vcf or .ics input can target the regular
+  // spreadsheet outputs.
+  { ext: 'vcf',  mime: 'text/vcard', label: 'vCard (.vcf)' },
+  { ext: 'ics',  mime: 'text/calendar', label: 'iCalendar (.ics)' },
 ];
 
 const IMAGE_OUTPUTS = [
@@ -52,12 +60,24 @@ const IMAGE_OUTPUTS = [
   { ext: 'ppm',  mime: 'image/x-portable-pixmap', label: 'Netpbm PPM (.ppm)' },
   { ext: 'tga',  mime: 'image/x-targa', label: 'Targa (.tga)' },
   { ext: 'cbz',  mime: 'application/vnd.comicbook+zip', label: 'Comic Book ZIP (.cbz)' },
+  { ext: 'tif',  mime: 'image/tiff', label: 'TIFF (.tif)' },
+];
+
+const SLIDES_OUTPUTS = [
+  { ext: 'pptx', mime: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', label: 'PowerPoint (.pptx)' },
+  { ext: 'odp',  mime: 'application/vnd.oasis.opendocument.presentation', label: 'OpenDocument presentation (.odp)' },
+  { ext: 'pdf',  mime: 'application/pdf', label: 'PDF (.pdf)' },
+  { ext: 'docx', mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', label: 'Word (.docx)' },
+  { ext: 'md',   mime: 'text/markdown', label: 'Markdown (.md)' },
+  { ext: 'html', mime: 'text/html', label: 'HTML (.html)' },
+  { ext: 'txt',  mime: 'text/plain', label: 'Plain text (.txt)' },
 ];
 
 export const MATRIX = {
   document: DOC_OUTPUTS,
   spreadsheet: SHEET_OUTPUTS,
   image: IMAGE_OUTPUTS,
+  slides: SLIDES_OUTPUTS,
   unknown: [],
 };
 
@@ -71,8 +91,15 @@ export function targetsFor(family) {
 // the dropdown actually offers them.
 const PDF_IMAGE_BRIDGE = IMAGE_OUTPUTS.filter((o) => o.ext !== 'pdf');
 
+// HTML and Markdown inputs may carry tables; surface the
+// spreadsheet outputs so the user can extract them. Filtering by
+// ext keeps the dropdown short — only the most useful destinations.
+const TABLE_BRIDGE_EXTS = new Set(['csv', 'tsv', 'xlsx', 'json', 'ods']);
+const HTML_TABLE_BRIDGE = SHEET_OUTPUTS.filter((o) => TABLE_BRIDGE_EXTS.has(o.ext));
+
 export function targetsForItem({ family, ext }) {
   const base = targetsFor(family);
   if (family === 'document' && ext === 'pdf') return [...base, ...PDF_IMAGE_BRIDGE];
+  if (family === 'document' && (ext === 'html' || ext === 'md')) return [...base, ...HTML_TABLE_BRIDGE];
   return base;
 }

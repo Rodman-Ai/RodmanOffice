@@ -21,6 +21,15 @@ const EXT_TABLE = {
   csv:  { family: 'spreadsheet', mime: 'text/csv', ext: 'csv' },
   tsv:  { family: 'spreadsheet', mime: 'text/tab-separated-values', ext: 'tsv' },
   json: { family: 'spreadsheet', mime: 'application/json', ext: 'json' },
+  ndjson: { family: 'spreadsheet', mime: 'application/x-ndjson', ext: 'ndjson' },
+  jsonl: { family: 'spreadsheet', mime: 'application/x-ndjson', ext: 'ndjson' },
+  yaml: { family: 'spreadsheet', mime: 'application/yaml', ext: 'yaml' },
+  yml:  { family: 'spreadsheet', mime: 'application/yaml', ext: 'yaml' },
+  vcf:  { family: 'spreadsheet', mime: 'text/vcard', ext: 'vcf' },
+  ics:  { family: 'spreadsheet', mime: 'text/calendar', ext: 'ics' },
+
+  // Slides
+  pptx: { family: 'slides', mime: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', ext: 'pptx' },
 
   // Images
   png:  { family: 'image', mime: 'image/png', ext: 'png' },
