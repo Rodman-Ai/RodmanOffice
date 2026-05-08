@@ -15,12 +15,37 @@ const DOC_OUTPUTS = [
   { ext: 'txt',  mime: 'text/plain', label: 'Plain text (.txt)' },
   { ext: 'adoc', mime: 'text/asciidoc', label: 'AsciiDoc (.adoc)' },
   { ext: 'tex',  mime: 'application/x-tex', label: 'LaTeX (.tex)' },
+  // Newly added doc targets.
+  { ext: 'json', mime: 'application/json', label: 'JSON document (.json)' },
+  { ext: 'yaml', mime: 'application/yaml', label: 'YAML document (.yaml)' },
+  { ext: 'wiki', mime: 'text/x-wiki', label: 'MediaWiki (.wiki)' },
+  { ext: 'rst',  mime: 'text/x-rst', label: 'reStructuredText (.rst)' },
+  { ext: 'org',  mime: 'text/x-org', label: 'Org-mode (.org)' },
+  { ext: 'dbk',  mime: 'application/docbook+xml', label: 'DocBook (.dbk)' },
+  { ext: 'fb2',  mime: 'application/x-fictionbook+xml', label: 'FictionBook (.fb2)' },
+  // Cross-family bridges into the presentation engines.
+  { ext: 'pptx', mime: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', label: 'PowerPoint (.pptx)' },
+  { ext: 'odp',  mime: 'application/vnd.oasis.opendocument.presentation', label: 'OpenDocument presentation (.odp)' },
 ];
 
 const SHEET_OUTPUTS = [
   { ext: 'xlsx', mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', label: 'Excel (.xlsx)' },
   { ext: 'csv',  mime: 'text/csv', label: 'CSV (.csv)' },
   { ext: 'pdf',  mime: 'application/pdf', label: 'PDF (.pdf)' },
+  // Newly added spreadsheet targets.
+  { ext: 'tsv',  mime: 'text/tab-separated-values', label: 'TSV (.tsv)' },
+  { ext: 'psv',  mime: 'text/plain', label: 'PSV pipe-separated (.psv)' },
+  { ext: 'json', mime: 'application/json', label: 'JSON (.json)' },
+  { ext: 'ndjson', mime: 'application/x-ndjson', label: 'NDJSON (.ndjson)' },
+  { ext: 'html', mime: 'text/html', label: 'HTML tables (.html)' },
+  { ext: 'md',   mime: 'text/markdown', label: 'Markdown tables (.md)' },
+  { ext: 'xml',  mime: 'application/vnd.ms-excel.sheet.xml', label: 'Excel 2003 XML (.xml)' },
+  { ext: 'ods',  mime: 'application/vnd.oasis.opendocument.spreadsheet', label: 'OpenDocument (.ods)' },
+  // Contact / calendar bridges. Read paths live alongside these
+  // outputs so a .vcf or .ics input can target the regular
+  // spreadsheet outputs.
+  { ext: 'vcf',  mime: 'text/vcard', label: 'vCard (.vcf)' },
+  { ext: 'ics',  mime: 'text/calendar', label: 'iCalendar (.ics)' },
 ];
 
 const IMAGE_OUTPUTS = [
@@ -29,12 +54,30 @@ const IMAGE_OUTPUTS = [
   { ext: 'webp', mime: 'image/webp', label: 'WebP (.webp)' },
   { ext: 'psd',  mime: 'image/vnd.adobe.photoshop', label: 'Photoshop (.psd)' },
   { ext: 'pdf',  mime: 'application/pdf', label: 'PDF (.pdf)' },
+  // Newly added image targets.
+  { ext: 'bmp',  mime: 'image/bmp', label: 'Bitmap (.bmp)' },
+  { ext: 'ico',  mime: 'image/x-icon', label: 'Icon (.ico)' },
+  { ext: 'ppm',  mime: 'image/x-portable-pixmap', label: 'Netpbm PPM (.ppm)' },
+  { ext: 'tga',  mime: 'image/x-targa', label: 'Targa (.tga)' },
+  { ext: 'cbz',  mime: 'application/vnd.comicbook+zip', label: 'Comic Book ZIP (.cbz)' },
+  { ext: 'tif',  mime: 'image/tiff', label: 'TIFF (.tif)' },
+];
+
+const SLIDES_OUTPUTS = [
+  { ext: 'pptx', mime: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', label: 'PowerPoint (.pptx)' },
+  { ext: 'odp',  mime: 'application/vnd.oasis.opendocument.presentation', label: 'OpenDocument presentation (.odp)' },
+  { ext: 'pdf',  mime: 'application/pdf', label: 'PDF (.pdf)' },
+  { ext: 'docx', mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', label: 'Word (.docx)' },
+  { ext: 'md',   mime: 'text/markdown', label: 'Markdown (.md)' },
+  { ext: 'html', mime: 'text/html', label: 'HTML (.html)' },
+  { ext: 'txt',  mime: 'text/plain', label: 'Plain text (.txt)' },
 ];
 
 export const MATRIX = {
   document: DOC_OUTPUTS,
   spreadsheet: SHEET_OUTPUTS,
   image: IMAGE_OUTPUTS,
+  slides: SLIDES_OUTPUTS,
   unknown: [],
 };
 
@@ -43,12 +86,20 @@ export function targetsFor(family) {
 }
 
 // Per-source augmentation. PDF is a document for text/PDF→PDF flows
-// but can also be rasterized into any image format — surface those
-// extra options on PDF inputs so the dropdown actually offers them.
+// but can also be rasterized into any image format (or every page
+// into a CBZ archive). Surface those extra options on PDF inputs so
+// the dropdown actually offers them.
 const PDF_IMAGE_BRIDGE = IMAGE_OUTPUTS.filter((o) => o.ext !== 'pdf');
+
+// HTML and Markdown inputs may carry tables; surface the
+// spreadsheet outputs so the user can extract them. Filtering by
+// ext keeps the dropdown short — only the most useful destinations.
+const TABLE_BRIDGE_EXTS = new Set(['csv', 'tsv', 'xlsx', 'json', 'ods']);
+const HTML_TABLE_BRIDGE = SHEET_OUTPUTS.filter((o) => TABLE_BRIDGE_EXTS.has(o.ext));
 
 export function targetsForItem({ family, ext }) {
   const base = targetsFor(family);
   if (family === 'document' && ext === 'pdf') return [...base, ...PDF_IMAGE_BRIDGE];
+  if (family === 'document' && (ext === 'html' || ext === 'md')) return [...base, ...HTML_TABLE_BRIDGE];
   return base;
 }

@@ -9,12 +9,23 @@ canvas, and parser APIs.
 
 | Family | Reads | Writes |
 |---|---|---|
-| Documents | DOCX, PDF, RTF, ODT, EPUB, Markdown, HTML, TXT | DOCX, PDF, RTF, ODT, EPUB, Markdown, HTML, TXT, AsciiDoc, LaTeX |
-| Spreadsheets | XLSX, XLS, CSV | XLSX, CSV, PDF |
-| Images | PNG, JPEG, GIF, BMP, WebP, SVG, PSD, PSB, PDF | PNG, JPEG, WebP, PSD, PDF |
+| Documents | DOCX, PDF, RTF, ODT, EPUB, Markdown, HTML, TXT | DOCX, PDF, RTF, ODT, EPUB, Markdown, HTML, TXT, AsciiDoc, LaTeX, JSON, YAML, MediaWiki, reStructuredText, Org-mode, DocBook, FictionBook, PPTX, ODP |
+| Spreadsheets | XLSX, XLS, CSV, TSV, JSON, NDJSON, YAML, HTML tables, Markdown tables, vCard, iCalendar | XLSX, CSV, TSV, PSV, JSON, NDJSON, HTML, Markdown, Excel 2003 XML, ODS, vCard, iCalendar, PDF |
+| Slides | PPTX | PPTX, ODP, PDF, DOCX, Markdown, HTML, TXT |
+| Images | PNG, JPEG, GIF, BMP, WebP, SVG, PSD, PSB, ICO, TIFF (browser-dependent), PDF (any page) | PNG, JPEG, WebP, PSD, BMP, ICO, PPM, TGA, TIFF, CBZ, PDF (Photoshop-compatible) |
 
-Cross-family bridges include CSV-to-PDF, PNG-to-PDF, PDF-to-PNG, and
-PDF-to-PSD where the shared engines support the route.
+Cross-family bridges:
+
+- Spreadsheet → PDF (rasterized as HTML tables).
+- Image source → PDF (single-page, JPEG-wrapped).
+- PDF → image: any PDF rasterizes to PNG/JPEG/WebP/PSD/BMP/ICO/PPM/TGA/TIFF.
+- PDF → CBZ: every PDF page rasterizes into a comic-book ZIP archive.
+- HTML/Markdown source → spreadsheet: tables in the document become
+  CSV/TSV/XLSX/JSON/ODS rows.
+- Document → PPTX/ODP: H1 (or H2 fallback) splits the document into
+  slides; each section becomes one slide with a title and body text frame.
+- PPTX → DOCX/PDF/Markdown/HTML/TXT: deck text content is concatenated
+  with H2 slide-title separators and run through the document writer.
 
 ## Shared Engines
 
@@ -28,11 +39,26 @@ PDF.js. See `../lib/images/README.md` for the image dependency inventory.
 the spreadsheet worker. The shared `/lib` engines are outside that scope, so
 conversion paths need those assets from the network or the browser HTTP cache.
 
+## Trust Boundaries
+
+- HTML inputs (`.html`, `.htm`, `.epub` body content, `.odt` body content) are
+  passed through a small in-browser sanitizer that drops `<script>`, `<style>`,
+  `<iframe>`, `<object>`, `<embed>`, `<link>`, `<meta>`, `<base>`, `<form>`,
+  every `on*=` handler attribute, and `javascript:` / `data:` / `vbscript:`
+  URLs. The sanitizer is conservative — assume any other formatting in the
+  input may round-trip into the output.
+- Text inputs (`.txt`, `.md`, `.html`, `.htm`) are decoded as UTF-8. A leading
+  UTF-8 BOM is stripped silently; UTF-16 BOMs are rejected with a friendly
+  error so the user can re-save as UTF-8.
+
 ## Known Gaps
 
-- HTML input is preserved as trusted content for document-style conversions.
-- Conversion fixture tests are still needed for common routes, unsupported routes, worker failures, and bulk ZIP output.
-- Large files are limited by browser memory and the relevant parser engine.
+- TIFF, AVIF, and HEIC inputs depend on browser native decoding and are not
+  guaranteed to load on every browser/version.
+- Multi-sheet inputs render to PDF/Markdown/HTML as one section per sheet;
+  formulas and cell formatting are not preserved end-to-end.
+- Conversion fixture tests are still needed for common routes, unsupported
+  routes, worker failures, and bulk ZIP output.
 
 ## Verification
 
@@ -43,4 +69,12 @@ node --check converter/detect.js
 node --check converter/matrix.js
 node --check converter/sw.js
 node --check converter/worker.js
+node --check lib/docs/interop.js
+node --check lib/sheets/csv.js
+node --check lib/sheets/serializers.js
+node --check lib/sheets/vcard.js
+node --check lib/sheets/icalendar.js
+node --check lib/images/image-io.js
+node --check lib/images/cbz.js
+node --check lib/slides/pptx.js
 ```
