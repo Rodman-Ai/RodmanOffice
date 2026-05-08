@@ -13,6 +13,7 @@ import { targetsForItem } from './matrix.js';
 import { createQueue, downloadBlob, emitZip } from './bulk.js';
 import * as docs from '../lib/docs/index.js';
 import * as images from '../lib/images/index.js';
+import * as sheets from '../lib/sheets/index.js';
 
 const dropZone   = document.getElementById('dropZone');
 const fileInput  = document.getElementById('fileInput');
@@ -40,6 +41,8 @@ let worker = null;
 let jobSeq = 0;
 const pending = new Map();
 
+let workerFailed = false;
+
 function rejectWorkerJobs(error) {
   const err = error instanceof Error ? error : new Error(String(error || 'Spreadsheet worker failed'));
   pending.forEach((slot) => slot.reject(err));
@@ -48,10 +51,12 @@ function rejectWorkerJobs(error) {
     worker.terminate();
     worker = null;
   }
+  workerFailed = true;
 }
 
 function ensureWorker() {
   if (worker) return worker;
+  workerFailed = false;
   worker = new Worker(new URL('./worker.js', import.meta.url), { type: 'module' });
   worker.addEventListener('message', (e) => {
     const { id, ok, output, error } = e.data;
@@ -92,14 +97,14 @@ async function readDocToHtml(source) {
   switch (ext) {
     case 'docx': return docs.loadDocx(buf);
     case 'pdf':  return docs.loadPdf(buf);
-    case 'rtf':  return docs.rtfImport(TXT_DEC.decode(buf));
-    case 'odt':  return docs.odtImport(buf);
-    case 'epub': return docs.epubImport(buf);
+    case 'rtf':  return docs.rtfImport(decodeText(buf));
+    case 'odt':  return sanitizeHtml(await docs.odtImport(buf));
+    case 'epub': return sanitizeHtml(await docs.epubImport(buf));
     case 'html':
-    case 'htm':  return TXT_DEC.decode(buf);
-    case 'txt':  return textToHtml(TXT_DEC.decode(buf));
+    case 'htm':  return sanitizeHtml(decodeText(buf));
+    case 'txt':  return textToHtml(decodeText(buf));
     case 'md':
-    case 'markdown': return mdToHtml(TXT_DEC.decode(buf));
+    case 'markdown': return mdToHtml(decodeText(buf));
     default: throw new Error(`Unsupported document input: .${ext}`);
   }
 }
@@ -117,8 +122,55 @@ async function writeDocFromHtml(html, target, name) {
     case 'tex':  return TXT_ENC.encode(docs.latexExport(html, title));
     case 'html': return TXT_ENC.encode(wrapHtml(html, title));
     case 'txt':  return TXT_ENC.encode(htmlToText(html));
+    case 'json': return TXT_ENC.encode(docs.jsonDocExport(html, title));
+    case 'yaml': return TXT_ENC.encode(docs.yamlExport(html, title));
+    case 'wiki': return TXT_ENC.encode(docs.mediawikiExport(html, title));
+    case 'rst':  return TXT_ENC.encode(docs.rstExport(html, title));
+    case 'org':  return TXT_ENC.encode(docs.orgExport(html, title));
+    case 'dbk':  return TXT_ENC.encode(docs.docbookExport(html, title));
+    case 'fb2':  return TXT_ENC.encode(docs.fb2Export(html, title));
     default: throw new Error(`Unsupported document output: .${target.ext}`);
   }
+}
+
+// Decode bytes as UTF-8 and strip a leading BOM. UTF-16 BOMs get a
+// friendly error so the user knows to re-save the file as UTF-8 —
+// trying to decode UTF-16 with the UTF-8 decoder is what produces
+// the classic "every other character is null" mojibake.
+function decodeText(buf) {
+  const view = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
+  if (view.length >= 2 && ((view[0] === 0xFE && view[1] === 0xFF) || (view[0] === 0xFF && view[1] === 0xFE))) {
+    throw new Error('UTF-16 file detected. Save the file as UTF-8 and try again.');
+  }
+  let text = TXT_DEC.decode(view);
+  if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+  return text;
+}
+
+// Strip clearly-active markup and javascript: / data: URLs from
+// untrusted HTML before we feed it to the rest of the pipeline.
+// The Word/HTML/EPUB/ODT writers all accept HTML innerHTML, so any
+// surviving <script>, <iframe>, or on*= attributes would round-trip
+// straight into the output file.
+function sanitizeHtml(html) {
+  if (!html) return '';
+  const tmp = document.createElement('template');
+  tmp.innerHTML = String(html);
+  const drop = tmp.content.querySelectorAll('script, style, iframe, object, embed, link, meta, base, form');
+  drop.forEach((el) => el.remove());
+  const all = tmp.content.querySelectorAll('*');
+  all.forEach((el) => {
+    for (const attr of Array.from(el.attributes)) {
+      const name = attr.name.toLowerCase();
+      const value = String(attr.value || '').trim();
+      if (name.startsWith('on')) { el.removeAttribute(attr.name); continue; }
+      if ((name === 'href' || name === 'src' || name === 'xlink:href') &&
+          /^\s*(javascript|data|vbscript):/i.test(value)) {
+        el.removeAttribute(attr.name);
+      }
+    }
+  });
+  return tmp.innerHTML;
 }
 
 async function runDoc(source, target) {
@@ -155,6 +207,28 @@ async function encodeCanvasToTarget(canvas, target, name) {
     // JPEG image. Photoshop, Acrobat and Preview all open it
     // straight back as a flattened image.
     const blob = await images.encodePdfFromCanvas(canvas, { format: 'jpeg', quality: 0.92 });
+    const buf = await blob.arrayBuffer();
+    return { bytes: buf, mime: target.mime };
+  }
+  if (target.ext === 'bmp') {
+    const buf = await images.encodeBMP(canvas).arrayBuffer();
+    return { bytes: buf, mime: target.mime };
+  }
+  if (target.ext === 'ico') {
+    const blob = await images.encodeICO(canvas);
+    const buf = await blob.arrayBuffer();
+    return { bytes: buf, mime: target.mime };
+  }
+  if (target.ext === 'ppm') {
+    const buf = await images.encodePPM(canvas).arrayBuffer();
+    return { bytes: buf, mime: target.mime };
+  }
+  if (target.ext === 'tga') {
+    const buf = await images.encodeTGA(canvas).arrayBuffer();
+    return { bytes: buf, mime: target.mime };
+  }
+  if (target.ext === 'cbz') {
+    const blob = await images.encodeCbzFromCanvas(canvas);
     const buf = await blob.arrayBuffer();
     return { bytes: buf, mime: target.mime };
   }
@@ -199,30 +273,72 @@ async function runImage(source, target) {
 // through runDoc.
 
 async function runPdfAsImage(source, target) {
+  // Multi-page bridge: any PDF → CBZ rasterizes every page.
+  if (target.ext === 'cbz') {
+    const blob = await images.encodeCbzFromPdf(source.bytes);
+    const buf = await blob.arrayBuffer();
+    return { bytes: buf, mime: target.mime };
+  }
   const { canvas } = await images.decodePdfPage(source.bytes, 0);
   return encodeCanvasToTarget(canvas, target, source.name);
 }
 
 function isImageTarget(target) {
   if (!target) return false;
-  return target.ext === 'png' || target.ext === 'jpg' || target.ext === 'webp' || target.ext === 'psd';
+  switch (target.ext) {
+    case 'png': case 'jpg': case 'webp': case 'psd':
+    case 'bmp': case 'ico': case 'ppm': case 'tga': case 'cbz':
+      return true;
+    default: return false;
+  }
 }
 
 // ---------- Spreadsheet family (worker for native; main thread for PDF) ----------
 
 async function runSheet(source, target) {
-  if (target.ext === 'xlsx' || target.ext === 'csv') {
+  const sourceExt = (source.name.split('.').pop() || '').toLowerCase();
+  // The worker only knows how to parse XLSX/XLS/CSV, so it can take
+  // any of those as input as long as the output is also a delimited
+  // text or XLSX format. Everything else (TSV/JSON inputs, or any
+  // structured output) runs on the main thread.
+  const workerCanRead = sourceExt === 'xlsx' || sourceExt === 'xls' || sourceExt === 'csv';
+  const workerCanWrite = target.ext === 'xlsx' || target.ext === 'csv' || target.ext === 'tsv' || target.ext === 'psv';
+  if (workerCanRead && workerCanWrite) {
     return runOnWorker(source, target);
   }
+  const wb = importSpreadsheetAny(source);
   if (target.ext === 'pdf') {
-    const sheets = await import('../lib/sheets/index.js');
-    const wb = sheets.importSpreadsheet(source.bytes, source.name);
     const html = workbookToHtml(wb);
     const blob = docs.savePdf(html, { title: wb.name });
     const buf = await blob.arrayBuffer();
     return { bytes: buf, mime: target.mime };
   }
-  throw new Error(`Unsupported spreadsheet output: .${target.ext}`);
+  let bytes;
+  switch (target.ext) {
+    case 'xlsx':   bytes = sheets.exportWorkbookAsXLSX(wb); break;
+    case 'csv':    bytes = sheets.exportSheetAsCSV(wb.sheets[0]); break;
+    case 'tsv':    bytes = sheets.exportSheetAsTsv(wb.sheets[0]); break;
+    case 'psv':    bytes = sheets.exportSheetAsPsv(wb.sheets[0]); break;
+    case 'json':   bytes = sheets.exportWorkbookAsJson(wb); break;
+    case 'ndjson': bytes = sheets.exportSheetAsNdjson(wb.sheets[0]); break;
+    case 'html':   bytes = sheets.exportWorkbookAsHtml(wb); break;
+    case 'md':     bytes = sheets.exportWorkbookAsMarkdown(wb); break;
+    case 'xml':    bytes = sheets.exportWorkbookAsExcelXml(wb); break;
+    case 'ods':    bytes = sheets.exportWorkbookAsOds(wb); break;
+    default: throw new Error(`Unsupported spreadsheet output: .${target.ext}`);
+  }
+  const buf = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+  return { bytes: buf, mime: target.mime };
+}
+
+// Choose the right spreadsheet importer: TSV and JSON inputs need
+// dedicated parsers, anything else flows through importSpreadsheet
+// (which handles XLSX/CSV by extension).
+function importSpreadsheetAny(source) {
+  const ext = (source.name.split('.').pop() || '').toLowerCase();
+  if (ext === 'tsv') return sheets.parseTsvWorkbook(decodeText(source.bytes), source.name);
+  if (ext === 'json') return sheets.parseJsonWorkbook(decodeText(source.bytes), source.name);
+  return sheets.importSpreadsheet(source.bytes, source.name);
 }
 
 function workbookToHtml(wb) {

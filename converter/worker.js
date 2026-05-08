@@ -27,6 +27,10 @@ self.addEventListener('message', async (e) => {
       bytes = sheets.exportWorkbookAsXLSX(wb);
     } else if (target.ext === 'csv') {
       bytes = sheets.exportSheetAsCSV(wb.sheets[0]);
+    } else if (target.ext === 'tsv') {
+      bytes = sheets.exportSheetAsTsv(wb.sheets[0]);
+    } else if (target.ext === 'psv') {
+      bytes = sheets.exportSheetAsPsv(wb.sheets[0]);
     } else {
       throw new Error(`Worker cannot emit .${target.ext}; route via main thread`);
     }

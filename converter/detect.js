@@ -19,6 +19,8 @@ const EXT_TABLE = {
   xlsx: { family: 'spreadsheet', mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', ext: 'xlsx' },
   xls:  { family: 'spreadsheet', mime: 'application/vnd.ms-excel', ext: 'xls' },
   csv:  { family: 'spreadsheet', mime: 'text/csv', ext: 'csv' },
+  tsv:  { family: 'spreadsheet', mime: 'text/tab-separated-values', ext: 'tsv' },
+  json: { family: 'spreadsheet', mime: 'application/json', ext: 'json' },
 
   // Images
   png:  { family: 'image', mime: 'image/png', ext: 'png' },
@@ -30,6 +32,11 @@ const EXT_TABLE = {
   svg:  { family: 'image', mime: 'image/svg+xml', ext: 'svg' },
   psd:  { family: 'image', mime: 'image/vnd.adobe.photoshop', ext: 'psd' },
   psb:  { family: 'image', mime: 'image/vnd.adobe.photoshop', ext: 'psb' },
+  ico:  { family: 'image', mime: 'image/x-icon', ext: 'ico' },
+  tif:  { family: 'image', mime: 'image/tiff', ext: 'tif' },
+  tiff: { family: 'image', mime: 'image/tiff', ext: 'tif' },
+  ppm:  { family: 'image', mime: 'image/x-portable-pixmap', ext: 'ppm' },
+  tga:  { family: 'image', mime: 'image/x-targa', ext: 'tga' },
 };
 
 function magicSniff(bytes) {
@@ -50,6 +57,12 @@ function magicSniff(bytes) {
       b.length >= 12 && b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50) return EXT_TABLE.webp;
   // RTF: {\rtf
   if (b[0] === 0x7B && b[1] === 0x5C && b[2] === 0x72 && b[3] === 0x74) return EXT_TABLE.rtf;
+  // ICO: 00 00 01 00
+  if (b[0] === 0x00 && b[1] === 0x00 && b[2] === 0x01 && b[3] === 0x00) return EXT_TABLE.ico;
+  // TIFF (little-endian): 49 49 2A 00
+  if (b[0] === 0x49 && b[1] === 0x49 && b[2] === 0x2A && b[3] === 0x00) return EXT_TABLE.tif;
+  // TIFF (big-endian): 4D 4D 00 2A
+  if (b[0] === 0x4D && b[1] === 0x4D && b[2] === 0x00 && b[3] === 0x2A) return EXT_TABLE.tif;
   // ZIP-based (DOCX, XLSX, ODT, EPUB) — PK\x03\x04. Can't disambiguate from magic alone.
   if (b[0] === 0x50 && b[1] === 0x4B && b[2] === 0x03 && b[3] === 0x04) return null;
   return null;
