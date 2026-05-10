@@ -116,6 +116,20 @@ const VIDEO_OUTPUTS = [
   { ext: 'amv', mime: 'video/x-amv',          label: 'AMV (.amv)' },
   { ext: 'gxf', mime: 'application/gxf',      label: 'GXF (.gxf)' },
 
+  // ----- Part 8 codec variants in existing containers -----
+  { ext: '3gp_h263',   mime: 'video/3gpp',         outputExt: '3gp',  label: '3GP H.263 (.3gp)' },
+  { ext: 'avi_xvid',   mime: 'video/x-msvideo',    outputExt: 'avi',  label: 'AVI Xvid / DivX (.avi)' },
+  { ext: 'webm_vp9',   mime: 'video/webm',         outputExt: 'webm', label: 'WebM VP9 (.webm)' },
+  { ext: 'mkv_ffv1',   mime: 'video/x-matroska',   outputExt: 'mkv',  label: 'MKV FFV1 lossless (.mkv)' },
+  { ext: 'avi_huffyuv', mime: 'video/x-msvideo',   outputExt: 'avi',  label: 'AVI HuffYUV lossless (.avi)' },
+  { ext: 'mov_jp2',    mime: 'video/quicktime',    outputExt: 'mov',  label: 'MOV JPEG 2000 (.mov)' },
+  { ext: 'mov_cinepak', mime: 'video/quicktime',   outputExt: 'mov',  label: 'MOV Cinepak (.mov)' },
+  { ext: 'nut_snow',   mime: 'video/x-nut',        outputExt: 'nut',  label: 'NUT Snow wavelet (.nut)' },
+  { ext: 'wmv_wmv3',   mime: 'video/x-ms-wmv',     outputExt: 'wmv',  label: 'WMV3 / VC-1 (.wmv)' },
+  { ext: 'avi_raw',    mime: 'video/x-msvideo',    outputExt: 'avi',  label: 'AVI raw YUV (.avi)' },
+  { ext: 'png_seq',    mime: 'application/zip',    outputExt: 'zip',  label: 'PNG sequence ZIP (.zip)' },
+  { ext: 'dpx_seq',    mime: 'application/zip',    outputExt: 'zip',  label: 'DPX sequence ZIP (.zip)' },
+
   // Frame-derived outputs.
   { ext: 'gif',  mime: 'image/gif',         label: 'Animated GIF (.gif)' },
   { ext: 'png',  mime: 'image/png',         label: 'PNG (first frame)' },
@@ -145,6 +159,16 @@ const AUDIO_OUTPUTS = [
   { ext: 'wv',   mime: 'audio/x-wavpack',   label: 'WavPack (.wv)' },
   { ext: 'spx',  mime: 'audio/ogg',         label: 'Speex (.spx)' },
   { ext: 'gsm',  mime: 'audio/gsm',         label: 'GSM telephony (.gsm)' },
+
+  // ----- Part 8 audio codec variants -----
+  { ext: 'alac',         mime: 'audio/mp4',         outputExt: 'm4a', label: 'M4A Apple Lossless / ALAC (.m4a)' },
+  { ext: 'm4a_heaacv2',  mime: 'audio/mp4',         outputExt: 'm4a', label: 'M4A HE-AAC v2 (.m4a)' },
+  { ext: 'wav_mulaw',    mime: 'audio/wav',         outputExt: 'wav', label: 'WAV μ-law telephony (.wav)' },
+  { ext: 'wav_alaw',     mime: 'audio/wav',         outputExt: 'wav', label: 'WAV A-law telephony (.wav)' },
+  { ext: 'wav_pcm24',    mime: 'audio/wav',         outputExt: 'wav', label: 'WAV 24-bit PCM (.wav)' },
+  { ext: 'wav_float32',  mime: 'audio/wav',         outputExt: 'wav', label: 'WAV 32-bit float (.wav)' },
+  { ext: 'wav_adpcm',    mime: 'audio/wav',         outputExt: 'wav', label: 'WAV ADPCM IMA (.wav)' },
+  { ext: 'amrwb',        mime: 'audio/amr-wb',      outputExt: 'awb', label: 'AMR-WB voice (.awb)' },
 ];
 
 const SUBTITLE_OUTPUTS = [
