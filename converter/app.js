@@ -9,7 +9,7 @@
 // the relevant translation step on the main thread.
 
 import { detect } from './detect.js';
-import { targetsForItem } from './matrix.js';
+import { targetsForItem, ready as matrixReady } from './matrix.js';
 import { createQueue, downloadBlob, emitZip } from './bulk.js';
 import * as docs from '../lib/docs/index.js';
 import * as images from '../lib/images/index.js';
@@ -293,11 +293,79 @@ async function encodeCanvasToTarget(canvas, target, name) {
     const buf = await images.encodeTIFF(canvas).arrayBuffer();
     return { bytes: buf, mime: target.mime };
   }
+  if (target.ext === 'tif-multi') {
+    // Single-canvas fallback: delegate to encodeMultiTIFF, which
+    // collapses to encodeTIFF when given exactly one page.
+    const buf = await images.encodeMultiTIFF([canvas]).arrayBuffer();
+    return { bytes: buf, mime: target.mime };
+  }
   if (target.ext === 'cbz') {
     const blob = await images.encodeCbzFromCanvas(canvas);
     const buf = await blob.arrayBuffer();
     return { bytes: buf, mime: target.mime };
   }
+  // ----- Part 10: synchronous byte-level encoders (one Blob) -----
+  if (target.ext === 'pgm') {
+    const buf = await images.encodePGM(canvas).arrayBuffer();
+    return { bytes: buf, mime: target.mime };
+  }
+  if (target.ext === 'pbm') {
+    const buf = await images.encodePBM(canvas).arrayBuffer();
+    return { bytes: buf, mime: target.mime };
+  }
+  if (target.ext === 'pam') {
+    const buf = await images.encodePAM(canvas).arrayBuffer();
+    return { bytes: buf, mime: target.mime };
+  }
+  if (target.ext === 'xbm') {
+    const stem = (name || 'image').replace(/\.[^.]+$/, '').replace(/[^A-Za-z0-9_]/g, '_') || 'image';
+    const buf = await images.encodeXBM(canvas, stem).arrayBuffer();
+    return { bytes: buf, mime: target.mime };
+  }
+  if (target.ext === 'xpm') {
+    const stem = (name || 'image').replace(/\.[^.]+$/, '').replace(/[^A-Za-z0-9_]/g, '_') || 'image';
+    const buf = await images.encodeXPM(canvas, stem).arrayBuffer();
+    return { bytes: buf, mime: target.mime };
+  }
+  if (target.ext === 'pcx') {
+    const buf = await images.encodePCX(canvas).arrayBuffer();
+    return { bytes: buf, mime: target.mime };
+  }
+  if (target.ext === 'hdr') {
+    const buf = await images.encodeHDR(canvas).arrayBuffer();
+    return { bytes: buf, mime: target.mime };
+  }
+  if (target.ext === 'wbmp') {
+    const buf = await images.encodeWBMP(canvas).arrayBuffer();
+    return { bytes: buf, mime: target.mime };
+  }
+  if (target.ext === 'sgi') {
+    const buf = await images.encodeSGI(canvas).arrayBuffer();
+    return { bytes: buf, mime: target.mime };
+  }
+  if (target.ext === 'ras') {
+    const buf = await images.encodeRAS(canvas).arrayBuffer();
+    return { bytes: buf, mime: target.mime };
+  }
+  if (target.ext === 'ff') {
+    const buf = await images.encodeFarbfeld(canvas).arrayBuffer();
+    return { bytes: buf, mime: target.mime };
+  }
+  // Container-style encoders that wrap PNG entries — both async.
+  if (target.ext === 'icns') {
+    const blob = await images.encodeICNS(canvas);
+    const buf = await blob.arrayBuffer();
+    return { bytes: buf, mime: target.mime };
+  }
+  if (target.ext === 'cur') {
+    const blob = await images.encodeCUR(canvas);
+    const buf = await blob.arrayBuffer();
+    return { bytes: buf, mime: target.mime };
+  }
+  // AVIF rides the existing canvas.toBlob path because 'image/avif'
+  // is now in the ENCODABLE set; the matrix only surfaces it when
+  // isAvifEncodeSupported() resolves true at boot, so this branch
+  // is reached only on browsers that can encode it.
   // PNG / JPEG / WebP — alpha-flatten when targeting JPEG to avoid
   // black backgrounds.
   if (target.mime === 'image/jpeg' && hasAlpha(canvas)) {
@@ -345,6 +413,13 @@ async function runPdfAsImage(source, target, onProgress) {
     const buf = await blob.arrayBuffer();
     return { bytes: buf, mime: target.mime };
   }
+  // Multi-page TIFF: every PDF page becomes one IFD in a single .tif.
+  if (target.ext === 'tif-multi') {
+    const canvases = await images.pdfPagesToCanvases(source.bytes, { onProgress });
+    const blob = images.encodeMultiTIFF(canvases);
+    const buf = await blob.arrayBuffer();
+    return { bytes: buf, mime: target.mime };
+  }
   const { canvas } = await images.decodePdfPage(source.bytes, 0);
   if (onProgress) onProgress(1);
   return encodeCanvasToTarget(canvas, target, source.name);
@@ -356,6 +431,11 @@ function isImageTarget(target) {
     case 'png': case 'jpg': case 'webp': case 'psd':
     case 'bmp': case 'ico': case 'ppm': case 'tga':
     case 'tif': case 'tiff': case 'cbz':
+    // ----- Part 10 image targets -----
+    case 'pgm': case 'pbm': case 'pam':
+    case 'xbm': case 'xpm': case 'pcx': case 'hdr':
+    case 'wbmp': case 'sgi': case 'ras': case 'ff':
+    case 'icns': case 'cur': case 'tif-multi': case 'avif':
       return true;
     default: return false;
   }
@@ -1060,4 +1140,8 @@ dropZone.addEventListener('drop', (e) => {
 convertBtn.addEventListener('click', convertAll);
 clearBtn.addEventListener('click', () => { queue.clear(); render(); });
 
-render();
+// Wait for the AVIF capability probe before the first render so the
+// dropdown reflects whether AVIF encode is actually available in
+// this browser. The probe times out after ~250ms so this never
+// blocks boot meaningfully.
+matrixReady.then(render);

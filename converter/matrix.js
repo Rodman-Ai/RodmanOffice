@@ -4,6 +4,8 @@
 //
 // Entry shape: { ext, mime, label }.
 
+import { isAvifEncodeSupported } from '../lib/images/index.js';
+
 const DOC_OUTPUTS = [
   { ext: 'docx', mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', label: 'Word (.docx)' },
   { ext: 'pdf',  mime: 'application/pdf', label: 'PDF (.pdf)' },
@@ -62,7 +64,35 @@ const IMAGE_OUTPUTS = [
   { ext: 'tga',  mime: 'image/x-targa', label: 'Targa (.tga)' },
   { ext: 'cbz',  mime: 'application/vnd.comicbook+zip', label: 'Comic Book ZIP (.cbz)' },
   { ext: 'tif',  mime: 'image/tiff', label: 'TIFF (.tif)' },
+  // ----- Part 10: Apple icon, Windows cursor, multi-page TIFF -----
+  { ext: 'icns', mime: 'image/icns', label: 'Apple Icon (.icns)' },
+  { ext: 'cur',  mime: 'image/x-win-bitmap', label: 'Windows Cursor (.cur)' },
+  { ext: 'tif-multi', mime: 'image/tiff', outputExt: 'tif', label: 'TIFF multi-page (.tif)' },
+  // ----- Part 10: Netpbm trio (P5/P4/P7) -----
+  { ext: 'pgm',  mime: 'image/x-portable-graymap', label: 'Netpbm PGM (.pgm)' },
+  { ext: 'pbm',  mime: 'image/x-portable-bitmap', label: 'Netpbm PBM (.pbm)' },
+  { ext: 'pam',  mime: 'image/x-portable-arbitrarymap', label: 'Netpbm PAM (.pam)' },
+  // ----- Part 10: Legacy / Unix raster set -----
+  { ext: 'pcx',  mime: 'image/x-pcx', label: 'PCX (.pcx)' },
+  { ext: 'hdr',  mime: 'image/vnd.radiance', label: 'Radiance HDR (.hdr)' },
+  { ext: 'xbm',  mime: 'image/x-xbitmap', label: 'X11 Bitmap (.xbm)' },
+  { ext: 'xpm',  mime: 'image/x-xpixmap', label: 'X11 PixMap (.xpm)' },
+  { ext: 'wbmp', mime: 'image/vnd.wap.wbmp', label: 'WAP Bitmap (.wbmp)' },
+  { ext: 'sgi',  mime: 'image/x-sgi', label: 'SGI Image (.sgi)' },
+  { ext: 'ras',  mime: 'image/x-cmu-raster', label: 'Sun Raster (.ras)' },
+  { ext: 'ff',   mime: 'image/x-farbfeld', label: 'Farbfeld (.ff)' },
 ];
+
+// AVIF encoder support is browser-dependent; probe once at module
+// load and append the option only if `canvas.toBlob('image/avif')`
+// returns a real Blob. The converter UI awaits `ready` before
+// populating its target dropdown so users never see a target that
+// will fail at runtime.
+export const ready = isAvifEncodeSupported().then((ok) => {
+  if (ok) {
+    IMAGE_OUTPUTS.push({ ext: 'avif', mime: 'image/avif', label: 'AVIF (.avif)' });
+  }
+});
 
 const SLIDES_OUTPUTS = [
   { ext: 'pptx', mime: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', label: 'PowerPoint (.pptx)' },
