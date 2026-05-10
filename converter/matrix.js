@@ -74,11 +74,32 @@ const SLIDES_OUTPUTS = [
 ];
 
 const VIDEO_OUTPUTS = [
+  // Common containers (H.264 + AAC default).
   { ext: 'mp4',  mime: 'video/mp4',         label: 'MP4 (.mp4)' },
   { ext: 'mov',  mime: 'video/quicktime',   label: 'QuickTime (.mov)' },
   { ext: 'webm', mime: 'video/webm',        label: 'WebM (.webm)' },
   { ext: 'mkv',  mime: 'video/x-matroska',  label: 'Matroska (.mkv)' },
   { ext: 'avi',  mime: 'video/x-msvideo',   label: 'AVI (.avi)' },
+
+  // Legacy / specialised containers added in Part 7.
+  { ext: 'wmv',  mime: 'video/x-ms-wmv',    label: 'Windows Media (.wmv)' },
+  { ext: 'flv',  mime: 'video/x-flv',       label: 'Flash Video (.flv)' },
+  { ext: '3gp',  mime: 'video/3gpp',        label: '3GP mobile (.3gp)' },
+  { ext: 'ts',   mime: 'video/mp2t',        label: 'MPEG-TS (.ts)' },
+  { ext: 'm2ts', mime: 'video/mp2t',        label: 'AVCHD M2TS (.m2ts)' },
+  { ext: 'vob',  mime: 'video/dvd',         label: 'DVD VOB (.vob)' },
+  { ext: 'ogv',  mime: 'video/ogg',         label: 'Ogg Theora (.ogv)' },
+  { ext: 'dv',   mime: 'video/x-dv',        label: 'DV NTSC (.dv)' },
+
+  // Modern codec variants. `outputExt` keeps the user-facing
+  // filename plain `.mp4` / `.webm` while the matrix key stays
+  // unique so the dropdown can offer multiple codec choices for
+  // the same container.
+  { ext: 'mp4_h265', mime: 'video/mp4',  outputExt: 'mp4',  label: 'MP4 H.265 / HEVC (.mp4)' },
+  { ext: 'mp4_av1',  mime: 'video/mp4',  outputExt: 'mp4',  label: 'MP4 AV1 (.mp4)' },
+  { ext: 'webm_av1', mime: 'video/webm', outputExt: 'webm', label: 'WebM AV1 (.webm)' },
+
+  // Frame-derived outputs.
   { ext: 'gif',  mime: 'image/gif',         label: 'Animated GIF (.gif)' },
   { ext: 'png',  mime: 'image/png',         label: 'PNG (first frame)' },
   { ext: 'jpg',  mime: 'image/jpeg',        label: 'JPEG (first frame)' },

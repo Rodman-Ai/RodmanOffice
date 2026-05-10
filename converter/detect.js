@@ -40,6 +40,18 @@ const EXT_TABLE = {
   mpeg: { family: 'video', mime: 'video/mpeg',        ext: 'mpg' },
   webm: { family: 'video', mime: 'video/webm',        ext: 'webm' },
   mkv:  { family: 'video', mime: 'video/x-matroska',  ext: 'mkv' },
+  wmv:  { family: 'video', mime: 'video/x-ms-wmv',    ext: 'wmv' },
+  asf:  { family: 'video', mime: 'video/x-ms-asf',    ext: 'asf' },
+  flv:  { family: 'video', mime: 'video/x-flv',       ext: 'flv' },
+  f4v:  { family: 'video', mime: 'video/mp4',         ext: 'f4v' },
+  '3gp':  { family: 'video', mime: 'video/3gpp',      ext: '3gp' },
+  '3g2':  { family: 'video', mime: 'video/3gpp2',     ext: '3g2' },
+  ts:   { family: 'video', mime: 'video/mp2t',        ext: 'ts' },
+  m2ts: { family: 'video', mime: 'video/mp2t',        ext: 'm2ts' },
+  mts:  { family: 'video', mime: 'video/mp2t',        ext: 'm2ts' },
+  vob:  { family: 'video', mime: 'video/dvd',         ext: 'vob' },
+  ogv:  { family: 'video', mime: 'video/ogg',         ext: 'ogv' },
+  dv:   { family: 'video', mime: 'video/x-dv',        ext: 'dv' },
 
   // Audio
   mp3:  { family: 'audio', mime: 'audio/mpeg',  ext: 'mp3' },
