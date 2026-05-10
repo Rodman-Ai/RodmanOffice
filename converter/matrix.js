@@ -30,6 +30,7 @@ const DOC_OUTPUTS = [
 
 const SHEET_OUTPUTS = [
   { ext: 'xlsx', mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', label: 'Excel (.xlsx)' },
+  { ext: 'xls',  mime: 'application/vnd.ms-excel', label: 'Excel 97-2003 (.xls)' },
   { ext: 'csv',  mime: 'text/csv', label: 'CSV (.csv)' },
   { ext: 'pdf',  mime: 'application/pdf', label: 'PDF (.pdf)' },
   // Newly added spreadsheet targets.

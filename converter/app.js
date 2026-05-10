@@ -104,6 +104,7 @@ async function readDocToHtml(source) {
   const buf = source.bytes;
   switch (ext) {
     case 'docx': return docs.loadDocx(buf);
+    case 'doc':  return docs.docImport(buf);
     case 'pdf':  return docs.loadPdf(buf);
     case 'rtf':  return docs.rtfImport(decodeText(buf));
     case 'odt':  return sanitizeHtml(await docs.odtImport(buf));
@@ -380,6 +381,22 @@ function isSpreadsheetTarget(target) {
 // PPTX → PPTX is a no-op pass-through.
 
 async function runSlides(source, target) {
+  const sourceExt = (source.name.split('.').pop() || '').toLowerCase();
+  if (sourceExt === 'ppt') {
+    // Legacy PowerPoint binary — best-effort text extraction. We
+    // can't re-emit a valid .ppt, so wrap the recovered text as a
+    // single-section document and route through the existing doc /
+    // slide writers. The user picks any compatible target.
+    const html = docs.pptImport(source.bytes);
+    if (target.ext === 'pptx') {
+      const deck = htmlToDeck(html, (source.name || 'imported').replace(/\.[^.]+$/, ''));
+      const blob = slides.savePptx(deck);
+      const bytes = await blobToBytes(blob);
+      return { bytes: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), mime: target.mime };
+    }
+    const bytes = await writeDocFromHtml(html, target, source.name);
+    return { bytes: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), mime: target.mime };
+  }
   if (target.ext === 'pptx') {
     // Pass-through. The user picked the same format on both sides.
     return { bytes: source.bytes, mime: target.mime };
@@ -544,7 +561,7 @@ async function runSheet(source, target) {
   // text or XLSX format. Everything else (TSV/JSON inputs, or any
   // structured output) runs on the main thread.
   const workerCanRead = sourceExt === 'xlsx' || sourceExt === 'xls' || sourceExt === 'csv';
-  const workerCanWrite = target.ext === 'xlsx' || target.ext === 'csv' || target.ext === 'tsv' || target.ext === 'psv';
+  const workerCanWrite = target.ext === 'xlsx' || target.ext === 'xls' || target.ext === 'csv' || target.ext === 'tsv' || target.ext === 'psv';
   if (workerCanRead && workerCanWrite) {
     return runOnWorker(source, target);
   }
@@ -558,6 +575,7 @@ async function runSheet(source, target) {
   let bytes;
   switch (target.ext) {
     case 'xlsx':   bytes = sheets.exportWorkbookAsXLSX(wb); break;
+    case 'xls':    bytes = sheets.exportWorkbookAsXLS(wb); break;
     case 'csv':    bytes = sheets.exportSheetAsCSV(wb.sheets[0]); break;
     case 'tsv':    bytes = sheets.exportSheetAsTsv(wb.sheets[0]); break;
     case 'psv':    bytes = sheets.exportSheetAsPsv(wb.sheets[0]); break;

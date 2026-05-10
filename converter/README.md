@@ -9,9 +9,9 @@ canvas, and parser APIs.
 
 | Family | Reads | Writes |
 |---|---|---|
-| Documents | DOCX, PDF, RTF, ODT, EPUB, Markdown, HTML, TXT | DOCX, PDF, RTF, ODT, EPUB, Markdown, HTML, TXT, AsciiDoc, LaTeX, JSON, YAML, MediaWiki, reStructuredText, Org-mode, DocBook, FictionBook, PPTX, ODP |
-| Spreadsheets | XLSX, XLS, CSV, TSV, JSON, NDJSON, YAML, HTML tables, Markdown tables, vCard, iCalendar | XLSX, CSV, TSV, PSV, JSON, NDJSON, HTML, Markdown, Excel 2003 XML, ODS, vCard, iCalendar, PDF |
-| Slides | PPTX | PPTX, ODP, PDF, DOCX, Markdown, HTML, TXT |
+| Documents | DOCX, DOC*, PDF, RTF, ODT, EPUB, Markdown, HTML, TXT | DOCX, PDF, RTF, ODT, EPUB, Markdown, HTML, TXT, AsciiDoc, LaTeX, JSON, YAML, MediaWiki, reStructuredText, Org-mode, DocBook, FictionBook, PPTX, ODP |
+| Spreadsheets | XLSX, XLS, CSV, TSV, JSON, NDJSON, YAML, HTML tables, Markdown tables, vCard, iCalendar | XLSX, XLS (Excel 97-2003), CSV, TSV, PSV, JSON, NDJSON, HTML, Markdown, Excel 2003 XML, ODS, vCard, iCalendar, PDF |
+| Slides | PPTX, PPT* | PPTX, ODP, PDF, DOCX, Markdown, HTML, TXT |
 | Images | PNG, JPEG, GIF, BMP, WebP, SVG, PSD, PSB, ICO, TIFF (browser-dependent), PDF (any page) | PNG, JPEG, WebP, PSD, BMP, ICO, PPM, TGA, TIFF, CBZ, PDF (Photoshop-compatible) |
 | Video | MP4, MOV, AVI, MPG, MPEG, WebM, MKV, WMV, ASF, FLV, F4V, 3GP, 3G2, TS, M2TS, MTS, VOB, OGV, DV, MJPEG, APNG, M1V, M2V, Y4M, NUT, SWF, WTV, IVF, AMV, GXF, MXF | MP4 (H.264 / H.265 / AV1), MOV (H.264 / ProRes 422 HQ / JPEG 2000 / Cinepak), WebM (VP8 / VP9 / AV1), MKV (H.264 / FFV1 lossless), AVI (MPEG-4 / Xvid / HuffYUV / raw YUV), WMV (WMV2 / WMV3 / VC-1), FLV, 3GP (H.264 / H.263), MPEG-TS, M2TS, VOB, OGV, DV, MJPEG, APNG, animated WebP, animated AVIF, MXF DNxHR, Y4M, M1V, M2V, NUT (H.264 / Snow), SWF, WTV, IVF, AMV, GXF, PNG sequence ZIP, DPX sequence ZIP, animated GIF, PNG/JPEG/WebP (frame), PDF (frame), CBZ (frame sequence), 26 audio extract targets |
 | Audio | MP3, M4A, AAC, WAV, OGG, FLAC, OPUS, AC-3, E-AC-3, AIFF, CAF, AMR, MP2, WMA, AU, TTA, WavPack, Speex, GSM | MP3, M4A (AAC / HE-AAC v2 / ALAC lossless), WAV (16-bit / 24-bit / 32-bit float / μ-law / A-law / ADPCM IMA), OGG (Vorbis), FLAC, OPUS, AC-3, E-AC-3, AIFF, CAF, AMR-NB, AMR-WB, MP2, WMA, AU, TTA, WavPack, Speex, GSM |
@@ -133,6 +133,22 @@ PDF.js. See `../lib/images/README.md` for the image dependency inventory.
 `sw.js` caches the Converter app shell under the `converter/` scope, including
 the spreadsheet worker. The shared `/lib` engines are outside that scope, so
 conversion paths need those assets from the network or the browser HTTP cache.
+
+### Legacy MS Office binary formats (DOC / PPT)
+
+DOC and PPT are Word 97-2003 / PowerPoint 97-2003 binary OLE2
+files. The converter does **best-effort text extraction only**:
+it scans the raw bytes for printable UTF-16 LE (and falls back to
+ANSI / CP1252) text runs and emits each surviving run as an HTML
+paragraph. Formatting, images, tables, and slide layout are lost.
+
+For full-fidelity conversion, open the file in Word / PowerPoint /
+LibreOffice and save as `.docx` / `.pptx` first; the converter
+handles those modern formats with full structure.
+
+XLS (Excel 97-2003) is the exception — full read **and** write is
+supported through the vendored `@e965/xlsx` engine, which speaks
+the BIFF8 binary format natively.
 
 ## Trust Boundaries
 
