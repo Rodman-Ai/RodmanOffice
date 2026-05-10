@@ -87,12 +87,26 @@ const VIDEO_OUTPUTS = [
   { ext: 'cbz',  mime: 'application/vnd.comicbook+zip', label: 'CBZ (frame sequence)' },
 ];
 
+const AUDIO_OUTPUTS = [
+  { ext: 'mp3',  mime: 'audio/mpeg', label: 'MP3 (.mp3)' },
+  { ext: 'm4a',  mime: 'audio/mp4',  label: 'AAC (.m4a)' },
+  { ext: 'wav',  mime: 'audio/wav',  label: 'WAV (.wav)' },
+  { ext: 'ogg',  mime: 'audio/ogg',  label: 'Ogg Vorbis (.ogg)' },
+  { ext: 'flac', mime: 'audio/flac', label: 'FLAC (.flac)' },
+  { ext: 'opus', mime: 'audio/ogg',  label: 'Opus (.opus)' },
+];
+
+// Audio targets ride alongside video targets — every video source
+// can drop the video track and emit just the audio.
+VIDEO_OUTPUTS.push(...AUDIO_OUTPUTS);
+
 export const MATRIX = {
   document: DOC_OUTPUTS,
   spreadsheet: SHEET_OUTPUTS,
   image: IMAGE_OUTPUTS,
   slides: SLIDES_OUTPUTS,
   video: VIDEO_OUTPUTS,
+  audio: AUDIO_OUTPUTS,
   unknown: [],
 };
 

@@ -13,7 +13,8 @@ canvas, and parser APIs.
 | Spreadsheets | XLSX, XLS, CSV, TSV, JSON, NDJSON, YAML, HTML tables, Markdown tables, vCard, iCalendar | XLSX, CSV, TSV, PSV, JSON, NDJSON, HTML, Markdown, Excel 2003 XML, ODS, vCard, iCalendar, PDF |
 | Slides | PPTX | PPTX, ODP, PDF, DOCX, Markdown, HTML, TXT |
 | Images | PNG, JPEG, GIF, BMP, WebP, SVG, PSD, PSB, ICO, TIFF (browser-dependent), PDF (any page) | PNG, JPEG, WebP, PSD, BMP, ICO, PPM, TGA, TIFF, CBZ, PDF (Photoshop-compatible) |
-| Video | MP4, MOV, AVI, MPG, MPEG, WebM, MKV | MP4, MOV, WebM, MKV, AVI, animated GIF, PNG/JPEG/WebP (frame), PDF (frame), CBZ (frame sequence) |
+| Video | MP4, MOV, AVI, MPG, MPEG, WebM, MKV | MP4, MOV, WebM, MKV, AVI, animated GIF, PNG/JPEG/WebP (frame), PDF (frame), CBZ (frame sequence), MP3/M4A/WAV/OGG/FLAC/OPUS (audio extract) |
+| Audio | MP3, M4A, AAC, WAV, OGG, FLAC, OPUS | MP3, M4A (AAC), WAV, OGG (Vorbis), FLAC, OPUS |
 
 Cross-family bridges:
 
@@ -32,6 +33,10 @@ Cross-family bridges:
   first frame as a PDF.
 - Video → animated GIF: FFmpeg.wasm runs a two-pass palettegen +
   paletteuse pipeline so colors stay accurate.
+- Video → audio (MP3, M4A/AAC, WAV, OGG, FLAC, OPUS): drops the
+  video stream and re-encodes the audio track. Audio inputs feed
+  the same path so audio↔audio conversion ("WAV → MP3") works
+  without any extra wiring.
 
 ## Video Engine
 
