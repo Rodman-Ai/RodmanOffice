@@ -932,7 +932,7 @@ async function convertAll() {
         }
       }
 
-      const outName = renameWithExt(item.file.name, item.target.ext);
+      const outName = renameWithExt(item.file.name, item.target.outputExt || item.target.ext);
       if (bundleZip) {
         collected.push({ name: outName, bytes: output.bytes });
       } else {

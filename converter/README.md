@@ -13,7 +13,7 @@ canvas, and parser APIs.
 | Spreadsheets | XLSX, XLS, CSV, TSV, JSON, NDJSON, YAML, HTML tables, Markdown tables, vCard, iCalendar | XLSX, CSV, TSV, PSV, JSON, NDJSON, HTML, Markdown, Excel 2003 XML, ODS, vCard, iCalendar, PDF |
 | Slides | PPTX | PPTX, ODP, PDF, DOCX, Markdown, HTML, TXT |
 | Images | PNG, JPEG, GIF, BMP, WebP, SVG, PSD, PSB, ICO, TIFF (browser-dependent), PDF (any page) | PNG, JPEG, WebP, PSD, BMP, ICO, PPM, TGA, TIFF, CBZ, PDF (Photoshop-compatible) |
-| Video | MP4, MOV, AVI, MPG, MPEG, WebM, MKV | MP4, MOV, WebM, MKV, AVI, animated GIF, PNG/JPEG/WebP (frame), PDF (frame), CBZ (frame sequence), MP3/M4A/WAV/OGG/FLAC/OPUS (audio extract) |
+| Video | MP4, MOV, AVI, MPG, MPEG, WebM, MKV, WMV, ASF, FLV, F4V, 3GP, 3G2, TS, M2TS, MTS, VOB, OGV, DV | MP4 (H.264 / H.265 / AV1), MOV, WebM (VP8 / AV1), MKV, AVI, WMV, FLV, 3GP, MPEG-TS, M2TS, VOB, OGV, DV, animated GIF, PNG/JPEG/WebP (frame), PDF (frame), CBZ (frame sequence), MP3/M4A/WAV/OGG/FLAC/OPUS (audio extract) |
 | Audio | MP3, M4A, AAC, WAV, OGG, FLAC, OPUS | MP3, M4A (AAC), WAV, OGG (Vorbis), FLAC, OPUS |
 
 Cross-family bridges:
@@ -48,6 +48,27 @@ the device — FFmpeg runs entirely in-browser. The single-threaded
 build is shipped intentionally because `SharedArrayBuffer` (needed
 by the multi-threaded core) requires COOP/COEP response headers
 that GitHub Pages can't set on static files.
+
+### Codec coverage
+
+The vendored `@ffmpeg/core@0.12.6` build includes the codecs we
+target by default. A few notes on the modern ones:
+
+- **H.265 / HEVC** (`MP4 H.265 (.mp4)` target) uses `libx265`. The
+  output carries the `hvc1` tag so QuickTime / Safari recognise the
+  stream.
+- **AV1** (`MP4 AV1` and `WebM AV1` targets) uses `libaom-av1` with
+  `-cpu-used 8` for the fastest available preset. AV1 encoding is
+  CPU-intensive even with the fastest preset; expect multi-minute
+  encodes for short clips.
+- **DV** writes 720x480 NTSC by default (`-target ntsc-dv`). Source
+  videos are scaled to fit; arbitrary resolutions otherwise fail
+  the DV codec's strict frame-size requirements.
+
+If a target codec isn't compiled into the vendored core, the job
+will fail with a non-zero exit code. Swap in a different
+`@ffmpeg/core` build under `lib/video/vendor/ffmpeg/` to widen
+coverage.
 
 ## Shared Engines
 
