@@ -15,15 +15,22 @@ import * as docs from '../lib/docs/index.js';
 import * as images from '../lib/images/index.js';
 import * as sheets from '../lib/sheets/index.js';
 import * as slides from '../lib/slides/index.js';
+// lib/video pulls in the FFmpeg.wasm vendor blob (~25 MB) the
+// first time any of its functions are called. We deliberately
+// import it lazily inside runVideo() so the converter shell
+// doesn't pay that cost when no video work is queued.
 
-const dropZone   = document.getElementById('dropZone');
-const fileInput  = document.getElementById('fileInput');
-const pickBtn    = document.getElementById('pickBtn');
-const queueSec   = document.getElementById('queueSection');
-const queueList  = document.getElementById('queueList');
-const convertBtn = document.getElementById('convertBtn');
-const clearBtn   = document.getElementById('clearBtn');
-const zipToggle  = document.getElementById('zipToggle');
+const dropZone           = document.getElementById('dropZone');
+const fileInput          = document.getElementById('fileInput');
+const pickBtn            = document.getElementById('pickBtn');
+const queueSec           = document.getElementById('queueSection');
+const queueList          = document.getElementById('queueList');
+const convertBtn         = document.getElementById('convertBtn');
+const clearBtn           = document.getElementById('clearBtn');
+const zipToggle          = document.getElementById('zipToggle');
+const queueOverall       = document.getElementById('queueOverall');
+const queueOverallText   = document.getElementById('queueOverallText');
+const queueOverallFill   = document.getElementById('queueOverallFill');
 
 const queue = createQueue();
 let isConverting = false;
@@ -330,14 +337,15 @@ async function runImage(source, target) {
 // out of scope (no-op) and PDF→other-document continues to flow
 // through runDoc.
 
-async function runPdfAsImage(source, target) {
+async function runPdfAsImage(source, target, onProgress) {
   // Multi-page bridge: any PDF → CBZ rasterizes every page.
   if (target.ext === 'cbz') {
-    const blob = await images.encodeCbzFromPdf(source.bytes);
+    const blob = await images.encodeCbzFromPdf(source.bytes, { onProgress });
     const buf = await blob.arrayBuffer();
     return { bytes: buf, mime: target.mime };
   }
   const { canvas } = await images.decodePdfPage(source.bytes, 0);
+  if (onProgress) onProgress(1);
   return encodeCanvasToTarget(canvas, target, source.name);
 }
 
@@ -406,6 +414,61 @@ function deckToHtml(deck) {
     }
   }
   return html || '<p>(empty deck)</p>';
+}
+
+// ---------- Video family (FFmpeg.wasm; lazy-loaded) ----------
+//
+// First call into runVideo dynamically imports lib/video, which in
+// turn lazily fetches the ~25 MB FFmpeg.wasm core on the first
+// transcode. We keep the import dynamic so the converter shell
+// stays small for users who never queue a video.
+
+const VIDEO_IMAGE_TARGETS = new Set(['png', 'jpg', 'webp', 'pdf']);
+
+let _videoEngine = null;
+async function getVideoEngine() {
+  if (!_videoEngine) _videoEngine = await import('../lib/video/index.js');
+  return _videoEngine;
+}
+
+async function runVideo(source, target, onProgress) {
+  const sourceExt = (source.name.split('.').pop() || '').toLowerCase();
+  const fromExt = sourceExt === 'mpeg' ? 'mpg' : sourceExt;
+  const inputBytes = source.bytes instanceof Uint8Array
+    ? source.bytes
+    : new Uint8Array(source.bytes);
+
+  const video = await getVideoEngine();
+
+  // Animated GIF: dedicated palettegen pipeline produces much better
+  // colors than a naive `-i in -t 5 out.gif` would.
+  if (target.ext === 'gif') {
+    const out = await video.videoToAnimatedGif(inputBytes, { ext: fromExt, fps: 12, onProgress });
+    const buf = out.buffer.slice(out.byteOffset, out.byteOffset + out.byteLength);
+    return { bytes: buf, mime: target.mime };
+  }
+
+  // Frame-sequence CBZ: pull N frames spread across the clip and ZIP
+  // them as a comic-style archive.
+  if (target.ext === 'cbz') {
+    const canvases = await video.extractFrames(inputBytes, { ext: fromExt, count: 24, onProgress });
+    const blob = await images.encodeCbzFromCanvases(canvases);
+    const buf = await blob.arrayBuffer();
+    return { bytes: buf, mime: target.mime };
+  }
+
+  // Single-frame still image targets — extract first frame, then
+  // route through the existing image encoder switch.
+  if (VIDEO_IMAGE_TARGETS.has(target.ext)) {
+    const canvas = await video.extractFrame(inputBytes, { ext: fromExt, timestamp: 0 });
+    if (onProgress) onProgress(1);
+    return encodeCanvasToTarget(canvas, target, source.name);
+  }
+
+  // Container/codec transcode.
+  const out = await video.transcode(inputBytes, { from: fromExt, to: target.ext, onProgress });
+  const buf = out.buffer.slice(out.byteOffset, out.byteOffset + out.byteLength);
+  return { bytes: buf, mime: target.mime };
 }
 
 // ---------- Spreadsheet family (worker for native; main thread for PDF) ----------
@@ -594,7 +657,29 @@ function renderRow(item) {
   const status = document.createElement('div');
   status.className = 'queue-status';
   if (item.status === 'converting') {
-    status.textContent = 'Converting...';
+    status.classList.add('is-converting');
+    const text = document.createElement('span');
+    text.className = 'queue-status-text';
+    if (item.loadingMessage) text.textContent = item.loadingMessage;
+    else if (typeof item.progress === 'number') text.textContent = `${Math.round(item.progress * 100)}%`;
+    else text.textContent = 'Converting…';
+    const bar = document.createElement('div');
+    bar.className = 'queue-progress';
+    bar.setAttribute('role', 'progressbar');
+    bar.setAttribute('aria-valuemin', '0');
+    bar.setAttribute('aria-valuemax', '100');
+    const fill = document.createElement('div');
+    fill.className = 'queue-progress-fill';
+    if (typeof item.progress === 'number') {
+      const pct = Math.max(0, Math.min(100, Math.round(item.progress * 100)));
+      bar.setAttribute('aria-valuenow', String(pct));
+      fill.style.width = pct + '%';
+    } else {
+      bar.dataset.indeterminate = 'true';
+    }
+    bar.appendChild(fill);
+    status.appendChild(text);
+    status.appendChild(bar);
   } else if (item.status === 'error') {
     if (item.blocked) {
       status.textContent = 'Blocked';
@@ -688,6 +773,70 @@ async function addFiles(fileList) {
 
 // ---------- Conversion runner ----------
 
+// Progress reporter for one queue item. Schedules a single render
+// per animation frame so a high-frequency ffmpeg progress callback
+// doesn't flood the DOM.
+let _renderScheduled = false;
+function scheduleRender() {
+  if (_renderScheduled) return;
+  _renderScheduled = true;
+  requestAnimationFrame(() => {
+    _renderScheduled = false;
+    render();
+  });
+}
+
+function makeProgress(itemId) {
+  return (ratio) => {
+    queue.setProgress(itemId, ratio);
+    queue.setLoadingMessage(itemId, null);
+    scheduleRender();
+  };
+}
+
+let _overallTotal = 0;
+let _overallIndex = 0;
+let _overallCurrentProgress = null;
+
+function startOverall(total) {
+  _overallTotal = total;
+  _overallIndex = 0;
+  _overallCurrentProgress = null;
+  renderOverall();
+}
+function tickOverall() {
+  _overallIndex += 1;
+  _overallCurrentProgress = null;
+  renderOverall();
+}
+function setOverallCurrent(ratio) {
+  _overallCurrentProgress = ratio;
+  renderOverall();
+}
+function endOverall() {
+  _overallTotal = 0;
+  _overallIndex = 0;
+  _overallCurrentProgress = null;
+  renderOverall();
+}
+function renderOverall() {
+  if (!queueOverall) return;
+  if (_overallTotal === 0) {
+    queueOverall.hidden = true;
+    return;
+  }
+  queueOverall.hidden = false;
+  const completedRatio = _overallIndex / _overallTotal;
+  const currentRatio = (_overallCurrentProgress ?? 0) / _overallTotal;
+  const overall = Math.max(0, Math.min(1, completedRatio + currentRatio));
+  const pct = Math.round(overall * 100);
+  const human = _overallCurrentProgress == null
+    ? `Converting ${Math.min(_overallIndex + 1, _overallTotal)} of ${_overallTotal}…`
+    : `Converting ${Math.min(_overallIndex + 1, _overallTotal)} of ${_overallTotal} — ${pct}%`;
+  if (queueOverallText) queueOverallText.textContent = human;
+  if (queueOverallFill) queueOverallFill.style.width = pct + '%';
+}
+
 async function convertAll() {
   if (isConverting) return;
   const jobs = queue.pendingWithTargets();
@@ -699,18 +848,27 @@ async function convertAll() {
   }
   const collected = [];
   isConverting = true;
+  startOverall(jobs.length);
   render();
 
   for (const item of jobs) {
     queue.setStatus(item.id, 'converting', { error: null });
+    queue.setProgress(item.id, null);
+    queue.setLoadingMessage(item.id, null);
     render();
     try {
       const source = await readSource(item);
       let output;
       // Cross-family bridge: PDF source + image target → rasterize.
       const sourceExt = (source.name.split('.').pop() || '').toLowerCase();
+      const onProgress = (ratio) => {
+        queue.setProgress(item.id, ratio);
+        queue.setLoadingMessage(item.id, null);
+        setOverallCurrent(ratio);
+        scheduleRender();
+      };
       if (sourceExt === 'pdf' && isImageTarget(item.target)) {
-        output = await runPdfAsImage(source, item.target);
+        output = await runPdfAsImage(source, item.target, onProgress);
       } else if (item.detected.family === 'document' &&
                  (sourceExt === 'html' || sourceExt === 'htm' || sourceExt === 'md' || sourceExt === 'markdown') &&
                  isSpreadsheetTarget(item.target)) {
@@ -723,6 +881,17 @@ async function convertAll() {
           case 'spreadsheet': output = await runSheet(source, item.target); break;
           case 'image':       output = await runImage(source, item.target); break;
           case 'slides':      output = await runSlides(source, item.target); break;
+          case 'video': {
+            // Surface the wasm download status the very first time
+            // any video job runs; the engine memoizes the load so
+            // subsequent jobs in the same session won't trigger it.
+            if (!_videoEngine) {
+              queue.setLoadingMessage(item.id, 'Loading video engine (~25 MB)…');
+              scheduleRender();
+            }
+            output = await runVideo(source, item.target, onProgress);
+            break;
+          }
           default: throw new Error('Unknown family: ' + item.detected.family);
         }
       }
@@ -734,11 +903,14 @@ async function convertAll() {
         downloadBlob(new Blob([output.bytes], { type: output.mime }), outName);
       }
       queue.setStatus(item.id, 'done');
+      queue.setProgress(item.id, null);
     } catch (err) {
       queue.setStatus(item.id, 'error', {
         error: err instanceof Error ? err.message : String(err),
       });
+      queue.setProgress(item.id, null);
     }
+    tickOverall();
     render();
   }
 
@@ -750,6 +922,7 @@ async function convertAll() {
     }
   }
   isConverting = false;
+  endOverall();
   render();
 }
 

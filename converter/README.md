@@ -13,6 +13,7 @@ canvas, and parser APIs.
 | Spreadsheets | XLSX, XLS, CSV, TSV, JSON, NDJSON, YAML, HTML tables, Markdown tables, vCard, iCalendar | XLSX, CSV, TSV, PSV, JSON, NDJSON, HTML, Markdown, Excel 2003 XML, ODS, vCard, iCalendar, PDF |
 | Slides | PPTX | PPTX, ODP, PDF, DOCX, Markdown, HTML, TXT |
 | Images | PNG, JPEG, GIF, BMP, WebP, SVG, PSD, PSB, ICO, TIFF (browser-dependent), PDF (any page) | PNG, JPEG, WebP, PSD, BMP, ICO, PPM, TGA, TIFF, CBZ, PDF (Photoshop-compatible) |
+| Video | MP4, MOV, AVI, MPG, MPEG, WebM, MKV | MP4, MOV, WebM, MKV, AVI, animated GIF, PNG/JPEG/WebP (frame), PDF (frame), CBZ (frame sequence) |
 
 Cross-family bridges:
 
@@ -26,6 +27,22 @@ Cross-family bridges:
   slides; each section becomes one slide with a title and body text frame.
 - PPTX → DOCX/PDF/Markdown/HTML/TXT: deck text content is concatenated
   with H2 slide-title separators and run through the document writer.
+- Video → image / CBZ / PDF: FFmpeg.wasm extracts the first frame
+  (single image), N evenly-spaced frames (CBZ comic archive), or the
+  first frame as a PDF.
+- Video → animated GIF: FFmpeg.wasm runs a two-pass palettegen +
+  paletteuse pipeline so colors stay accurate.
+
+## Video Engine
+
+The first time any video conversion runs in a session, the converter
+lazy-downloads the FFmpeg.wasm engine (~25 MB binary) from
+`/lib/video/vendor/ffmpeg/`. The browser HTTP cache holds it across
+visits, so subsequent conversions are immediate. Bytes never leave
+the device — FFmpeg runs entirely in-browser. The single-threaded
+build is shipped intentionally because `SharedArrayBuffer` (needed
+by the multi-threaded core) requires COOP/COEP response headers
+that GitHub Pages can't set on static files.
 
 ## Shared Engines
 
@@ -77,4 +94,6 @@ node --check lib/sheets/icalendar.js
 node --check lib/images/image-io.js
 node --check lib/images/cbz.js
 node --check lib/slides/pptx.js
+node --check lib/video/index.js
+node --check lib/video/ffmpeg.js
 ```

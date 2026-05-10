@@ -45,6 +45,10 @@
     <section id="queueSection" class="queue-section" hidden>
       <header class="queue-header">
         <h2 class="queue-title">Queue</h2>
+        <div id="queueOverall" class="queue-overall" hidden role="status" aria-live="polite">
+          <span id="queueOverallText">Converting…</span>
+          <div class="queue-overall-bar"><div id="queueOverallFill" class="queue-overall-fill" style="width: 0%"></div></div>
+        </div>
         <label class="zip-toggle">
           <input id="zipToggle" type="checkbox" />
           <span>Bundle in .zip</span>
@@ -98,7 +102,12 @@
             <dd>PNG · JPEG · GIF · BMP · WEBP · SVG · PSD · PSB · ICO · TIFF · PDF (any page)</dd>
             <dt>Images <span class="dir">write</span></dt>
             <dd>PNG · JPEG · WEBP · PSD · BMP · ICO · PPM · TGA · TIFF · CBZ · PDF (Photoshop-compatible)</dd>
+            <dt>Video <span class="dir">read</span></dt>
+            <dd>MP4 · MOV · AVI · MPG · MPEG · WEBM · MKV</dd>
+            <dt>Video <span class="dir">write</span></dt>
+            <dd>MP4 · MOV · WEBM · MKV · AVI · animated GIF · PNG/JPEG/WEBP (frame) · PDF (frame) · CBZ (frames)</dd>
           </dl>
+          <p class="format-note">First video conversion lazy-downloads the FFmpeg engine (~25 MB). Cached after.</p>
         </div>
       </div>
     </section>
