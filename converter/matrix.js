@@ -99,6 +99,23 @@ const VIDEO_OUTPUTS = [
   { ext: 'mp4_av1',  mime: 'video/mp4',  outputExt: 'mp4',  label: 'MP4 AV1 (.mp4)' },
   { ext: 'webm_av1', mime: 'video/webm', outputExt: 'webm', label: 'WebM AV1 (.webm)' },
 
+  // Specialised / professional video targets added in Part 7.
+  { ext: 'mjpeg', mime: 'video/x-motion-jpeg', label: 'Motion JPEG (.mjpeg)' },
+  { ext: 'apng',  mime: 'image/apng',          label: 'Animated PNG (.apng)' },
+  { ext: 'webp_anim', mime: 'image/webp', outputExt: 'webp', label: 'Animated WebP (.webp)' },
+  { ext: 'avif_anim', mime: 'image/avif', outputExt: 'avif', label: 'Animated AVIF (.avif)' },
+  { ext: 'mov_prores', mime: 'video/quicktime',  outputExt: 'mov', label: 'MOV ProRes 422 HQ (.mov)' },
+  { ext: 'mxf_dnxhr',  mime: 'application/mxf',  outputExt: 'mxf', label: 'MXF DNxHR (.mxf)' },
+  { ext: 'y4m', mime: 'video/x-yuv4mpegpipe', label: 'YUV4MPEG (.y4m)' },
+  { ext: 'm1v', mime: 'video/mpeg',           label: 'MPEG-1 video (.m1v)' },
+  { ext: 'm2v', mime: 'video/mpeg',           label: 'MPEG-2 video (.m2v)' },
+  { ext: 'nut', mime: 'video/x-nut',          label: 'NUT (.nut)' },
+  { ext: 'swf', mime: 'application/x-shockwave-flash', label: 'Flash SWF (.swf)' },
+  { ext: 'wtv', mime: 'video/x-ms-wtv',       label: 'Windows TV (.wtv)' },
+  { ext: 'ivf', mime: 'video/x-ivf',          label: 'IVF VP9 (.ivf)' },
+  { ext: 'amv', mime: 'video/x-amv',          label: 'AMV (.amv)' },
+  { ext: 'gxf', mime: 'application/gxf',      label: 'GXF (.gxf)' },
+
   // Frame-derived outputs.
   { ext: 'gif',  mime: 'image/gif',         label: 'Animated GIF (.gif)' },
   { ext: 'png',  mime: 'image/png',         label: 'PNG (first frame)' },
@@ -115,6 +132,28 @@ const AUDIO_OUTPUTS = [
   { ext: 'ogg',  mime: 'audio/ogg',  label: 'Ogg Vorbis (.ogg)' },
   { ext: 'flac', mime: 'audio/flac', label: 'FLAC (.flac)' },
   { ext: 'opus', mime: 'audio/ogg',  label: 'Opus (.opus)' },
+  // Specialised audio targets added in Part 7.
+  { ext: 'ac3',  mime: 'audio/ac3',         label: 'Dolby AC-3 (.ac3)' },
+  { ext: 'eac3', mime: 'audio/eac3',        label: 'Dolby Digital Plus (.eac3)' },
+  { ext: 'aiff', mime: 'audio/aiff',        label: 'Apple AIFF (.aiff)' },
+  { ext: 'caf',  mime: 'audio/x-caf',       label: 'Apple Core Audio (.caf)' },
+  { ext: 'amr',  mime: 'audio/amr',         label: 'AMR-NB voice (.amr)' },
+  { ext: 'mp2',  mime: 'audio/mpeg',        label: 'MPEG Layer 2 (.mp2)' },
+  { ext: 'wma',  mime: 'audio/x-ms-wma',    label: 'Windows Media Audio (.wma)' },
+  { ext: 'au',   mime: 'audio/basic',       label: 'Sun AU (.au)' },
+  { ext: 'tta',  mime: 'audio/x-tta',       label: 'True Audio (.tta)' },
+  { ext: 'wv',   mime: 'audio/x-wavpack',   label: 'WavPack (.wv)' },
+  { ext: 'spx',  mime: 'audio/ogg',         label: 'Speex (.spx)' },
+  { ext: 'gsm',  mime: 'audio/gsm',         label: 'GSM telephony (.gsm)' },
+];
+
+const SUBTITLE_OUTPUTS = [
+  { ext: 'srt',  mime: 'application/x-subrip', label: 'SubRip (.srt)' },
+  { ext: 'vtt',  mime: 'text/vtt',             label: 'WebVTT (.vtt)' },
+  { ext: 'ass',  mime: 'text/x-ssa',           label: 'Advanced SubStation (.ass)' },
+  { ext: 'ssa',  mime: 'text/x-ssa',           label: 'SubStation Alpha (.ssa)' },
+  { ext: 'ttml', mime: 'application/ttml+xml', label: 'TTML (.ttml)' },
+  { ext: 'lrc',  mime: 'application/x-lrc',    label: 'LRC lyrics (.lrc)' },
 ];
 
 // Audio targets ride alongside video targets — every video source
@@ -128,6 +167,7 @@ export const MATRIX = {
   slides: SLIDES_OUTPUTS,
   video: VIDEO_OUTPUTS,
   audio: AUDIO_OUTPUTS,
+  subtitle: SUBTITLE_OUTPUTS,
   unknown: [],
 };
 

@@ -52,6 +52,20 @@ const EXT_TABLE = {
   vob:  { family: 'video', mime: 'video/dvd',         ext: 'vob' },
   ogv:  { family: 'video', mime: 'video/ogg',         ext: 'ogv' },
   dv:   { family: 'video', mime: 'video/x-dv',        ext: 'dv' },
+  // Specialised video containers added in Part 7.
+  mjpeg: { family: 'video', mime: 'video/x-motion-jpeg', ext: 'mjpeg' },
+  mjpg:  { family: 'video', mime: 'video/x-motion-jpeg', ext: 'mjpeg' },
+  apng:  { family: 'video', mime: 'image/apng',          ext: 'apng' },
+  m1v:   { family: 'video', mime: 'video/mpeg',          ext: 'm1v' },
+  m2v:   { family: 'video', mime: 'video/mpeg',          ext: 'm2v' },
+  y4m:   { family: 'video', mime: 'video/x-yuv4mpegpipe',ext: 'y4m' },
+  nut:   { family: 'video', mime: 'video/x-nut',         ext: 'nut' },
+  swf:   { family: 'video', mime: 'application/x-shockwave-flash', ext: 'swf' },
+  wtv:   { family: 'video', mime: 'video/x-ms-wtv',      ext: 'wtv' },
+  ivf:   { family: 'video', mime: 'video/x-ivf',         ext: 'ivf' },
+  amv:   { family: 'video', mime: 'video/x-amv',         ext: 'amv' },
+  gxf:   { family: 'video', mime: 'application/gxf',     ext: 'gxf' },
+  mxf:   { family: 'video', mime: 'application/mxf',     ext: 'mxf' },
 
   // Audio
   mp3:  { family: 'audio', mime: 'audio/mpeg',  ext: 'mp3' },
@@ -62,6 +76,29 @@ const EXT_TABLE = {
   oga:  { family: 'audio', mime: 'audio/ogg',   ext: 'ogg' },
   flac: { family: 'audio', mime: 'audio/flac',  ext: 'flac' },
   opus: { family: 'audio', mime: 'audio/ogg',   ext: 'opus' },
+  // Specialised audio formats added in Part 7.
+  ac3:  { family: 'audio', mime: 'audio/ac3',           ext: 'ac3' },
+  eac3: { family: 'audio', mime: 'audio/eac3',          ext: 'eac3' },
+  aiff: { family: 'audio', mime: 'audio/aiff',          ext: 'aiff' },
+  aif:  { family: 'audio', mime: 'audio/aiff',          ext: 'aiff' },
+  caf:  { family: 'audio', mime: 'audio/x-caf',         ext: 'caf' },
+  amr:  { family: 'audio', mime: 'audio/amr',           ext: 'amr' },
+  mp2:  { family: 'audio', mime: 'audio/mpeg',          ext: 'mp2' },
+  wma:  { family: 'audio', mime: 'audio/x-ms-wma',      ext: 'wma' },
+  au:   { family: 'audio', mime: 'audio/basic',         ext: 'au' },
+  snd:  { family: 'audio', mime: 'audio/basic',         ext: 'au' },
+  tta:  { family: 'audio', mime: 'audio/x-tta',         ext: 'tta' },
+  wv:   { family: 'audio', mime: 'audio/x-wavpack',     ext: 'wv' },
+  spx:  { family: 'audio', mime: 'audio/ogg',           ext: 'spx' },
+  gsm:  { family: 'audio', mime: 'audio/gsm',           ext: 'gsm' },
+
+  // Subtitles
+  srt:  { family: 'subtitle', mime: 'application/x-subrip',  ext: 'srt' },
+  vtt:  { family: 'subtitle', mime: 'text/vtt',              ext: 'vtt' },
+  ass:  { family: 'subtitle', mime: 'text/x-ssa',            ext: 'ass' },
+  ssa:  { family: 'subtitle', mime: 'text/x-ssa',            ext: 'ssa' },
+  ttml: { family: 'subtitle', mime: 'application/ttml+xml',  ext: 'ttml' },
+  lrc:  { family: 'subtitle', mime: 'application/x-lrc',     ext: 'lrc' },
 
   // Images
   png:  { family: 'image', mime: 'image/png', ext: 'png' },

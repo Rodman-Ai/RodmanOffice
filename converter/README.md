@@ -13,8 +13,9 @@ canvas, and parser APIs.
 | Spreadsheets | XLSX, XLS, CSV, TSV, JSON, NDJSON, YAML, HTML tables, Markdown tables, vCard, iCalendar | XLSX, CSV, TSV, PSV, JSON, NDJSON, HTML, Markdown, Excel 2003 XML, ODS, vCard, iCalendar, PDF |
 | Slides | PPTX | PPTX, ODP, PDF, DOCX, Markdown, HTML, TXT |
 | Images | PNG, JPEG, GIF, BMP, WebP, SVG, PSD, PSB, ICO, TIFF (browser-dependent), PDF (any page) | PNG, JPEG, WebP, PSD, BMP, ICO, PPM, TGA, TIFF, CBZ, PDF (Photoshop-compatible) |
-| Video | MP4, MOV, AVI, MPG, MPEG, WebM, MKV, WMV, ASF, FLV, F4V, 3GP, 3G2, TS, M2TS, MTS, VOB, OGV, DV | MP4 (H.264 / H.265 / AV1), MOV, WebM (VP8 / AV1), MKV, AVI, WMV, FLV, 3GP, MPEG-TS, M2TS, VOB, OGV, DV, animated GIF, PNG/JPEG/WebP (frame), PDF (frame), CBZ (frame sequence), MP3/M4A/WAV/OGG/FLAC/OPUS (audio extract) |
-| Audio | MP3, M4A, AAC, WAV, OGG, FLAC, OPUS | MP3, M4A (AAC), WAV, OGG (Vorbis), FLAC, OPUS |
+| Video | MP4, MOV, AVI, MPG, MPEG, WebM, MKV, WMV, ASF, FLV, F4V, 3GP, 3G2, TS, M2TS, MTS, VOB, OGV, DV, MJPEG, APNG, M1V, M2V, Y4M, NUT, SWF, WTV, IVF, AMV, GXF, MXF | MP4 (H.264 / H.265 / AV1), MOV (H.264 / ProRes 422 HQ), WebM (VP8 / AV1), MKV, AVI, WMV, FLV, 3GP, MPEG-TS, M2TS, VOB, OGV, DV, MJPEG, APNG, animated WebP, animated AVIF, MXF DNxHR, Y4M, M1V, M2V, NUT, SWF, WTV, IVF, AMV, GXF, animated GIF, PNG/JPEG/WebP (frame), PDF (frame), CBZ (frame sequence), 18 audio extract targets |
+| Audio | MP3, M4A, AAC, WAV, OGG, FLAC, OPUS, AC-3, E-AC-3, AIFF, CAF, AMR, MP2, WMA, AU, TTA, WavPack, Speex, GSM | MP3, M4A (AAC), WAV, OGG (Vorbis), FLAC, OPUS, AC-3, E-AC-3, AIFF, CAF, AMR-NB, MP2, WMA, AU, TTA, WavPack, Speex, GSM |
+| Subtitles | SRT, WebVTT, ASS, SSA, TTML, LRC | SRT, WebVTT, ASS, SSA, TTML, LRC |
 
 Cross-family bridges:
 
@@ -69,6 +70,36 @@ If a target codec isn't compiled into the vendored core, the job
 will fail with a non-zero exit code. Swap in a different
 `@ffmpeg/core` build under `lib/video/vendor/ffmpeg/` to widen
 coverage.
+
+### Subtitles
+
+The `subtitle` family converts between SubRip (`.srt`), WebVTT
+(`.vtt`), Advanced SubStation (`.ass` / `.ssa`), TTML (`.ttml`),
+and LRC (`.lrc`). FFmpeg auto-selects the codec from the input and
+output filename extensions. Subtitle conversion is fast — typically
+sub-second — but the engine still has to be loaded once per session,
+so the first subtitle job may show "Loading subtitle engine
+(~25 MB)…" while the wasm binary fetches.
+
+### Specialised audio + video coverage notes
+
+The Part 7 batch (PR #36) widened the engine's coverage substantially.
+A few targets require codecs that may or may not be compiled into the
+vendored single-threaded `@ffmpeg/core@0.12.6` build:
+
+- **ProRes (`mov_prores`)** — built into mainline FFmpeg as
+  `prores_aw`; should work in the default core.
+- **DNxHR (`mxf_dnxhr`)** — built into mainline FFmpeg as `dnxhd`.
+- **AMR-NB (`amr`)** — needs `libopencore_amrnb`. Usually included.
+- **Speex (`spx`)** — needs `libspeex`. Usually included.
+- **WavPack (`wv`)** — needs `libwavpack`. Usually included.
+- **GSM (`gsm`)** — needs `libgsm`. Usually included.
+- **AMV** — strict 128x96 / 160x120 resolution; output is always
+  scaled to 160x120 mono 22.05 kHz.
+
+If any of these fail with "Cannot find a valid encoder" at runtime
+on a real conversion, the fix is to swap in a wider-build
+`ffmpeg-core.wasm` under `lib/video/vendor/ffmpeg/`.
 
 ## Shared Engines
 
