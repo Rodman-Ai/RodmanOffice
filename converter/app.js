@@ -424,6 +424,7 @@ function deckToHtml(deck) {
 // stays small for users who never queue a video.
 
 const VIDEO_IMAGE_TARGETS = new Set(['png', 'jpg', 'webp', 'pdf']);
+const AUDIO_TARGETS = new Set(['mp3', 'm4a', 'wav', 'ogg', 'flac', 'opus']);
 
 let _videoEngine = null;
 async function getVideoEngine() {
@@ -465,8 +466,32 @@ async function runVideo(source, target, onProgress) {
     return encodeCanvasToTarget(canvas, target, source.name);
   }
 
+  // Audio extraction (drop video stream, encode audio track).
+  if (AUDIO_TARGETS.has(target.ext)) {
+    const out = await video.transcodeAudio(inputBytes, { from: fromExt, to: target.ext, onProgress });
+    const buf = out.buffer.slice(out.byteOffset, out.byteOffset + out.byteLength);
+    return { bytes: buf, mime: target.mime };
+  }
+
   // Container/codec transcode.
   const out = await video.transcode(inputBytes, { from: fromExt, to: target.ext, onProgress });
+  const buf = out.buffer.slice(out.byteOffset, out.byteOffset + out.byteLength);
+  return { bytes: buf, mime: target.mime };
+}
+
+// Audio source family → audio target. Reuses the video engine
+// (FFmpeg.wasm) since it handles both video and audio streams.
+async function runAudio(source, target, onProgress) {
+  if (!AUDIO_TARGETS.has(target.ext)) {
+    throw new Error(`Unsupported audio output: .${target.ext}`);
+  }
+  const sourceExt = (source.name.split('.').pop() || '').toLowerCase();
+  const fromExt = sourceExt === 'oga' ? 'ogg' : sourceExt;
+  const inputBytes = source.bytes instanceof Uint8Array
+    ? source.bytes
+    : new Uint8Array(source.bytes);
+  const video = await getVideoEngine();
+  const out = await video.transcodeAudio(inputBytes, { from: fromExt, to: target.ext, onProgress });
   const buf = out.buffer.slice(out.byteOffset, out.byteOffset + out.byteLength);
   return { bytes: buf, mime: target.mime };
 }
@@ -890,6 +915,17 @@ async function convertAll() {
               scheduleRender();
             }
             output = await runVideo(source, item.target, onProgress);
+            break;
+          }
+          case 'audio': {
+            // Audio shares the FFmpeg.wasm engine with video, so the
+            // first audio job in a fresh session also pays the
+            // ~25 MB engine download.
+            if (!_videoEngine) {
+              queue.setLoadingMessage(item.id, 'Loading audio engine (~25 MB)…');
+              scheduleRender();
+            }
+            output = await runAudio(source, item.target, onProgress);
             break;
           }
           default: throw new Error('Unknown family: ' + item.detected.family);

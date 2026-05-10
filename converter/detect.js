@@ -41,6 +41,16 @@ const EXT_TABLE = {
   webm: { family: 'video', mime: 'video/webm',        ext: 'webm' },
   mkv:  { family: 'video', mime: 'video/x-matroska',  ext: 'mkv' },
 
+  // Audio
+  mp3:  { family: 'audio', mime: 'audio/mpeg',  ext: 'mp3' },
+  m4a:  { family: 'audio', mime: 'audio/mp4',   ext: 'm4a' },
+  aac:  { family: 'audio', mime: 'audio/aac',   ext: 'm4a' },
+  wav:  { family: 'audio', mime: 'audio/wav',   ext: 'wav' },
+  ogg:  { family: 'audio', mime: 'audio/ogg',   ext: 'ogg' },
+  oga:  { family: 'audio', mime: 'audio/ogg',   ext: 'ogg' },
+  flac: { family: 'audio', mime: 'audio/flac',  ext: 'flac' },
+  opus: { family: 'audio', mime: 'audio/ogg',   ext: 'opus' },
+
   // Images
   png:  { family: 'image', mime: 'image/png', ext: 'png' },
   jpg:  { family: 'image', mime: 'image/jpeg', ext: 'jpg' },
