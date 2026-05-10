@@ -486,12 +486,32 @@ async function runAudio(source, target, onProgress) {
     throw new Error(`Unsupported audio output: .${target.ext}`);
   }
   const sourceExt = (source.name.split('.').pop() || '').toLowerCase();
-  const fromExt = sourceExt === 'oga' ? 'ogg' : sourceExt;
+  // Normalise a few common aliases that share a format with their
+  // primary extension.
+  const fromExt = (
+    sourceExt === 'oga' ? 'ogg' :
+    sourceExt === 'aif' ? 'aiff' :
+    sourceExt === 'snd' ? 'au' :
+    sourceExt
+  );
   const inputBytes = source.bytes instanceof Uint8Array
     ? source.bytes
     : new Uint8Array(source.bytes);
   const video = await getVideoEngine();
   const out = await video.transcodeAudio(inputBytes, { from: fromExt, to: target.ext, onProgress });
+  const buf = out.buffer.slice(out.byteOffset, out.byteOffset + out.byteLength);
+  return { bytes: buf, mime: target.mime };
+}
+
+// Subtitle source family → subtitle target. FFmpeg auto-selects the
+// codec from input + output filename extensions.
+async function runSubtitle(source, target, onProgress) {
+  const sourceExt = (source.name.split('.').pop() || '').toLowerCase();
+  const inputBytes = source.bytes instanceof Uint8Array
+    ? source.bytes
+    : new Uint8Array(source.bytes);
+  const video = await getVideoEngine();
+  const out = await video.transcodeSubtitle(inputBytes, { from: sourceExt, to: target.ext, onProgress });
   const buf = out.buffer.slice(out.byteOffset, out.byteOffset + out.byteLength);
   return { bytes: buf, mime: target.mime };
 }
@@ -926,6 +946,16 @@ async function convertAll() {
               scheduleRender();
             }
             output = await runAudio(source, item.target, onProgress);
+            break;
+          }
+          case 'subtitle': {
+            // Subtitle conversion also runs through FFmpeg.wasm — the
+            // first subtitle job triggers the same engine download.
+            if (!_videoEngine) {
+              queue.setLoadingMessage(item.id, 'Loading subtitle engine (~25 MB)…');
+              scheduleRender();
+            }
+            output = await runSubtitle(source, item.target, onProgress);
             break;
           }
           default: throw new Error('Unknown family: ' + item.detected.family);
