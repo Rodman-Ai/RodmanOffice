@@ -5,6 +5,7 @@
 const EXT_TABLE = {
   // Documents
   docx: { family: 'document', mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', ext: 'docx' },
+  doc:  { family: 'document', mime: 'application/msword', ext: 'doc' },
   pdf:  { family: 'document', mime: 'application/pdf', ext: 'pdf' },
   rtf:  { family: 'document', mime: 'application/rtf', ext: 'rtf' },
   odt:  { family: 'document', mime: 'application/vnd.oasis.opendocument.text', ext: 'odt' },
@@ -30,6 +31,7 @@ const EXT_TABLE = {
 
   // Slides
   pptx: { family: 'slides', mime: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', ext: 'pptx' },
+  ppt:  { family: 'slides', mime: 'application/vnd.ms-powerpoint', ext: 'ppt' },
 
   // Video
   mp4:  { family: 'video', mime: 'video/mp4',         ext: 'mp4' },

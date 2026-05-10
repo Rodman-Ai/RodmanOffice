@@ -25,6 +25,8 @@ self.addEventListener('message', async (e) => {
     let bytes;
     if (target.ext === 'xlsx') {
       bytes = sheets.exportWorkbookAsXLSX(wb);
+    } else if (target.ext === 'xls') {
+      bytes = sheets.exportWorkbookAsXLS(wb);
     } else if (target.ext === 'csv') {
       bytes = sheets.exportSheetAsCSV(wb.sheets[0]);
     } else if (target.ext === 'tsv') {
