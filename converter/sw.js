@@ -1,5 +1,13 @@
 // RodmanConvert service worker — offline app shell.
 // Network-first, cache-fallback. Mirrors /word/sw.js's strategy.
+//
+// Shared engines under /lib/ — including the ~25 MB FFmpeg.wasm
+// binary at /lib/video/vendor/ffmpeg/ffmpeg-core.wasm — are
+// outside this worker's scope, so they are never precached. The
+// browser HTTP cache holds them on first download instead, which
+// keeps the install footprint of the converter small and avoids
+// an outsized SW cache quota hit for users who never convert
+// video.
 const VERSION = 'rconv-v2';
 const CACHE_PREFIX = 'rconv-';
 const APP_SHELL = [

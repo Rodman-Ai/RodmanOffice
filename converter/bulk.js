@@ -14,7 +14,10 @@ export function createQueue() {
     items,
     add(file, extra = {}) {
       const id = nextId++;
-      items.set(id, { id, file, status: 'pending', target: null, error: null, blocked: false, ...extra });
+      items.set(id, {
+        id, file, status: 'pending', target: null, error: null,
+        blocked: false, progress: null, loadingMessage: null, ...extra,
+      });
       return id;
     },
     remove(id) { items.delete(id); },
@@ -26,6 +29,14 @@ export function createQueue() {
     setStatus(id, status, extra = {}) {
       const it = items.get(id);
       if (it) Object.assign(it, { status }, extra);
+    },
+    setProgress(id, progress) {
+      const it = items.get(id);
+      if (it) it.progress = progress;
+    },
+    setLoadingMessage(id, message) {
+      const it = items.get(id);
+      if (it) it.loadingMessage = message || null;
     },
     pendingWithTargets() {
       return [...items.values()].filter((it) => (

@@ -31,6 +31,16 @@ const EXT_TABLE = {
   // Slides
   pptx: { family: 'slides', mime: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', ext: 'pptx' },
 
+  // Video
+  mp4:  { family: 'video', mime: 'video/mp4',         ext: 'mp4' },
+  m4v:  { family: 'video', mime: 'video/mp4',         ext: 'mp4' },
+  mov:  { family: 'video', mime: 'video/quicktime',   ext: 'mov' },
+  avi:  { family: 'video', mime: 'video/x-msvideo',   ext: 'avi' },
+  mpg:  { family: 'video', mime: 'video/mpeg',        ext: 'mpg' },
+  mpeg: { family: 'video', mime: 'video/mpeg',        ext: 'mpg' },
+  webm: { family: 'video', mime: 'video/webm',        ext: 'webm' },
+  mkv:  { family: 'video', mime: 'video/x-matroska',  ext: 'mkv' },
+
   // Images
   png:  { family: 'image', mime: 'image/png', ext: 'png' },
   jpg:  { family: 'image', mime: 'image/jpeg', ext: 'jpg' },
@@ -72,6 +82,15 @@ function magicSniff(bytes) {
   if (b[0] === 0x49 && b[1] === 0x49 && b[2] === 0x2A && b[3] === 0x00) return EXT_TABLE.tif;
   // TIFF (big-endian): 4D 4D 00 2A
   if (b[0] === 0x4D && b[1] === 0x4D && b[2] === 0x00 && b[3] === 0x2A) return EXT_TABLE.tif;
+  // MP4 / MOV: bytes 4-7 == "ftyp". Container brand is at 8-11 but
+  // the family is the same regardless — leave the disambiguation to
+  // the file extension.
+  if (b.length >= 8 && b[4] === 0x66 && b[5] === 0x74 && b[6] === 0x79 && b[7] === 0x70) return EXT_TABLE.mp4;
+  // AVI: "RIFF" .... "AVI ".
+  if (b.length >= 12 && b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 &&
+      b[8] === 0x41 && b[9] === 0x56 && b[10] === 0x49 && b[11] === 0x20) return EXT_TABLE.avi;
+  // MPEG-1/2 program stream (00 00 01 BA) or sequence header (00 00 01 B3).
+  if (b[0] === 0x00 && b[1] === 0x00 && b[2] === 0x01 && (b[3] === 0xBA || b[3] === 0xB3)) return EXT_TABLE.mpg;
   // ZIP-based (DOCX, XLSX, ODT, EPUB) — PK\x03\x04. Can't disambiguate from magic alone.
   if (b[0] === 0x50 && b[1] === 0x4B && b[2] === 0x03 && b[3] === 0x04) return null;
   return null;

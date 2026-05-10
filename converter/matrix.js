@@ -73,11 +73,26 @@ const SLIDES_OUTPUTS = [
   { ext: 'txt',  mime: 'text/plain', label: 'Plain text (.txt)' },
 ];
 
+const VIDEO_OUTPUTS = [
+  { ext: 'mp4',  mime: 'video/mp4',         label: 'MP4 (.mp4)' },
+  { ext: 'mov',  mime: 'video/quicktime',   label: 'QuickTime (.mov)' },
+  { ext: 'webm', mime: 'video/webm',        label: 'WebM (.webm)' },
+  { ext: 'mkv',  mime: 'video/x-matroska',  label: 'Matroska (.mkv)' },
+  { ext: 'avi',  mime: 'video/x-msvideo',   label: 'AVI (.avi)' },
+  { ext: 'gif',  mime: 'image/gif',         label: 'Animated GIF (.gif)' },
+  { ext: 'png',  mime: 'image/png',         label: 'PNG (first frame)' },
+  { ext: 'jpg',  mime: 'image/jpeg',        label: 'JPEG (first frame)' },
+  { ext: 'webp', mime: 'image/webp',        label: 'WebP (first frame)' },
+  { ext: 'pdf',  mime: 'application/pdf',   label: 'PDF (first frame)' },
+  { ext: 'cbz',  mime: 'application/vnd.comicbook+zip', label: 'CBZ (frame sequence)' },
+];
+
 export const MATRIX = {
   document: DOC_OUTPUTS,
   spreadsheet: SHEET_OUTPUTS,
   image: IMAGE_OUTPUTS,
   slides: SLIDES_OUTPUTS,
+  video: VIDEO_OUTPUTS,
   unknown: [],
 };
 
