@@ -424,7 +424,19 @@ function deckToHtml(deck) {
 // stays small for users who never queue a video.
 
 const VIDEO_IMAGE_TARGETS = new Set(['png', 'jpg', 'webp', 'pdf']);
-const AUDIO_TARGETS = new Set(['mp3', 'm4a', 'wav', 'ogg', 'flac', 'opus']);
+// Mirror of AUDIO_ENCODER_FOR keys in lib/video/index.js. Kept as
+// a static Set so the dispatch in runVideo / runAudio doesn't have
+// to await the lazy video-engine import just to decide where to
+// route a target. Update when AUDIO_ENCODER_FOR grows.
+const AUDIO_TARGETS = new Set([
+  // Originals.
+  'mp3', 'm4a', 'wav', 'ogg', 'flac', 'opus',
+  // Part 7 specialised audio.
+  'ac3', 'eac3', 'aiff', 'caf', 'amr', 'mp2', 'wma', 'au', 'tta', 'wv', 'spx', 'gsm',
+  // Part 8 codec variants.
+  'alac', 'm4a_heaacv2', 'wav_mulaw', 'wav_alaw', 'wav_pcm24', 'wav_float32', 'wav_adpcm', 'amrwb',
+]);
+const SEQUENCE_TARGETS = new Set(['png_seq', 'dpx_seq']);
 
 let _videoEngine = null;
 async function getVideoEngine() {
@@ -469,6 +481,13 @@ async function runVideo(source, target, onProgress) {
   // Audio extraction (drop video stream, encode audio track).
   if (AUDIO_TARGETS.has(target.ext)) {
     const out = await video.transcodeAudio(inputBytes, { from: fromExt, to: target.ext, onProgress });
+    const buf = out.buffer.slice(out.byteOffset, out.byteOffset + out.byteLength);
+    return { bytes: buf, mime: target.mime };
+  }
+
+  // Image-sequence ZIP (PNG / DPX per-frame).
+  if (SEQUENCE_TARGETS.has(target.ext)) {
+    const out = await video.transcodeImageSequence(inputBytes, { from: fromExt, to: target.ext, onProgress });
     const buf = out.buffer.slice(out.byteOffset, out.byteOffset + out.byteLength);
     return { bytes: buf, mime: target.mime };
   }

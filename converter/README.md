@@ -13,8 +13,8 @@ canvas, and parser APIs.
 | Spreadsheets | XLSX, XLS, CSV, TSV, JSON, NDJSON, YAML, HTML tables, Markdown tables, vCard, iCalendar | XLSX, CSV, TSV, PSV, JSON, NDJSON, HTML, Markdown, Excel 2003 XML, ODS, vCard, iCalendar, PDF |
 | Slides | PPTX | PPTX, ODP, PDF, DOCX, Markdown, HTML, TXT |
 | Images | PNG, JPEG, GIF, BMP, WebP, SVG, PSD, PSB, ICO, TIFF (browser-dependent), PDF (any page) | PNG, JPEG, WebP, PSD, BMP, ICO, PPM, TGA, TIFF, CBZ, PDF (Photoshop-compatible) |
-| Video | MP4, MOV, AVI, MPG, MPEG, WebM, MKV, WMV, ASF, FLV, F4V, 3GP, 3G2, TS, M2TS, MTS, VOB, OGV, DV, MJPEG, APNG, M1V, M2V, Y4M, NUT, SWF, WTV, IVF, AMV, GXF, MXF | MP4 (H.264 / H.265 / AV1), MOV (H.264 / ProRes 422 HQ), WebM (VP8 / AV1), MKV, AVI, WMV, FLV, 3GP, MPEG-TS, M2TS, VOB, OGV, DV, MJPEG, APNG, animated WebP, animated AVIF, MXF DNxHR, Y4M, M1V, M2V, NUT, SWF, WTV, IVF, AMV, GXF, animated GIF, PNG/JPEG/WebP (frame), PDF (frame), CBZ (frame sequence), 18 audio extract targets |
-| Audio | MP3, M4A, AAC, WAV, OGG, FLAC, OPUS, AC-3, E-AC-3, AIFF, CAF, AMR, MP2, WMA, AU, TTA, WavPack, Speex, GSM | MP3, M4A (AAC), WAV, OGG (Vorbis), FLAC, OPUS, AC-3, E-AC-3, AIFF, CAF, AMR-NB, MP2, WMA, AU, TTA, WavPack, Speex, GSM |
+| Video | MP4, MOV, AVI, MPG, MPEG, WebM, MKV, WMV, ASF, FLV, F4V, 3GP, 3G2, TS, M2TS, MTS, VOB, OGV, DV, MJPEG, APNG, M1V, M2V, Y4M, NUT, SWF, WTV, IVF, AMV, GXF, MXF | MP4 (H.264 / H.265 / AV1), MOV (H.264 / ProRes 422 HQ / JPEG 2000 / Cinepak), WebM (VP8 / VP9 / AV1), MKV (H.264 / FFV1 lossless), AVI (MPEG-4 / Xvid / HuffYUV / raw YUV), WMV (WMV2 / WMV3 / VC-1), FLV, 3GP (H.264 / H.263), MPEG-TS, M2TS, VOB, OGV, DV, MJPEG, APNG, animated WebP, animated AVIF, MXF DNxHR, Y4M, M1V, M2V, NUT (H.264 / Snow), SWF, WTV, IVF, AMV, GXF, PNG sequence ZIP, DPX sequence ZIP, animated GIF, PNG/JPEG/WebP (frame), PDF (frame), CBZ (frame sequence), 26 audio extract targets |
+| Audio | MP3, M4A, AAC, WAV, OGG, FLAC, OPUS, AC-3, E-AC-3, AIFF, CAF, AMR, MP2, WMA, AU, TTA, WavPack, Speex, GSM | MP3, M4A (AAC / HE-AAC v2 / ALAC lossless), WAV (16-bit / 24-bit / 32-bit float / μ-law / A-law / ADPCM IMA), OGG (Vorbis), FLAC, OPUS, AC-3, E-AC-3, AIFF, CAF, AMR-NB, AMR-WB, MP2, WMA, AU, TTA, WavPack, Speex, GSM |
 | Subtitles | SRT, WebVTT, ASS, SSA, TTML, LRC | SRT, WebVTT, ASS, SSA, TTML, LRC |
 
 Cross-family bridges:
@@ -100,6 +100,27 @@ vendored single-threaded `@ffmpeg/core@0.12.6` build:
 If any of these fail with "Cannot find a valid encoder" at runtime
 on a real conversion, the fix is to swap in a wider-build
 `ffmpeg-core.wasm` under `lib/video/vendor/ffmpeg/`.
+
+### Codec variant targets (PR #37)
+
+PR #37 adds 12 video and 8 audio targets that share an existing
+container with the default codec but pick a different encoder.
+The matrix uses synthetic keys (`mkv_ffv1`, `webm_vp9`,
+`mov_prores`, `alac`, `wav_pcm24`, …) plus the existing
+`outputExt` indirection so download filenames stay clean.
+
+PNG and DPX sequence outputs are a small UX exception — FFmpeg
+emits one file per frame, so the converter ZIP-bundles the
+sequence and downloads it as a `.zip`. Same shape as the existing
+video → CBZ bridge.
+
+Codecs most likely present in the default build:
+`h263`, `mpeg4`, `libvpx-vp9`, `ffv1`, `huffyuv`, `png`, `dpx`,
+`cinepak`, `wmv3`, `rawvideo`, `alac`, `pcm_*`, `adpcm_*`.
+
+Possibly missing in stripped builds: `libopenjpeg` (JPEG 2000),
+`snow` (experimental), `aac_he_v2` profile, `libvo_amrwbenc`
+(AMR-WB needs a GPL flag). Same swap-in path as above.
 
 ## Shared Engines
 
