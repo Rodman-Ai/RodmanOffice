@@ -1642,6 +1642,11 @@ ${editor.innerHTML}
   $('#filePicker').addEventListener('change', async (e) => {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
+    // Any open clears the previous Compress-PDF source. The .pdf
+    // branch re-sets the slot below; every other path leaves it null,
+    // so opening a non-PDF after a PDF doesn't leave stale bytes
+    // attached to the next Compress PDF action.
+    originalPdfBytes = null;
     if (/\.rwd\.enc$/i.test(file.name)) {
       const txt = await file.text();
       const data = await decryptRwd(txt);

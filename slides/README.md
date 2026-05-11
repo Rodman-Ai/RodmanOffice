@@ -13,12 +13,27 @@ step.
 - Cut, copy, and paste slide elements inside the deck.
 - Save/open the native `.json` deck format.
 - Import/export `.pptx` through the shared `../lib/slides/` engine.
-- Export PDF through the browser print path.
+- Export `.odp`, `.docx`, `.md`, `.html`, `.txt` — every slide flows
+  through the shared `deckToHtml` bridge (`../lib/slides/html-bridge.js`)
+  into the doc-family writers in `../lib/docs/`.
+- Export PDF through the engine writer in `../lib/docs/pdfio.js`. See
+  the PDF fidelity caveat below.
 - Present from the start, current slide, or a one-off custom slide range, with optional automatic slide advance timing.
 - Use View controls for ruler, gridlines, guides, color, grayscale, and black-and-white editor previews.
 - Open Ask Claude from the title bar, Insert, Review, or Help. The panel
   supports per-request BYOK chat; the Claude API key is entered for one
   request and is not stored by RodmanSlides.
+
+## PDF export fidelity
+
+`Export PDF` runs the deck through `deckToHtml(deck) → savePdf(html)`
+using the suite's hand-rolled PDF writer in `../lib/docs/pdfio.js`.
+Output is deterministic across browsers and doesn't invoke the print
+dialog, but the engine renders text-only Helvetica with simple layout —
+slide theme colors, backgrounds, and image elements are **not**
+preserved. For pixel-perfect PDF that matches the on-screen slide,
+open the deck in PowerPoint or Keynote (via the `.pptx` export) and
+print to PDF from there.
 
 ## Storage
 
