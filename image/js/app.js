@@ -1819,8 +1819,24 @@
     { ext: 'icns', label: 'Apple Icon',   lossy: false, palette: false },
     { ext: 'cur',  label: 'Windows Cursor', lossy: false, palette: true },
     { ext: 'tif',  label: 'TIFF',         lossy: false, palette: false },
+    { ext: 'tif-multi', label: 'TIFF (multi-page wrapper)', lossy: false, palette: false },
     { ext: 'psd',  label: 'Photoshop',    lossy: false, palette: false },
     { ext: 'pdf',  label: 'PDF (Photoshop)', lossy: true, palette: false },
+    // Part 10 niche image formats — same encoders as the converter.
+    { ext: 'ppm',  label: 'Netpbm PPM',   lossy: false, palette: false },
+    { ext: 'pgm',  label: 'Netpbm PGM (grayscale)', lossy: false, palette: false },
+    { ext: 'pbm',  label: 'Netpbm PBM (1-bit)', lossy: false, palette: false },
+    { ext: 'pam',  label: 'Netpbm PAM (RGBA)', lossy: false, palette: false },
+    { ext: 'tga',  label: 'Targa (.tga)', lossy: false, palette: false },
+    { ext: 'pcx',  label: 'PCX',          lossy: false, palette: false },
+    { ext: 'hdr',  label: 'Radiance HDR', lossy: false, palette: false },
+    { ext: 'xbm',  label: 'X11 Bitmap (.xbm)', lossy: false, palette: false },
+    { ext: 'xpm',  label: 'X11 PixMap (.xpm)', lossy: false, palette: false },
+    { ext: 'wbmp', label: 'WAP Bitmap',   lossy: false, palette: false },
+    { ext: 'sgi',  label: 'SGI Image',    lossy: false, palette: false },
+    { ext: 'ras',  label: 'Sun Raster',   lossy: false, palette: false },
+    { ext: 'ff',   label: 'Farbfeld',     lossy: false, palette: false },
+    { ext: 'cbz',  label: 'Comic Book ZIP', lossy: false, palette: false },
   ];
 
   const btnSaveAs = $('btn-save-as');
@@ -1901,6 +1917,9 @@
     if (colors) work = IO.quantizeCanvas(work, colors);
 
     const stamp = `retropaint-${Date.now()}`;
+    // XBM / XPM emit C source where the symbol name has to be a
+    // valid identifier (no dashes). Derive a stem from the stamp.
+    const stem = stamp.replace(/[^A-Za-z0-9_]/g, '_') || 'image';
     try {
       let blob, filename;
       switch (ext) {
@@ -1913,8 +1932,24 @@
         case 'icns': blob = await IO.encodeICNS(work); filename = IO.suggestFilename(stamp, 'icns'); break;
         case 'cur':  blob = await IO.encodeCUR(work); filename = IO.suggestFilename(stamp, 'cur'); break;
         case 'tif':  blob = IO.encodeTIFF(work); filename = IO.suggestFilename(stamp, 'tif'); break;
+        case 'tif-multi': blob = IO.encodeMultiTIFF([work]); filename = IO.suggestFilename(stamp, 'tif'); break;
         case 'psd':  blob = IO.encodePsd(work); filename = IO.suggestFilename(stamp, 'psd'); break;
         case 'pdf':  blob = await IO.encodePdfFromCanvas(work, { format: 'jpeg', quality }); filename = IO.suggestFilename(stamp, 'pdf'); break;
+        // Part 10 niche image formats.
+        case 'ppm':  blob = IO.encodePPM(work);  filename = IO.suggestFilename(stamp, 'ppm'); break;
+        case 'pgm':  blob = IO.encodePGM(work);  filename = IO.suggestFilename(stamp, 'pgm'); break;
+        case 'pbm':  blob = IO.encodePBM(work);  filename = IO.suggestFilename(stamp, 'pbm'); break;
+        case 'pam':  blob = IO.encodePAM(work);  filename = IO.suggestFilename(stamp, 'pam'); break;
+        case 'tga':  blob = IO.encodeTGA(work);  filename = IO.suggestFilename(stamp, 'tga'); break;
+        case 'pcx':  blob = IO.encodePCX(work);  filename = IO.suggestFilename(stamp, 'pcx'); break;
+        case 'hdr':  blob = IO.encodeHDR(work);  filename = IO.suggestFilename(stamp, 'hdr'); break;
+        case 'xbm':  blob = IO.encodeXBM(work, stem); filename = IO.suggestFilename(stamp, 'xbm'); break;
+        case 'xpm':  blob = IO.encodeXPM(work, stem); filename = IO.suggestFilename(stamp, 'xpm'); break;
+        case 'wbmp': blob = IO.encodeWBMP(work); filename = IO.suggestFilename(stamp, 'wbmp'); break;
+        case 'sgi':  blob = IO.encodeSGI(work);  filename = IO.suggestFilename(stamp, 'sgi'); break;
+        case 'ras':  blob = IO.encodeRAS(work);  filename = IO.suggestFilename(stamp, 'ras'); break;
+        case 'ff':   blob = IO.encodeFarbfeld(work); filename = IO.suggestFilename(stamp, 'ff'); break;
+        case 'cbz':  blob = await IO.encodeCbzFromCanvas(work); filename = IO.suggestFilename(stamp, 'cbz'); break;
         default: throw new Error('Unknown format: ' + ext);
       }
       IO.triggerDownload(blob, filename);

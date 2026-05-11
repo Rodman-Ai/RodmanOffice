@@ -1497,6 +1497,11 @@
       }
     },
     exportPdf() { exportToPdf(); },
+    exportOdp() { exportDeckAs('odp'); },
+    exportDocx() { exportDeckAs('docx'); },
+    exportMd() { exportDeckAs('md'); },
+    exportHtml() { exportDeckAs('html'); },
+    exportTxt() { exportDeckAs('txt'); },
     resetDeck() {
       if (!confirm('Wipe local deck storage and start fresh? This cannot be undone.')) return;
       D.clear();
@@ -1888,29 +1893,101 @@
     if (e.target === e.currentTarget) closeHelpTopic();
   });
 
-  // ---------- Export to PDF (via window.print) ----------
-  function exportToPdf() {
-    // Build a hidden .print-deck that contains rendered copies of every slide.
-    const existing = document.querySelector('.print-deck');
-    if (existing) existing.remove();
+  // ---------- Export to PDF (engine writer in lib/docs/pdfio.js) ----------
+  //
+  // Deck → HTML (via the shared deckToHtml in lib/slides/html-bridge.js)
+  // → savePdf renders the standard 14 Type-1 fonts to a multi-page PDF
+  // without invoking window.print(). Output is consistent across
+  // browsers and works on platforms that block the print dialog.
+  async function exportToPdf() {
+    if (!window.RodmanDocs || !window.RodmanDocs.savePdf) {
+      alert('PDF engine failed to load. Reload the page and try again.');
+      return;
+    }
+    try {
+      const html = deckToHtmlString();
+      const blob = await window.RodmanDocs.savePdf(html, { title: deck.title || 'Presentation' });
+      downloadDeckBlob(blob, 'pdf');
+    } catch (err) {
+      alert('Could not export PDF: ' + (err.message || err));
+    }
+  }
 
-    const wrap = document.createElement('div');
-    wrap.className = 'print-deck';
-    document.body.appendChild(wrap);
+  function deckToHtmlString() {
+    if (!window.RodmanSlidesIO || !window.RodmanSlidesIO.deckToHtml) {
+      throw new Error('slides engine not loaded');
+    }
+    return window.RodmanSlidesIO.deckToHtml(deck);
+  }
 
-    deck.slides.forEach((slide) => {
-      const stage = document.createElement('div');
-      stage.className = 'print-slide';
-      wrap.appendChild(stage);
-      T.applyToStage(stage, deck.theme);
-      R.renderSlide(stage, slide, { editable: false });
+  function downloadDeckBlob(blob, ext) {
+    const url = URL.createObjectURL(blob instanceof Blob ? blob : new Blob([blob]));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = (deck.title || 'presentation').replace(/[^\w\-]+/g, '_') + '.' + ext;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+  }
+
+  // Multi-format exporter routed through the same deckToHtml → engine
+  // pipeline. Each branch picks the right writer for the requested ext.
+  async function exportDeckAs(ext) {
+    try {
+      const html = deckToHtmlString();
+      const title = deck.title || 'Presentation';
+      let bytesOrBlob;
+      let mime = '';
+      switch (ext) {
+        case 'odp':
+          if (!window.RodmanInterop || !window.RodmanInterop.odpExport) throw new Error('interop not loaded');
+          bytesOrBlob = window.RodmanInterop.odpExport(html, title);
+          mime = 'application/vnd.oasis.opendocument.presentation';
+          break;
+        case 'docx':
+          if (!window.RodmanDocs || !window.RodmanDocs.saveDocx) throw new Error('docs engine not loaded');
+          bytesOrBlob = await window.RodmanDocs.saveDocx(html, { title });
+          mime = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+          break;
+        case 'md':
+          if (!window.RodmanInterop || !window.RodmanInterop.mdExport) throw new Error('interop not loaded');
+          bytesOrBlob = window.RodmanInterop.mdExport(html, title);
+          mime = 'text/markdown';
+          break;
+        case 'html':
+          bytesOrBlob = `<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtmlText(title)}</title></head><body>${html}</body></html>`;
+          mime = 'text/html';
+          break;
+        case 'txt':
+          bytesOrBlob = htmlToPlainText(html);
+          mime = 'text/plain';
+          break;
+        default:
+          throw new Error('Unknown deck export ext: ' + ext);
+      }
+      const blob = bytesOrBlob instanceof Blob
+        ? bytesOrBlob
+        : new Blob([bytesOrBlob], { type: mime });
+      downloadDeckBlob(blob, ext);
+    } catch (err) {
+      alert('Could not export .' + ext + ': ' + (err.message || err));
+    }
+  }
+
+  function escapeHtmlText(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[c]));
+  }
+
+  function htmlToPlainText(html) {
+    const tmp = document.createElement('div');
+    tmp.innerHTML = html;
+    // Insert a blank line between block-level elements so paragraphs /
+    // headings don't smush together once we read .textContent.
+    tmp.querySelectorAll('p, h1, h2, h3, h4, h5, h6, li, br, hr').forEach((el) => {
+      el.appendChild(document.createTextNode('\n'));
     });
-
-    // Trigger print and clean up afterwards
-    setTimeout(() => {
-      window.print();
-      setTimeout(() => wrap.remove(), 500);
-    }, 100);
+    return (tmp.textContent || '').replace(/\n{3,}/g, '\n\n').trim() + '\n';
   }
 
   // ---------- Element clipboard (in-memory, cross-slide) ----------

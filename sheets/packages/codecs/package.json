@@ -8,7 +8,11 @@
   "exports": {
     ".": "./src/index.ts",
     "./csv": "./src/csv.ts",
-    "./xlsx": "./src/xlsx.ts"
+    "./xlsx": "./src/xlsx.ts",
+    "./serializers": "./src/serializers.ts",
+    "./vcard": "./src/vcard.ts",
+    "./icalendar": "./src/icalendar.ts",
+    "./pdf": "./src/pdf.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

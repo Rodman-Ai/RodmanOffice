@@ -147,53 +147,9 @@ async function writeDocFromHtml(html, target, name) {
   }
 }
 
-// Split a document HTML string at H1 (falling back to H2) to make
-// one slide per top-level section. The first slide takes the doc
-// title if no H1 is found before the first paragraph.
-function htmlToDeck(html, title) {
-  const tmp = document.createElement('div');
-  tmp.innerHTML = html;
-  const headingTag = tmp.querySelector('h1') ? 'H1' : (tmp.querySelector('h2') ? 'H2' : null);
-  const slidesOut = [];
-  let bucket = { title: title || 'Slide', body: '' };
-  if (!headingTag) {
-    bucket.body = tmp.innerHTML;
-    slidesOut.push(bucket);
-  } else {
-    Array.from(tmp.childNodes).forEach((n) => {
-      if (n.nodeType === 1 && n.tagName === headingTag) {
-        if (bucket.body || slidesOut.length === 0) slidesOut.push(bucket);
-        bucket = { title: n.textContent || 'Slide', body: '' };
-      } else {
-        bucket.body += n.outerHTML || (n.nodeValue || '');
-      }
-    });
-    if (bucket.body || !slidesOut.length) slidesOut.push(bucket);
-  }
-  return {
-    title,
-    slides: slidesOut.map((s) => ({
-      elements: [
-        {
-          id: `t-${Math.random().toString(36).slice(2, 8)}`,
-          kind: 'text',
-          x: 40, y: 40, w: 1200, h: 80,
-          html: `<b>${escapeHtml(s.title)}</b>`,
-          role: 'free', fontSize: 36, fontWeight: 700, align: 'left',
-          color: null, fontFamily: null,
-        },
-        {
-          id: `b-${Math.random().toString(36).slice(2, 8)}`,
-          kind: 'text',
-          x: 40, y: 140, w: 1200, h: 540,
-          html: s.body || '<p></p>',
-          role: 'free', fontSize: 20, fontWeight: 400, align: 'left',
-          color: null, fontFamily: null,
-        },
-      ],
-    })),
-  };
-}
+// htmlToDeck / deckToHtml live in lib/slides/html-bridge.js so the
+// Word and Slides apps can reuse the same implementation.
+const { htmlToDeck, deckToHtml } = slides;
 
 // Decode bytes as UTF-8 and strip a leading BOM. UTF-16 BOMs get a
 // friendly error so the user knows to re-save the file as UTF-8 —
@@ -526,31 +482,7 @@ async function runSlides(source, target) {
   return { bytes: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), mime: target.mime };
 }
 
-function deckToHtml(deck) {
-  let html = '';
-  if (deck.title) html += `<h1>${escapeHtml(deck.title)}</h1>`;
-  for (const slide of deck.slides || []) {
-    let firstText = true;
-    for (const el of slide.elements || []) {
-      if (el.kind !== 'text') continue;
-      if (firstText) {
-        // Emit the first text element's first paragraph as the slide
-        // title heading, the rest as body.
-        const tmp = document.createElement('div');
-        tmp.innerHTML = el.html || '';
-        const first = tmp.firstChild;
-        const titleText = first ? (first.textContent || '').trim() : '';
-        if (titleText) html += `<h2>${escapeHtml(titleText)}</h2>`;
-        if (first) first.remove();
-        html += tmp.innerHTML;
-        firstText = false;
-      } else {
-        html += el.html || '';
-      }
-    }
-  }
-  return html || '<p>(empty deck)</p>';
-}
+// deckToHtml is imported from lib/slides/html-bridge.js (see above).
 
 // ---------- Video family (FFmpeg.wasm; lazy-loaded) ----------
 //

@@ -1993,6 +1993,8 @@
     // both execute after the document is parsed, in source order —
     // so this shim runs before app.js below it.
     import * as docs from '../lib/docs/index.js';
+    import * as slides from '../lib/slides/index.js';
+    import * as images from '../lib/images/index.js';
     import * as claude from '../lib/claude/index.js';
     window.RodmanDocx = {
       saveDocx: docs.saveDocx, loadDocx: docs.loadDocx,
@@ -2003,7 +2005,17 @@
       rtfExport: docs.rtfExport, odtExport: docs.odtExport, epubExport: docs.epubExport,
       mdExport: docs.mdExport, asciidocExport: docs.asciidocExport, latexExport: docs.latexExport,
       rtfImport: docs.rtfImport, odtImport: docs.odtImport, epubImport: docs.epubImport,
+      // Format additions surfaced from the converter.
+      jsonDocExport: docs.jsonDocExport, yamlExport: docs.yamlExport,
+      mediawikiExport: docs.mediawikiExport, rstExport: docs.rstExport,
+      orgExport: docs.orgExport, docbookExport: docs.docbookExport,
+      fb2Export: docs.fb2Export, odpExport: docs.odpExport,
     };
+    window.RodmanSlides = {
+      savePptx: slides.savePptx, loadPptx: slides.loadPptx,
+      htmlToDeck: slides.htmlToDeck,
+    };
+    window.RodmanImagePdf = { compressPdf: images.compressPdf };
     window.RodmanClaude = claude;
   </script>
   <script src="app.js" defer></script>

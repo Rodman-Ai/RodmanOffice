@@ -12,6 +12,18 @@ export type RibbonActions = {
   importFile: () => void;
   exportCsv: () => void;
   exportXlsx: () => void;
+  // Part 12: extra exports.
+  exportTsv: () => void;
+  exportPsv: () => void;
+  exportJson: () => void;
+  exportNdjson: () => void;
+  exportHtml: () => void;
+  exportMd: () => void;
+  exportXml: () => void;
+  exportOds: () => void;
+  exportVcf: () => void;
+  exportIcs: () => void;
+  exportPdf: () => void;
   // Edit
   undo: () => void;
   redo: () => void;
@@ -130,6 +142,21 @@ export function Ribbon({ a }: { a: RibbonActions }) {
               <Row>
                 <BigBtn icon="CSV" label="Export CSV" onClick={a.exportCsv} />
                 <BigBtn icon="XLSX" label="Export XLSX" onClick={a.exportXlsx} />
+                <BigBtn icon="PDF" label="Export PDF" onClick={a.exportPdf} />
+              </Row>
+            </Group>
+            <Group label="More formats">
+              <Row>
+                <BigBtn icon="TSV" label="TSV" onClick={a.exportTsv} />
+                <BigBtn icon="PSV" label="PSV" onClick={a.exportPsv} />
+                <BigBtn icon="JSON" label="JSON" onClick={a.exportJson} />
+                <BigBtn icon="ND" label="NDJSON" onClick={a.exportNdjson} />
+                <BigBtn icon="HTML" label="HTML" onClick={a.exportHtml} />
+                <BigBtn icon="MD" label="Markdown" onClick={a.exportMd} />
+                <BigBtn icon="XML" label="Excel XML" onClick={a.exportXml} />
+                <BigBtn icon="ODS" label="ODS" onClick={a.exportOds} />
+                <BigBtn icon="VCF" label="vCard" onClick={a.exportVcf} />
+                <BigBtn icon="ICS" label="iCal" onClick={a.exportIcs} />
               </Row>
             </Group>
           </div>
