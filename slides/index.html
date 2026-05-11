@@ -112,6 +112,15 @@
           <button class="ribbon-btn wide" data-cmd="exportPptx">Export .pptx</button>
           <button class="ribbon-btn wide" data-cmd="exportPdf">Export PDF</button>
         </div>
+        <div class="group-row">
+          <button class="ribbon-btn wide" data-cmd="exportOdp">Export .odp</button>
+          <button class="ribbon-btn wide" data-cmd="exportDocx">Export .docx</button>
+          <button class="ribbon-btn wide" data-cmd="exportMd">Export .md</button>
+        </div>
+        <div class="group-row">
+          <button class="ribbon-btn wide" data-cmd="exportHtml">Export .html</button>
+          <button class="ribbon-btn wide" data-cmd="exportTxt">Export .txt</button>
+        </div>
         <div class="group-label">Save / Export</div>
       </div>
       <div class="group">
@@ -634,10 +643,20 @@
     // both execute deferred, in source order — this shim runs before
     // the deck/render/app scripts below.
     import * as slidesio from '../lib/slides/index.js';
+    import * as docs from '../lib/docs/index.js';
     import * as claude from '../lib/claude/index.js';
     window.RodmanSlidesIO = {
       savePptx: slidesio.savePptx,
       loadPptx: slidesio.loadPptx,
+      deckToHtml: slidesio.deckToHtml,
+    };
+    window.RodmanDocs = {
+      saveDocx: docs.saveDocx,
+      savePdf: docs.savePdf,
+    };
+    window.RodmanInterop = {
+      mdExport: docs.mdExport,
+      odpExport: docs.odpExport,
     };
     window.RodmanClaude = claude;
   </script>

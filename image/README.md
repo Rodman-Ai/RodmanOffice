@@ -70,7 +70,7 @@ Photoshop mode is the default. The layout:
 
 | Menu     | Items                                                        |
 | -------- | ------------------------------------------------------------ |
-| File     | New Canvas · Open · Save PNG · Save HD · Clear · Reset All   |
+| File     | New Canvas · Open · Save PNG · **Save As…** · Save HD · Clear · Reset All |
 | Edit     | Undo · Redo · Keyboard Shortcuts · History · Snapshots       |
 | Image    | Image Size · Adjustments (Levels / HSL / Color Balance / Threshold) · Replay |
 | Layer    | New · Duplicate · Merge Down · Delete                        |
@@ -126,8 +126,12 @@ Highlights:
 - Pointer Events for unified mouse / touch / pen / stylus input, with
   **stylus pressure** mapped to brush width.
 - **Undo + Redo** with 16-step history (`Ctrl+Z`, `Ctrl+Shift+Z` / `Ctrl+Y`).
-- **Open Image** — load any PNG/JPG into the canvas to trace, color, remix.
+- **Open Image** — load any PNG / JPG / GIF / BMP / WebP / SVG / PSD / PSB
+  / ICO / TIFF (browser-dependent) into the canvas to trace, color, remix.
+  PDF inputs rasterize through the shared `lib/images/pdf.js` engine.
 - **Save PNG** (`Ctrl+S`) — Shift-click for HD export at any scale.
+- **Save As…** — modal picker with format / quality / resolution /
+  colours controls (see *Save As formats* below).
 - **Live brush cursor preview**, **recent colors** strip,
   **custom HSV color picker**, **brush opacity slider**.
 - **Symmetry / mirror** — Off → H → V → Both → 4-way → 8-way kaleidoscope.
@@ -152,6 +156,30 @@ Highlights:
   network for those import/export paths.
 - **Last-used mode**, brush size, opacity, recent colors all persist.
 - **Reset all** — Shift-click ✕ Clear (or *File → Reset All Settings*).
+
+---
+
+## Save As formats
+
+Save As… surfaces every encoder the shared `lib/images/` engine
+exports. Browser-native targets (PNG / JPEG / WebP / AVIF) accept a
+quality slider; palette-indexed targets (PNG / BMP / ICO / CUR /
+TGA / PCX / SGI / RAS / GIF-via-quantization) accept a Colors choice
+(None / 256 / 128 / 64 / 16) that runs a median-cut pre-pass
+(`lib/images/quantize.js`). Every format also accepts a resolution
+scale (25 / 50 / 75 / 100 / 200 / 400 %).
+
+| Family | Formats |
+|--------|---------|
+| Browser-native | PNG · JPEG · WebP · AVIF (browser-dependent) |
+| Windows / Apple | BMP · ICO · CUR · ICNS · TIFF · multi-page TIFF · PSD · PDF |
+| Netpbm | PPM · PGM · PBM · PAM |
+| Legacy / Unix raster | TGA · PCX · HDR (Radiance) · XBM · XPM · WBMP · SGI · RAS (Sun) · Farbfeld |
+| Archive | CBZ |
+
+AVIF only appears in the dropdown when `canvas.toBlob('image/avif')`
+returns a real Blob in the current browser (Chrome 105+, Safari 16+,
+Firefox 113+). The probe runs once at modal-open time and caches.
 
 ---
 

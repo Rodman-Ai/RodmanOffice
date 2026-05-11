@@ -16,7 +16,8 @@ export function createQueue() {
       const id = nextId++;
       items.set(id, {
         id, file, status: 'pending', target: null, error: null,
-        blocked: false, progress: null, loadingMessage: null, ...extra,
+        blocked: false, progress: null, loadingMessage: null,
+        options: {}, ...extra,
       });
       return id;
     },
@@ -25,6 +26,10 @@ export function createQueue() {
     setTarget(id, target) {
       const it = items.get(id);
       if (it) it.target = target;
+    },
+    setOptions(id, partial) {
+      const it = items.get(id);
+      if (it) it.options = { ...(it.options || {}), ...(partial || {}) };
     },
     setStatus(id, status, extra = {}) {
       const it = items.get(id);

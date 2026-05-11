@@ -12,7 +12,7 @@ canvas, and parser APIs.
 | Documents | DOCX, DOC*, PDF, RTF, ODT, EPUB, Markdown, HTML, TXT | DOCX, PDF, RTF, ODT, EPUB, Markdown, HTML, TXT, AsciiDoc, LaTeX, JSON, YAML, MediaWiki, reStructuredText, Org-mode, DocBook, FictionBook, PPTX, ODP |
 | Spreadsheets | XLSX, XLS, CSV, TSV, JSON, NDJSON, YAML, HTML tables, Markdown tables, vCard, iCalendar | XLSX, XLS (Excel 97-2003), CSV, TSV, PSV, JSON, NDJSON, HTML, Markdown, Excel 2003 XML, ODS, vCard, iCalendar, PDF |
 | Slides | PPTX, PPT* | PPTX, ODP, PDF, DOCX, Markdown, HTML, TXT |
-| Images | PNG, JPEG, GIF, BMP, WebP, SVG, PSD, PSB, ICO, TIFF (browser-dependent), PDF (any page) | PNG, JPEG, WebP, PSD, BMP, ICO, PPM, TGA, TIFF, CBZ, PDF (Photoshop-compatible) |
+| Images | PNG, JPEG, GIF, BMP, WebP, SVG, PSD, PSB, ICO, TIFF (browser-dependent), PDF (any page) | PNG, JPEG, WebP, AVIF (browser-dependent), PSD, BMP, ICO, ICNS, CUR, TIFF (single + multi-page), PPM, PGM, PBM, PAM, TGA, PCX, HDR (Radiance), XBM, XPM, WBMP, SGI, RAS (Sun), Farbfeld, CBZ, PDF (Photoshop-compatible) |
 | Video | MP4, MOV, AVI, MPG, MPEG, WebM, MKV, WMV, ASF, FLV, F4V, 3GP, 3G2, TS, M2TS, MTS, VOB, OGV, DV, MJPEG, APNG, M1V, M2V, Y4M, NUT, SWF, WTV, IVF, AMV, GXF, MXF | MP4 (H.264 / H.265 / AV1), MOV (H.264 / ProRes 422 HQ / JPEG 2000 / Cinepak), WebM (VP8 / VP9 / AV1), MKV (H.264 / FFV1 lossless), AVI (MPEG-4 / Xvid / HuffYUV / raw YUV), WMV (WMV2 / WMV3 / VC-1), FLV, 3GP (H.264 / H.263), MPEG-TS, M2TS, VOB, OGV, DV, MJPEG, APNG, animated WebP, animated AVIF, MXF DNxHR, Y4M, M1V, M2V, NUT (H.264 / Snow), SWF, WTV, IVF, AMV, GXF, PNG sequence ZIP, DPX sequence ZIP, animated GIF, PNG/JPEG/WebP (frame), PDF (frame), CBZ (frame sequence), 26 audio extract targets |
 | Audio | MP3, M4A, AAC, WAV, OGG, FLAC, OPUS, AC-3, E-AC-3, AIFF, CAF, AMR, MP2, WMA, AU, TTA, WavPack, Speex, GSM | MP3, M4A (AAC / HE-AAC v2 / ALAC lossless), WAV (16-bit / 24-bit / 32-bit float / μ-law / A-law / ADPCM IMA), OGG (Vorbis), FLAC, OPUS, AC-3, E-AC-3, AIFF, CAF, AMR-NB, AMR-WB, MP2, WMA, AU, TTA, WavPack, Speex, GSM |
 | Subtitles | SRT, WebVTT, ASS, SSA, TTML, LRC | SRT, WebVTT, ASS, SSA, TTML, LRC |
@@ -21,8 +21,13 @@ Cross-family bridges:
 
 - Spreadsheet → PDF (rasterized as HTML tables).
 - Image source → PDF (single-page, JPEG-wrapped).
-- PDF → image: any PDF rasterizes to PNG/JPEG/WebP/PSD/BMP/ICO/PPM/TGA/TIFF.
+- PDF → image: any PDF rasterizes to PNG/JPEG/WebP/PSD/BMP/ICO/PPM/TGA/TIFF
+  (and any of the other single-canvas image targets).
 - PDF → CBZ: every PDF page rasterizes into a comic-book ZIP archive.
+- PDF → multi-page TIFF: every PDF page becomes one IFD inside a single `.tif`.
+- AVIF write is gated on browser support and only appears in the target
+  dropdown when `canvas.toBlob('image/avif')` returns a real Blob in this
+  browser (Chrome 105+, Safari 16+, Firefox 113+).
 - HTML/Markdown source → spreadsheet: tables in the document become
   CSV/TSV/XLSX/JSON/ODS rows.
 - Document → PPTX/ODP: H1 (or H2 fallback) splits the document into

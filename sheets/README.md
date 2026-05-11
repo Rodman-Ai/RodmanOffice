@@ -17,7 +17,7 @@ docs/              Strategy docs (competitor analysis, features, roadmap)
 
 - **Grid UX**: virtualized scroll, multi-sheet workbooks, range selection (drag, shift+arrows, click row/col headers for whole row/col), per-column resize, column-header chevron with sort and remove-duplicates.
 - **Ribbon**: Excel-style File · Home · Insert · Page Layout · Formulas · Data · Review · View · Help tabs using the shared RodmanOffice green visual language; Draw, Automate, and Acrobat are not live tabs.
-- **Editing**: full undo/redo (snapshot history, 100 steps), copy/cut/paste and paste-values with TSV expansion, find & replace (case-sensitive, replace-all as one undo step), CSV/XLSX import + export.
+- **Editing**: full undo/redo (snapshot history, 100 steps), copy/cut/paste and paste-values with TSV expansion, find & replace (case-sensitive, replace-all as one undo step), CSV/XLSX import + export plus the wider format set below.
 - **Formatting**: cell-format model (bold, italic, underline, alignment, text/fill colors, number formats — General / Number / Currency / Percent / Date / Datetime), exposed through the Home ribbon.
 - **Conditional formatting**: 9 condition types (>, ≥, <, ≤, =, ≠, between, contains, empty/non-empty) × 5 preset styles, applied to ranges and resolved per-cell at render time.
 - **Comments**: per-cell text with a corner indicator, hover tooltip, and Review-ribbon clear command.
@@ -30,6 +30,32 @@ docs/              Strategy docs (competitor analysis, features, roadmap)
 - **Persistence**: file-based store by default; Postgres adapter when `DATABASE_URL` is set.
 
 See [`docs/SHIPPED.md`](docs/SHIPPED.md) for the per-sprint changelog, [`docs/architecture.md`](docs/architecture.md) for how the pieces fit together, [`docs/roadmap.md`](docs/roadmap.md) for "shipped vs. deferred", and [`docs/excel-ribbon-backlog.md`](docs/excel-ribbon-backlog.md) for screenshot-derived Excel ribbon parity gaps. Big deferred items: freeze panes, data-validation dropdown, Yjs real-time collab, Python/SQL/JS code cells, DB/SaaS connectors, voice, MCP, full enterprise/SSO.
+
+## Supported formats
+
+The File ribbon exposes Import + Export to every format the shared
+`@aicell/codecs` package can speak. Codecs are thin TypeScript wrappers
+over the canonical engine at `../../lib/sheets/`.
+
+| Direction | Formats |
+|-----------|---------|
+| Import    | CSV · TSV · XLSX · XLS · JSON · NDJSON / JSONL · YAML · HTML tables · Markdown tables · vCard · iCalendar |
+| Export    | CSV · XLSX · TSV · PSV · JSON · NDJSON · HTML tables · Markdown tables · Excel 2003 XML · ODS · vCard · iCalendar · PDF |
+
+PDF export composes `exportWorkbookAsHtml` with the engine PDF writer
+at `../../lib/docs/pdfio.js` — the workbook renders as HTML tables and
+flows through the same `savePdf` used by the Word app, so the output
+is text-only Helvetica without external font hosting.
+
+JSON detects the shape of the input on import: arrays-of-objects
+collect into header-keyed rows; `{ sheets: [...] }` envelopes preserve
+multi-sheet workbooks. NDJSON / JSONL is one object per line.
+
+YAML import handles the tabular subset (array-of-objects, or
+array-of-arrays). vCard import maps every contact to one row (FN /
+EMAIL / TEL / ADR / ORG / TITLE / NOTE columns). iCalendar import maps
+every VEVENT to one row (SUMMARY / DTSTART / DTEND / LOCATION /
+DESCRIPTION columns).
 
 ## Local development
 

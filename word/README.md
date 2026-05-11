@@ -51,28 +51,63 @@ Full per-feature catalogue: [`FEATURES.md`](./FEATURES.md).
 
 ## Format support
 
-| Format | Save / export | Open / import |
-|---|---|---|
-| `.rwd` (native JSON) | ✓ | ✓ |
-| `.rwd.enc` (AES-GCM) | ✓ | ✓ |
-| `.docx` (OOXML) | ✓ | ✓ |
-| `.pdf` | ✓ | ✓ (text only) |
-| `.html` / `.htm` | ✓ | ✓ |
-| `.md` | ✓ (with optional YAML frontmatter) | ✓ |
-| `.txt` | ✓ | ✓ |
-| `.odt` | ✓ | ✓ |
-| `.rtf` | ✓ | ✓ |
-| `.epub` | ✓ | ✓ (chapters as one body) |
-| `.adoc` (AsciiDoc) | ✓ | — |
-| `.tex` (LaTeX) | ✓ | — |
+| Format | Save / export | Open / import | Notes |
+|---|---|---|---|
+| `.rwd` (native JSON) | ✓ | ✓ | |
+| `.rwd.enc` (AES-GCM) | ✓ | ✓ | |
+| `.docx` (OOXML) | ✓ | ✓ | |
+| `.pdf` | ✓ | ✓ (text only) | See **Compress PDF** below. |
+| `.html` / `.htm` | ✓ | ✓ | |
+| `.md` | ✓ (with optional YAML frontmatter) | ✓ | |
+| `.txt` | ✓ | ✓ | |
+| `.odt` | ✓ | ✓ | |
+| `.rtf` | ✓ | ✓ | |
+| `.epub` | ✓ | ✓ (chapters as one body) | |
+| `.adoc` (AsciiDoc) | ✓ | — | |
+| `.tex` (LaTeX) | ✓ | — | |
+| `.json` (document tree) | ✓ | — | Nested heading/paragraph blocks. |
+| `.yaml` | ✓ | — | YAML front-matter + body. |
+| `.wiki` (MediaWiki) | ✓ | — | Wikipedia-style wikitext. |
+| `.rst` (reStructuredText) | ✓ | — | Sphinx-friendly with underline headings. |
+| `.org` (Org-mode) | ✓ | — | Emacs Org outline + links. |
+| `.dbk` (DocBook 5 XML) | ✓ | — | Technical publishing. |
+| `.fb2` (FictionBook 2) | ✓ | — | E-book interchange. |
+| `.pptx` | ✓ | — | Splits at H1 (then H2 fallback) into slides. |
+| `.odp` | ✓ | — | OpenDocument presentation; same H1 split. |
 
 DOCX, PDF, RTF, ODT, EPUB, Markdown, AsciiDoc, LaTeX, HTML, and text
 import/export are bridged from the suite-level `../lib/docs/index.js`
-module. That shared module exposes the historical `window.RodmanDocx`,
-`window.RodmanPdf`, and `window.RodmanInterop` globals for the editor.
+module. The seven markup exports (JSON, YAML, MediaWiki, RST, Org-mode,
+DocBook, FictionBook) plus the PPTX / ODP slide bridges come from
+`../lib/docs/interop.js` and `../lib/slides/index.js`. Globals exposed
+to the classic editor scripts: `window.RodmanDocx`, `window.RodmanPdf`,
+`window.RodmanInterop`, `window.RodmanSlides`, and `window.RodmanImagePdf`.
 Because those engines live outside the `word/` service-worker scope,
-offline import/export needs the shared `/lib/docs` assets to be available
+offline import/export needs the shared `/lib/*` assets to be available
 from browser cache or the network.
+
+### Compress PDF
+
+When the active document was imported from a `.pdf`, the **Compress PDF…**
+tile in the Export menu re-rasterizes the original bytes at a chosen
+quality level and reassembles a smaller PDF. Levels (Acrobat-style):
+
+| Level   | JPEG quality | Page scale | Notes |
+|---------|--------------|-----------|-------|
+| Minimum | 0.95         | 1.00×     | Barely-touched; large file. |
+| Low     | 0.85         | 0.95×     | |
+| Medium  | 0.70         | 0.80×     | Default. |
+| High    | 0.55         | 0.65×     | |
+| Maximum | 0.40         | 0.50×     | Smallest file; blurry pages. |
+
+With **Preserve searchable text** on (default), each output page also
+carries an invisible-rendering-mode text overlay built from pdf.js's
+`getTextContent`, so Cmd-F and text selection still work in viewers.
+Turn it off for slightly smaller files at the cost of search.
+
+The action is gated on the open document having originated from a PDF
+in the current session; opening another file (DOCX, MD, …) clears
+the cached source bytes.
 
 ## Keyboard shortcuts
 

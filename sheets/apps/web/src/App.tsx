@@ -629,6 +629,17 @@ export function App() {
     importFile: triggerImport,
     exportCsv: () => void import("./csv").then(({ exportSheetAsCSV }) => exportSheetAsCSV(api.activeSheet)),
     exportXlsx: () => void import("./csv").then(({ exportWorkbookAsXLSX }) => exportWorkbookAsXLSX(api.workbook)),
+    exportTsv: () => void import("./csv").then(({ exportSheetAsTSV }) => exportSheetAsTSV(api.activeSheet)),
+    exportPsv: () => void import("./csv").then(({ exportSheetAsPSV }) => exportSheetAsPSV(api.activeSheet)),
+    exportJson: () => void import("./csv").then(({ exportWorkbookAsJSON }) => exportWorkbookAsJSON(api.workbook)),
+    exportNdjson: () => void import("./csv").then(({ exportSheetAsNDJSON }) => exportSheetAsNDJSON(api.activeSheet)),
+    exportHtml: () => void import("./csv").then(({ exportWorkbookAsHTML }) => exportWorkbookAsHTML(api.workbook)),
+    exportMd: () => void import("./csv").then(({ exportWorkbookAsMD }) => exportWorkbookAsMD(api.workbook)),
+    exportXml: () => void import("./csv").then(({ exportWorkbookAsXML }) => exportWorkbookAsXML(api.workbook)),
+    exportOds: () => void import("./csv").then(({ exportWorkbookAsODS }) => exportWorkbookAsODS(api.workbook)),
+    exportVcf: () => void import("./csv").then(({ exportWorkbookAsVCF }) => exportWorkbookAsVCF(api.workbook)),
+    exportIcs: () => void import("./csv").then(({ exportWorkbookAsICS }) => exportWorkbookAsICS(api.workbook)),
+    exportPdf: () => void import("./csv").then(({ exportWorkbookAsPDF }) => exportWorkbookAsPDF(api.workbook)),
     undo: api.undo,
     redo: api.redo,
     canUndo: api.canUndo,
@@ -760,7 +771,7 @@ export function App() {
         <input
           ref={fileInputRef}
           type="file"
-          accept=".csv,.tsv,.xlsx,.xls,text/csv,text/tab-separated-values,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          accept=".csv,.tsv,.xlsx,.xls,.json,.ndjson,.jsonl,.yaml,.yml,.html,.htm,.md,.markdown,.vcf,.ics,text/csv,text/tab-separated-values,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/json,application/x-ndjson,application/yaml,text/html,text/markdown,text/vcard,text/calendar"
           onChange={onPickFile}
           hidden
         />

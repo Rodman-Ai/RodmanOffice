@@ -1332,6 +1332,16 @@
         { ico: '📚', label: 'EPUB', desc: 'Split the document into chapters at H1 boundaries.', action: 'export-epub' },
         { ico: 'AD', label: 'AsciiDoc', desc: 'Lightweight markup popular for technical writing.', action: 'export-asciidoc' },
         { ico: 'TX', label: 'LaTeX', desc: 'Compile-ready .tex with article preamble.', action: 'export-latex' },
+        { ico: '{}', label: 'JSON',         desc: 'Document tree as nested JSON blocks.',           action: 'export-json' },
+        { ico: 'YL', label: 'YAML',         desc: 'YAML front-matter plus body.',                  action: 'export-yaml' },
+        { ico: 'Wk', label: 'MediaWiki',    desc: 'Wikipedia-style wikitext.',                     action: 'export-wiki' },
+        { ico: 'RS', label: 'reStructuredText', desc: 'Sphinx-friendly .rst with underline headings.', action: 'export-rst' },
+        { ico: '✱', label: 'Org-mode',     desc: 'Emacs Org outline + links.',                    action: 'export-org' },
+        { ico: 'DB', label: 'DocBook',      desc: 'DocBook 5 XML for technical publishing.',       action: 'export-dbk' },
+        { ico: '📖', label: 'FictionBook',  desc: 'FB2 e-book format.',                            action: 'export-fb2' },
+        { ico: '🎞', label: 'PowerPoint (.pptx)', desc: 'Split on H1 to slides; first paragraph becomes the title.', action: 'export-pptx' },
+        { ico: '🗂', label: 'OpenDocument presentation (.odp)', desc: 'LibreOffice Impress / Keynote slides.', action: 'export-odp' },
+        { ico: '🗜', label: 'Compress PDF…', desc: 'Rasterize a PDF you opened, pick a quality level, optional searchable text.', action: 'compress-pdf' },
       ],
     },
 
@@ -1632,6 +1642,11 @@ ${editor.innerHTML}
   $('#filePicker').addEventListener('change', async (e) => {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
+    // Any open clears the previous Compress-PDF source. The .pdf
+    // branch re-sets the slot below; every other path leaves it null,
+    // so opening a non-PDF after a PDF doesn't leave stale bytes
+    // attached to the next Compress PDF action.
+    originalPdfBytes = null;
     if (/\.rwd\.enc$/i.test(file.name)) {
       const txt = await file.text();
       const data = await decryptRwd(txt);
@@ -1695,6 +1710,10 @@ ${editor.innerHTML}
         const html = await window.RodmanPdf.loadPdf(buf);
         editor.innerHTML = sanitizeImported(html);
         docTitle.value = file.name.replace(/\.pdf$/i, '');
+        // Keep the original bytes so Compress PDF can re-rasterize
+        // the same source — text extraction is lossy and the
+        // rasterizer needs the real file.
+        originalPdfBytes = new Uint8Array(buf);
         addRecent(docTitle.value);
         queueAutosave();
         rebuildOutline();
@@ -3952,6 +3971,96 @@ ${editor.innerHTML}
     doExport(sanitizeFileName(docTitle.value) + '.tex', tex, 'application/x-tex');
     toast('Exported .tex', 'success');
   }
+  function exportJsonDoc() {
+    if (!window.RodmanInterop) { toast('interop.js not loaded', 'error'); return; }
+    const json = window.RodmanInterop.jsonDocExport(editor.innerHTML, docTitle.value);
+    doExport(sanitizeFileName(docTitle.value) + '.json', json, 'application/json');
+    toast('Exported .json', 'success');
+  }
+  function exportYaml() {
+    if (!window.RodmanInterop) { toast('interop.js not loaded', 'error'); return; }
+    const yaml = window.RodmanInterop.yamlExport(editor.innerHTML, docTitle.value);
+    doExport(sanitizeFileName(docTitle.value) + '.yaml', yaml, 'application/yaml');
+    toast('Exported .yaml', 'success');
+  }
+  function exportWiki() {
+    if (!window.RodmanInterop) { toast('interop.js not loaded', 'error'); return; }
+    const wiki = window.RodmanInterop.mediawikiExport(editor.innerHTML, docTitle.value);
+    doExport(sanitizeFileName(docTitle.value) + '.wiki', wiki, 'text/x-wiki');
+    toast('Exported .wiki', 'success');
+  }
+  function exportRst() {
+    if (!window.RodmanInterop) { toast('interop.js not loaded', 'error'); return; }
+    const rst = window.RodmanInterop.rstExport(editor.innerHTML, docTitle.value);
+    doExport(sanitizeFileName(docTitle.value) + '.rst', rst, 'text/x-rst');
+    toast('Exported .rst', 'success');
+  }
+  function exportOrg() {
+    if (!window.RodmanInterop) { toast('interop.js not loaded', 'error'); return; }
+    const org = window.RodmanInterop.orgExport(editor.innerHTML, docTitle.value);
+    doExport(sanitizeFileName(docTitle.value) + '.org', org, 'text/x-org');
+    toast('Exported .org', 'success');
+  }
+  function exportDocBook() {
+    if (!window.RodmanInterop) { toast('interop.js not loaded', 'error'); return; }
+    const xml = window.RodmanInterop.docbookExport(editor.innerHTML, docTitle.value);
+    doExport(sanitizeFileName(docTitle.value) + '.dbk', xml, 'application/docbook+xml');
+    toast('Exported .dbk', 'success');
+  }
+  function exportFb2() {
+    if (!window.RodmanInterop) { toast('interop.js not loaded', 'error'); return; }
+    const fb2 = window.RodmanInterop.fb2Export(editor.innerHTML, docTitle.value);
+    doExport(sanitizeFileName(docTitle.value) + '.fb2', fb2, 'application/x-fictionbook+xml');
+    toast('Exported .fb2', 'success');
+  }
+  async function exportPptx() {
+    if (!window.RodmanSlides) { toast('slides engine not loaded', 'error'); return; }
+    const deck = window.RodmanSlides.htmlToDeck(editor.innerHTML, docTitle.value || 'Document');
+    const bytes = await window.RodmanSlides.savePptx(deck);
+    doExport(sanitizeFileName(docTitle.value) + '.pptx',
+      new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' }));
+    toast('Exported .pptx', 'success');
+  }
+  function exportOdp() {
+    if (!window.RodmanInterop) { toast('interop.js not loaded', 'error'); return; }
+    const bytes = window.RodmanInterop.odpExport(editor.innerHTML, docTitle.value);
+    if (!bytes) { toast('ODP export needs the docx ZIP utilities', 'error'); return; }
+    doExport(sanitizeFileName(docTitle.value) + '.odp',
+      new Blob([bytes], { type: 'application/vnd.oasis.opendocument.presentation' }));
+    toast('Exported .odp', 'success');
+  }
+  async function compressPdfAction() {
+    if (!originalPdfBytes) {
+      toast('Open a PDF first — Compress PDF re-encodes the original bytes.', 'error');
+      return;
+    }
+    if (!window.RodmanImagePdf || !window.RodmanImagePdf.compressPdf) {
+      toast('PDF engine not loaded', 'error');
+      return;
+    }
+    const levelRaw = (window.prompt(
+      'Compression level (minimum / low / medium / high / maximum):',
+      'medium',
+    ) || '').trim().toLowerCase();
+    if (!levelRaw) return;
+    const valid = ['minimum', 'low', 'medium', 'high', 'maximum'];
+    const level = valid.includes(levelRaw) ? levelRaw : 'medium';
+    const preserveText = window.confirm(
+      'Preserve searchable text? Click OK to keep text-select / Cmd-F; Cancel for smaller files.',
+    );
+    toast('Compressing PDF…', 'info');
+    try {
+      const blob = await window.RodmanImagePdf.compressPdf(originalPdfBytes, { level, preserveText });
+      doExport(sanitizeFileName(docTitle.value || 'compressed') + '-compressed.pdf', blob);
+      toast(`Compressed PDF (${level}${preserveText ? ', searchable' : ''})`, 'success');
+    } catch (err) {
+      toast('Compress PDF failed: ' + err.message, 'error');
+    }
+  }
+  // Module-scope slot for the original PDF bytes when the active
+  // document was imported from a .pdf. Compress PDF re-rasterizes
+  // these bytes through lib/images/pdf.js compressPdf.
+  let originalPdfBytes = null;
 
   // Hook the existing exportMarkdown to add YAML front-matter support
   if (typeof exportMarkdown === 'function') {
@@ -4006,6 +4115,16 @@ ${editor.innerHTML}
       if (action === 'export-epub') { exportEpub(); closeBackstage(); return; }
       if (action === 'export-asciidoc') { exportAsciidoc(); closeBackstage(); return; }
       if (action === 'export-latex') { exportLatex(); closeBackstage(); return; }
+      if (action === 'export-json') { exportJsonDoc(); closeBackstage(); return; }
+      if (action === 'export-yaml') { exportYaml(); closeBackstage(); return; }
+      if (action === 'export-wiki') { exportWiki(); closeBackstage(); return; }
+      if (action === 'export-rst')  { exportRst(); closeBackstage(); return; }
+      if (action === 'export-org')  { exportOrg(); closeBackstage(); return; }
+      if (action === 'export-dbk')  { exportDocBook(); closeBackstage(); return; }
+      if (action === 'export-fb2')  { exportFb2(); closeBackstage(); return; }
+      if (action === 'export-pptx') { exportPptx(); closeBackstage(); return; }
+      if (action === 'export-odp')  { exportOdp(); closeBackstage(); return; }
+      if (action === 'compress-pdf') { compressPdfAction(); closeBackstage(); return; }
       if (action === 'md-preview') { closeBackstage(); openMdPreview(); return; }
       return orig(action);
     };
