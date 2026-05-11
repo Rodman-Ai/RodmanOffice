@@ -258,7 +258,11 @@ async function decodeImageSourceToCanvas(source) {
   return images.decodeToCanvas(source.bytes, source.mime);
 }
 
-async function encodeCanvasToTarget(canvas, target, name) {
+async function encodeCanvasToTarget(canvas, target, name, options) {
+  // Apply user-driven pre-passes once, here, so every encoder
+  // branch downstream sees the resized + palette-reduced canvas.
+  canvas = applyImagePrepasses(canvas, options);
+  const quality = (options && typeof options.quality === 'number') ? options.quality : 0.92;
   if (target.ext === 'psd') {
     const blob = images.encodePsd(canvas);
     const buf = await blob.arrayBuffer();
@@ -268,7 +272,7 @@ async function encodeCanvasToTarget(canvas, target, name) {
     // Photoshop PDF: a single-page PDF wrapping the canvas as a
     // JPEG image. Photoshop, Acrobat and Preview all open it
     // straight back as a flattened image.
-    const blob = await images.encodePdfFromCanvas(canvas, { format: 'jpeg', quality: 0.92 });
+    const blob = await images.encodePdfFromCanvas(canvas, { format: 'jpeg', quality });
     const buf = await blob.arrayBuffer();
     return { bytes: buf, mime: target.mime };
   }
@@ -366,8 +370,9 @@ async function encodeCanvasToTarget(canvas, target, name) {
   // is now in the ENCODABLE set; the matrix only surfaces it when
   // isAvifEncodeSupported() resolves true at boot, so this branch
   // is reached only on browsers that can encode it.
-  // PNG / JPEG / WebP — alpha-flatten when targeting JPEG to avoid
-  // black backgrounds.
+  // PNG / JPEG / WebP / AVIF — alpha-flatten when targeting JPEG to
+  // avoid black backgrounds; pass user quality through for the lossy
+  // formats. PNG ignores the quality arg.
   if (target.mime === 'image/jpeg' && hasAlpha(canvas)) {
     const flat = document.createElement('canvas');
     flat.width = canvas.width;
@@ -376,13 +381,32 @@ async function encodeCanvasToTarget(canvas, target, name) {
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, flat.width, flat.height);
     ctx.drawImage(canvas, 0, 0);
-    const blob = await images.canvasToBlob(flat, target.mime, 0.92);
+    const blob = await images.canvasToBlob(flat, target.mime, quality);
     const buf = await blob.arrayBuffer();
     return { bytes: buf, mime: target.mime };
   }
-  const blob = await images.canvasToBlob(canvas, target.mime);
+  const useQuality = (target.mime === 'image/jpeg'
+    || target.mime === 'image/webp'
+    || target.mime === 'image/avif');
+  const blob = await images.canvasToBlob(canvas, target.mime, useQuality ? quality : undefined);
   const buf = await blob.arrayBuffer();
   return { bytes: buf, mime: target.mime };
+}
+
+// Pre-pass that runs before any encoder: optional resize and
+// palette quantization. Both are user-driven via the queue row's
+// Options panel. Returns a NEW canvas if either pass modifies it,
+// or the original canvas otherwise.
+function applyImagePrepasses(canvas, options) {
+  if (!options) return canvas;
+  let out = canvas;
+  if (typeof options.scale === 'number' && options.scale > 0 && options.scale < 1) {
+    out = images.resize(out, options.scale, { smoothing: true });
+  }
+  if (options.colors) {
+    out = images.quantizeCanvas(out, options.colors);
+  }
+  return out;
 }
 
 function hasAlpha(canvas) {
@@ -394,9 +418,9 @@ function hasAlpha(canvas) {
   return false;
 }
 
-async function runImage(source, target) {
+async function runImage(source, target, options) {
   const canvas = await decodeImageSourceToCanvas(source);
-  return encodeCanvasToTarget(canvas, target, source.name);
+  return encodeCanvasToTarget(canvas, target, source.name, options);
 }
 
 // ---------- PDF as image (any PDF rasterized to a canvas) ----------
@@ -406,7 +430,7 @@ async function runImage(source, target) {
 // out of scope (no-op) and PDF→other-document continues to flow
 // through runDoc.
 
-async function runPdfAsImage(source, target, onProgress) {
+async function runPdfAsImage(source, target, onProgress, options) {
   // Multi-page bridge: any PDF → CBZ rasterizes every page.
   if (target.ext === 'cbz') {
     const blob = await images.encodeCbzFromPdf(source.bytes, { onProgress });
@@ -422,7 +446,22 @@ async function runPdfAsImage(source, target, onProgress) {
   }
   const { canvas } = await images.decodePdfPage(source.bytes, 0);
   if (onProgress) onProgress(1);
-  return encodeCanvasToTarget(canvas, target, source.name);
+  return encodeCanvasToTarget(canvas, target, source.name, options);
+}
+
+// PDF → PDF compression. Rasterizes every page at the level's
+// quality + scale and re-assembles. When `options.pdfPreserveText`
+// is true (default), invisible-text overlay keeps Cmd-F working.
+async function runCompressPdf(source, target, onProgress, options) {
+  const level = (options && options.pdfLevel) || 'medium';
+  const preserveText = !options || options.pdfPreserveText !== false;
+  const blob = await images.compressPdf(source.bytes, {
+    level,
+    preserveText,
+    onProgress,
+  });
+  const buf = await blob.arrayBuffer();
+  return { bytes: buf, mime: target.mime };
 }
 
 function isImageTarget(target) {
@@ -541,7 +580,7 @@ async function getVideoEngine() {
   return _videoEngine;
 }
 
-async function runVideo(source, target, onProgress) {
+async function runVideo(source, target, onProgress, options) {
   const sourceExt = (source.name.split('.').pop() || '').toLowerCase();
   const fromExt = sourceExt === 'mpeg' ? 'mpg' : sourceExt;
   const inputBytes = source.bytes instanceof Uint8Array
@@ -572,12 +611,12 @@ async function runVideo(source, target, onProgress) {
   if (VIDEO_IMAGE_TARGETS.has(target.ext)) {
     const canvas = await video.extractFrame(inputBytes, { ext: fromExt, timestamp: 0 });
     if (onProgress) onProgress(1);
-    return encodeCanvasToTarget(canvas, target, source.name);
+    return encodeCanvasToTarget(canvas, target, source.name, options);
   }
 
   // Audio extraction (drop video stream, encode audio track).
   if (AUDIO_TARGETS.has(target.ext)) {
-    const out = await video.transcodeAudio(inputBytes, { from: fromExt, to: target.ext, onProgress });
+    const out = await video.transcodeAudio(inputBytes, { from: fromExt, to: target.ext, onProgress, options });
     const buf = out.buffer.slice(out.byteOffset, out.byteOffset + out.byteLength);
     return { bytes: buf, mime: target.mime };
   }
@@ -590,14 +629,14 @@ async function runVideo(source, target, onProgress) {
   }
 
   // Container/codec transcode.
-  const out = await video.transcode(inputBytes, { from: fromExt, to: target.ext, onProgress });
+  const out = await video.transcode(inputBytes, { from: fromExt, to: target.ext, onProgress, options });
   const buf = out.buffer.slice(out.byteOffset, out.byteOffset + out.byteLength);
   return { bytes: buf, mime: target.mime };
 }
 
 // Audio source family → audio target. Reuses the video engine
 // (FFmpeg.wasm) since it handles both video and audio streams.
-async function runAudio(source, target, onProgress) {
+async function runAudio(source, target, onProgress, options) {
   if (!AUDIO_TARGETS.has(target.ext)) {
     throw new Error(`Unsupported audio output: .${target.ext}`);
   }
@@ -614,7 +653,7 @@ async function runAudio(source, target, onProgress) {
     ? source.bytes
     : new Uint8Array(source.bytes);
   const video = await getVideoEngine();
-  const out = await video.transcodeAudio(inputBytes, { from: fromExt, to: target.ext, onProgress });
+  const out = await video.transcodeAudio(inputBytes, { from: fromExt, to: target.ext, onProgress, options });
   const buf = out.buffer.slice(out.byteOffset, out.byteOffset + out.byteLength);
   return { bytes: buf, mime: target.mime };
 }
@@ -767,6 +806,225 @@ function render() {
   clearBtn.disabled = isConverting;
 }
 
+// ---------- Per-row Options panel ----------
+//
+// The Options disclosure surfaces resolution / quality / palette /
+// bitrate / codec / PDF-compression-level controls per queue item.
+// Each control writes through queue.setOptions(item.id, {...}); the
+// dispatchers above already read from item.options.
+
+const LOSSY_IMAGE_EXTS = new Set(['jpg', 'webp', 'avif', 'pdf']);
+const PALETTE_IMAGE_EXTS = new Set(['png', 'bmp', 'ico', 'icns', 'cur', 'tga', 'pcx', 'sgi', 'ras', 'gif']);
+
+function targetWantsImageOptions(target) {
+  if (!target) return false;
+  switch (target.ext) {
+    case 'png': case 'jpg': case 'webp': case 'avif': case 'psd': case 'pdf':
+    case 'bmp': case 'ico': case 'ppm': case 'tga': case 'tif': case 'tif-multi': case 'cbz':
+    case 'pgm': case 'pbm': case 'pam': case 'xbm': case 'xpm': case 'pcx': case 'hdr':
+    case 'wbmp': case 'sgi': case 'ras': case 'ff': case 'icns': case 'cur':
+      return true;
+  }
+  return false;
+}
+
+function targetWantsVideoOptions(target) {
+  if (!target) return false;
+  if (AUDIO_TARGETS.has(target.ext)) return false;          // audio takes the audio panel
+  if (VIDEO_IMAGE_TARGETS.has(target.ext)) return true;     // first-frame image: still wants quality
+  if (target.ext === 'gif' || target.ext === 'cbz') return false;
+  if (SEQUENCE_TARGETS.has(target.ext)) return false;
+  // The set of video container/codec targets is large but they all
+  // route through video.transcode, which now accepts options.
+  return /^(mp4|mov|mkv|webm|avi|wmv|asf|flv|f4v|3gp|3g2|ts|m2ts|vob|ogv|dv|mjpeg|apng|webp_anim|avif_anim|mov_prores|mxf_dnxhr|y4m|m1v|m2v|nut|swf|wtv|ivf|amv|gxf|mp4_h265|mp4_av1|webm_av1|3gp_h263|avi_xvid|webm_vp9|mkv_ffv1|avi_huffyuv|mov_jp2|mov_cinepak|nut_snow|wmv_wmv3|avi_raw)$/.test(target.ext);
+}
+
+function targetWantsAudioOptions(target) {
+  return target && AUDIO_TARGETS.has(target.ext);
+}
+
+function targetWantsPdfCompressOptions(target) {
+  return target && target.ext === 'pdf-compress';
+}
+
+function targetWantsAnyOptions(target) {
+  return targetWantsImageOptions(target)
+    || targetWantsVideoOptions(target)
+    || targetWantsAudioOptions(target)
+    || targetWantsPdfCompressOptions(target);
+}
+
+function makeField(label, controlEl) {
+  const wrap = document.createElement('label');
+  wrap.className = 'queue-option';
+  const lab = document.createElement('span');
+  lab.className = 'queue-option-label';
+  lab.textContent = label;
+  wrap.appendChild(lab);
+  wrap.appendChild(controlEl);
+  return wrap;
+}
+
+function makeSelect(value, choices, onChange) {
+  const sel = document.createElement('select');
+  for (const [v, label] of choices) {
+    const opt = document.createElement('option');
+    opt.value = String(v);
+    opt.textContent = label;
+    if (String(v) === String(value)) opt.selected = true;
+    sel.appendChild(opt);
+  }
+  sel.addEventListener('change', () => onChange(sel.value));
+  return sel;
+}
+
+function makeRangeWithReadout(value, min, max, step, format, onInput) {
+  const wrap = document.createElement('span');
+  wrap.className = 'queue-option-range';
+  const range = document.createElement('input');
+  range.type = 'range';
+  range.min = String(min); range.max = String(max); range.step = String(step);
+  range.value = String(value);
+  const out = document.createElement('span');
+  out.className = 'queue-option-value';
+  out.textContent = format(value);
+  range.addEventListener('input', () => {
+    out.textContent = format(parseFloat(range.value));
+    onInput(parseFloat(range.value));
+  });
+  wrap.appendChild(range);
+  wrap.appendChild(out);
+  return wrap;
+}
+
+function makeTextInput(value, placeholder, onChange) {
+  const inp = document.createElement('input');
+  inp.type = 'text';
+  inp.placeholder = placeholder || '';
+  if (value != null) inp.value = String(value);
+  inp.addEventListener('change', () => onChange(inp.value || null));
+  return inp;
+}
+
+function makeCheckbox(label, value, onChange) {
+  const wrap = document.createElement('label');
+  wrap.className = 'queue-option queue-option-check';
+  const cb = document.createElement('input');
+  cb.type = 'checkbox';
+  cb.checked = !!value;
+  cb.addEventListener('change', () => onChange(cb.checked));
+  const lab = document.createElement('span');
+  lab.className = 'queue-option-label';
+  lab.textContent = label;
+  wrap.appendChild(cb);
+  wrap.appendChild(lab);
+  return wrap;
+}
+
+function buildImageOptionFields(item, target, panel) {
+  const opts = item.options || {};
+  panel.appendChild(makeField('Resolution', makeSelect(opts.scale ?? 1, [
+    [1, '100% (original)'],
+    [0.75, '75%'],
+    [0.5, '50%'],
+    [0.25, '25%'],
+  ], (v) => queue.setOptions(item.id, { scale: parseFloat(v) }))));
+
+  if (LOSSY_IMAGE_EXTS.has(target.ext)) {
+    const q = typeof opts.quality === 'number' ? opts.quality : 0.92;
+    panel.appendChild(makeField('Quality',
+      makeRangeWithReadout(q, 0.1, 1.0, 0.05,
+        (v) => `${Math.round(v * 100)}%`,
+        (v) => queue.setOptions(item.id, { quality: v }))));
+  }
+  if (PALETTE_IMAGE_EXTS.has(target.ext)) {
+    panel.appendChild(makeField('Colors', makeSelect(opts.colors ?? '', [
+      ['', 'Full colour'],
+      [256, '256'],
+      [128, '128'],
+      [64, '64'],
+      [16, '16'],
+    ], (v) => queue.setOptions(item.id, { colors: v ? parseInt(v, 10) : null }))));
+  }
+}
+
+function buildVideoOptionFields(item, panel) {
+  const opts = item.options || {};
+  panel.appendChild(makeField('Quality', makeSelect(opts.videoPreset ?? 'original', [
+    ['original', 'Original'],
+    ['low',      'Low (480p, 800k)'],
+    ['medium',   'Medium (720p, 2M)'],
+    ['high',     'High (1080p, 5M)'],
+  ], (v) => queue.setOptions(item.id, { videoPreset: v }))));
+
+  // Advanced sub-disclosure
+  const advBtn = document.createElement('button');
+  advBtn.type = 'button';
+  advBtn.className = 'queue-option-advanced-toggle';
+  advBtn.textContent = 'Advanced ▸';
+  const advPanel = document.createElement('div');
+  advPanel.className = 'queue-option-advanced';
+  advPanel.hidden = true;
+  advBtn.addEventListener('click', () => {
+    const open = advPanel.hidden;
+    advPanel.hidden = !open;
+    advBtn.textContent = open ? 'Advanced ▾' : 'Advanced ▸';
+  });
+  advPanel.appendChild(makeField('Resolution', makeSelect(opts.videoResolution ?? 'auto', [
+    ['auto', 'Auto'],
+    ['1080p', '1080p'],
+    ['720p', '720p'],
+    ['480p', '480p'],
+  ], (v) => queue.setOptions(item.id, { videoResolution: v }))));
+  advPanel.appendChild(makeField('Video bitrate',
+    makeTextInput(opts.videoBitrate, 'e.g. 1500k',
+      (v) => queue.setOptions(item.id, { videoBitrate: v }))));
+  advPanel.appendChild(makeField('Audio codec', makeSelect(opts.audioCodec ?? '', [
+    ['', 'Default'],
+    ['aac', 'AAC'],
+    ['mp3', 'MP3'],
+    ['opus', 'Opus'],
+    ['vorbis', 'Vorbis'],
+    ['copy', 'Copy (no re-encode)'],
+  ], (v) => queue.setOptions(item.id, { audioCodec: v || null }))));
+  advPanel.appendChild(makeField('Audio bitrate', makeSelect(opts.audioBitrate ?? '', [
+    ['', 'Default'],
+    ['96k', '96k'],
+    ['128k', '128k'],
+    ['192k', '192k'],
+    ['256k', '256k'],
+    ['320k', '320k'],
+  ], (v) => queue.setOptions(item.id, { audioBitrate: v || null }))));
+  panel.appendChild(advBtn);
+  panel.appendChild(advPanel);
+}
+
+function buildAudioOptionFields(item, panel) {
+  const opts = item.options || {};
+  panel.appendChild(makeField('Bitrate', makeSelect(opts.audioOnlyBitrate ?? '', [
+    ['', 'Default'],
+    ['96k', '96k'],
+    ['128k', '128k'],
+    ['192k', '192k'],
+    ['256k', '256k'],
+    ['320k', '320k'],
+  ], (v) => queue.setOptions(item.id, { audioOnlyBitrate: v || null }))));
+}
+
+function buildPdfCompressFields(item, panel) {
+  const opts = item.options || {};
+  panel.appendChild(makeField('Compression', makeSelect(opts.pdfLevel ?? 'medium', [
+    ['minimum', 'Minimum (largest file)'],
+    ['low',     'Low'],
+    ['medium',  'Medium'],
+    ['high',    'High'],
+    ['maximum', 'Maximum (smallest file)'],
+  ], (v) => queue.setOptions(item.id, { pdfLevel: v }))));
+  panel.appendChild(makeCheckbox('Preserve searchable text',
+    opts.pdfPreserveText !== false,
+    (v) => queue.setOptions(item.id, { pdfPreserveText: v })));
+}
+
 function renderRow(item) {
   const li = document.createElement('li');
   li.className = 'queue-row';
@@ -868,10 +1126,41 @@ function renderRow(item) {
   remove.textContent = '×';
   remove.addEventListener('click', () => { queue.remove(item.id); render(); });
 
+  // Per-row Options disclosure. Only shown when the chosen target
+  // accepts user-tunable options (image / video / audio / pdf-compress).
+  let optionsToggle = null;
+  let optionsPanel = null;
+  if (targetWantsAnyOptions(item.target)
+      && !(isConverting || item.status === 'converting' || item.status === 'done')) {
+    optionsToggle = document.createElement('button');
+    optionsToggle.type = 'button';
+    optionsToggle.className = 'queue-options-toggle';
+    optionsToggle.textContent = 'Options ▸';
+    optionsPanel = document.createElement('div');
+    optionsPanel.className = 'queue-options';
+    optionsPanel.hidden = true;
+    if (targetWantsImageOptions(item.target)) {
+      buildImageOptionFields(item, item.target, optionsPanel);
+    } else if (targetWantsVideoOptions(item.target)) {
+      buildVideoOptionFields(item, optionsPanel);
+    } else if (targetWantsAudioOptions(item.target)) {
+      buildAudioOptionFields(item, optionsPanel);
+    } else if (targetWantsPdfCompressOptions(item.target)) {
+      buildPdfCompressFields(item, optionsPanel);
+    }
+    optionsToggle.addEventListener('click', () => {
+      const open = optionsPanel.hidden;
+      optionsPanel.hidden = !open;
+      optionsToggle.textContent = open ? 'Options ▾' : 'Options ▸';
+    });
+  }
+
   li.appendChild(nameWrap);
   li.appendChild(select);
+  if (optionsToggle) li.appendChild(optionsToggle);
   li.appendChild(status);
   li.appendChild(remove);
+  if (optionsPanel) li.appendChild(optionsPanel);
   return li;
 }
 
@@ -1029,8 +1318,10 @@ async function convertAll() {
         setOverallCurrent(ratio);
         scheduleRender();
       };
-      if (sourceExt === 'pdf' && isImageTarget(item.target)) {
-        output = await runPdfAsImage(source, item.target, onProgress);
+      if (sourceExt === 'pdf' && item.target.ext === 'pdf-compress') {
+        output = await runCompressPdf(source, item.target, onProgress, item.options);
+      } else if (sourceExt === 'pdf' && isImageTarget(item.target)) {
+        output = await runPdfAsImage(source, item.target, onProgress, item.options);
       } else if (item.detected.family === 'document' &&
                  (sourceExt === 'html' || sourceExt === 'htm' || sourceExt === 'md' || sourceExt === 'markdown') &&
                  isSpreadsheetTarget(item.target)) {
@@ -1041,7 +1332,7 @@ async function convertAll() {
         switch (item.detected.family) {
           case 'document':    output = await runDoc(source, item.target); break;
           case 'spreadsheet': output = await runSheet(source, item.target); break;
-          case 'image':       output = await runImage(source, item.target); break;
+          case 'image':       output = await runImage(source, item.target, item.options); break;
           case 'slides':      output = await runSlides(source, item.target); break;
           case 'video': {
             // Surface the wasm download status the very first time
@@ -1051,7 +1342,7 @@ async function convertAll() {
               queue.setLoadingMessage(item.id, 'Loading video engine (~25 MB)…');
               scheduleRender();
             }
-            output = await runVideo(source, item.target, onProgress);
+            output = await runVideo(source, item.target, onProgress, item.options);
             break;
           }
           case 'audio': {
@@ -1062,7 +1353,7 @@ async function convertAll() {
               queue.setLoadingMessage(item.id, 'Loading audio engine (~25 MB)…');
               scheduleRender();
             }
-            output = await runAudio(source, item.target, onProgress);
+            output = await runAudio(source, item.target, onProgress, item.options);
             break;
           }
           case 'subtitle': {

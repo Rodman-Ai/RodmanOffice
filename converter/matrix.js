@@ -230,6 +230,16 @@ export function targetsFor(family) {
   return MATRIX[family] || [];
 }
 
+// "Compress PDF" lives only on PDF inputs. The matrix key is
+// `pdf-compress` so the existing `pdf` target (text-rebuild path)
+// stays available; the converter routes by ext key in its dispatch.
+const PDF_COMPRESS_TARGET = {
+  ext: 'pdf-compress',
+  outputExt: 'pdf',
+  mime: 'application/pdf',
+  label: 'Compressed PDF (.pdf)',
+};
+
 // Per-source augmentation. PDF is a document for text/PDF→PDF flows
 // but can also be rasterized into any image format (or every page
 // into a CBZ archive). Surface those extra options on PDF inputs so
@@ -244,7 +254,9 @@ const HTML_TABLE_BRIDGE = SHEET_OUTPUTS.filter((o) => TABLE_BRIDGE_EXTS.has(o.ex
 
 export function targetsForItem({ family, ext }) {
   const base = targetsFor(family);
-  if (family === 'document' && ext === 'pdf') return [...base, ...PDF_IMAGE_BRIDGE];
+  if (family === 'document' && ext === 'pdf') {
+    return [...base, PDF_COMPRESS_TARGET, ...PDF_IMAGE_BRIDGE];
+  }
   if (family === 'document' && (ext === 'html' || ext === 'md')) return [...base, ...HTML_TABLE_BRIDGE];
   return base;
 }

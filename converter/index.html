@@ -85,33 +85,165 @@
         </div>
         <div class="about-col">
           <h3 class="about-col-title">Supported formats</h3>
+          <p class="format-legend">
+            <span class="fmt-read">Red</span> <strong>read only</strong> ·
+            <span class="fmt-write">White</span> <strong>write only</strong> ·
+            <span class="fmt-both">Blue</span> <strong>read &amp; write</strong>
+          </p>
           <dl class="format-matrix">
-            <dt>Documents <span class="dir">read</span></dt>
-            <dd>DOCX · DOC (text-only, best-effort) · PDF · RTF · ODT · EPUB · MD · HTML · TXT</dd>
-            <dt>Documents <span class="dir">write</span></dt>
-            <dd>DOCX · PDF · RTF · ODT · EPUB · MD · HTML · TXT · AsciiDoc · LaTeX · JSON · YAML · MediaWiki · reStructuredText · Org-mode · DocBook · FictionBook · PPTX · ODP</dd>
-            <dt>Spreadsheets <span class="dir">read</span></dt>
-            <dd>XLSX · XLS · CSV · TSV · JSON · NDJSON · YAML · HTML tables · Markdown tables · vCard · iCalendar</dd>
-            <dt>Spreadsheets <span class="dir">write</span></dt>
-            <dd>XLSX · XLS (Excel 97-2003) · CSV · TSV · PSV · JSON · NDJSON · HTML · Markdown · Excel 2003 XML · ODS · vCard · iCalendar · PDF</dd>
-            <dt>Slides <span class="dir">read</span></dt>
-            <dd>PPTX · PPT (text-only, best-effort)</dd>
-            <dt>Slides <span class="dir">write</span></dt>
-            <dd>PPTX · ODP · PDF · DOCX · MD · HTML · TXT</dd>
-            <dt>Images <span class="dir">read</span></dt>
-            <dd>PNG · JPEG · GIF · BMP · WEBP · SVG · PSD · PSB · ICO · TIFF · PDF (any page)</dd>
-            <dt>Images <span class="dir">write</span></dt>
-            <dd>PNG · JPEG · WEBP · AVIF (browser-dependent) · PSD · BMP · ICO · ICNS · CUR · TIFF (single + multi-page) · PPM · PGM · PBM · PAM · TGA · PCX · HDR (Radiance) · XBM · XPM · WBMP · SGI · RAS (Sun) · Farbfeld · CBZ · PDF (Photoshop-compatible)</dd>
-            <dt>Video <span class="dir">read</span></dt>
-            <dd>MP4 · MOV · AVI · MPG · MPEG · WEBM · MKV · WMV · ASF · FLV · F4V · 3GP · 3G2 · TS · M2TS · MTS · VOB · OGV · DV · MJPEG · APNG · M1V · M2V · Y4M · NUT · SWF · WTV · IVF · AMV · GXF · MXF</dd>
-            <dt>Video <span class="dir">write</span></dt>
-            <dd>MP4 (H.264, H.265 / HEVC, AV1) · MOV (H.264, ProRes, JPEG 2000, Cinepak) · WEBM (VP8, VP9, AV1) · MKV (H.264, FFV1 lossless) · AVI (MPEG-4, Xvid, HuffYUV, raw YUV) · WMV (WMV2, WMV3 / VC-1) · FLV · 3GP (H.264, H.263) · MPEG-TS · M2TS · VOB · OGV · DV · MJPEG · APNG · animated WebP · animated AVIF · MXF DNxHR · Y4M · M1V · M2V · NUT (H.264, Snow) · SWF · WTV · IVF · AMV · GXF · PNG/DPX sequence ZIP · animated GIF · PNG/JPEG/WEBP (frame) · PDF (frame) · CBZ (frames) · 18 audio extract targets including ALAC, HE-AAC v2, μ-law / A-law / 24-bit / 32-bit float PCM, ADPCM, AMR-WB</dd>
-            <dt>Audio <span class="dir">read</span></dt>
-            <dd>MP3 · M4A · AAC · WAV · OGG · FLAC · OPUS · AC3 · EAC3 · AIFF · AIF · CAF · AMR · MP2 · WMA · AU · TTA · WV · SPX · GSM</dd>
-            <dt>Audio <span class="dir">write</span></dt>
-            <dd>MP3 · M4A (AAC, HE-AAC v2, ALAC) · WAV (16-bit, 24-bit, 32-bit float, μ-law, A-law, ADPCM) · OGG (Vorbis) · FLAC · OPUS · AC-3 · E-AC-3 · AIFF · CAF · AMR-NB · AMR-WB · MP2 · WMA · AU · TTA · WavPack · Speex · GSM</dd>
-            <dt>Subtitles <span class="dir">read + write</span></dt>
-            <dd>SRT · WebVTT · ASS · SSA · TTML · LRC</dd>
+            <dt>Documents</dt>
+            <dd>
+              <span class="fmt-both">DOCX</span> ·
+              <span class="fmt-read">DOC</span> ·
+              <span class="fmt-both">PDF</span> ·
+              <span class="fmt-write">Compressed PDF</span> ·
+              <span class="fmt-both">RTF</span> ·
+              <span class="fmt-both">ODT</span> ·
+              <span class="fmt-both">EPUB</span> ·
+              <span class="fmt-both">MD</span> ·
+              <span class="fmt-both">HTML</span> ·
+              <span class="fmt-both">TXT</span> ·
+              <span class="fmt-write">AsciiDoc</span> ·
+              <span class="fmt-write">LaTeX</span> ·
+              <span class="fmt-write">JSON</span> ·
+              <span class="fmt-write">YAML</span> ·
+              <span class="fmt-write">MediaWiki</span> ·
+              <span class="fmt-write">reStructuredText</span> ·
+              <span class="fmt-write">Org-mode</span> ·
+              <span class="fmt-write">DocBook</span> ·
+              <span class="fmt-write">FictionBook</span>
+            </dd>
+            <dt>Spreadsheets</dt>
+            <dd>
+              <span class="fmt-both">XLSX</span> ·
+              <span class="fmt-both">XLS</span> ·
+              <span class="fmt-both">CSV</span> ·
+              <span class="fmt-both">TSV</span> ·
+              <span class="fmt-write">PSV</span> ·
+              <span class="fmt-both">JSON</span> ·
+              <span class="fmt-both">NDJSON</span> ·
+              <span class="fmt-read">YAML</span> ·
+              <span class="fmt-both">HTML&nbsp;tables</span> ·
+              <span class="fmt-both">Markdown&nbsp;tables</span> ·
+              <span class="fmt-write">Excel&nbsp;2003&nbsp;XML</span> ·
+              <span class="fmt-write">ODS</span> ·
+              <span class="fmt-both">vCard</span> ·
+              <span class="fmt-both">iCalendar</span> ·
+              <span class="fmt-write">PDF</span>
+            </dd>
+            <dt>Slides</dt>
+            <dd>
+              <span class="fmt-both">PPTX</span> ·
+              <span class="fmt-read">PPT</span> ·
+              <span class="fmt-write">ODP</span> ·
+              <span class="fmt-write">PDF</span> ·
+              <span class="fmt-write">DOCX</span> ·
+              <span class="fmt-write">MD</span> ·
+              <span class="fmt-write">HTML</span> ·
+              <span class="fmt-write">TXT</span>
+            </dd>
+            <dt>Images</dt>
+            <dd>
+              <span class="fmt-both">PNG</span> ·
+              <span class="fmt-both">JPEG</span> ·
+              <span class="fmt-both">WEBP</span> ·
+              <span class="fmt-write">AVIF</span> ·
+              <span class="fmt-read">GIF</span> ·
+              <span class="fmt-both">BMP</span> ·
+              <span class="fmt-both">ICO</span> ·
+              <span class="fmt-write">CUR</span> ·
+              <span class="fmt-write">ICNS</span> ·
+              <span class="fmt-read">SVG</span> ·
+              <span class="fmt-both">PSD</span> ·
+              <span class="fmt-read">PSB</span> ·
+              <span class="fmt-both">TIFF</span> ·
+              <span class="fmt-write">multi-page&nbsp;TIFF</span> ·
+              <span class="fmt-write">PPM</span> ·
+              <span class="fmt-write">PGM</span> ·
+              <span class="fmt-write">PBM</span> ·
+              <span class="fmt-write">PAM</span> ·
+              <span class="fmt-write">TGA</span> ·
+              <span class="fmt-write">PCX</span> ·
+              <span class="fmt-write">HDR</span> ·
+              <span class="fmt-write">XBM</span> ·
+              <span class="fmt-write">XPM</span> ·
+              <span class="fmt-write">WBMP</span> ·
+              <span class="fmt-write">SGI</span> ·
+              <span class="fmt-write">RAS</span> ·
+              <span class="fmt-write">Farbfeld</span> ·
+              <span class="fmt-write">CBZ</span> ·
+              <span class="fmt-both">PDF</span>
+            </dd>
+            <dt>Video</dt>
+            <dd>
+              <span class="fmt-both">MP4</span> ·
+              <span class="fmt-both">MOV</span> ·
+              <span class="fmt-both">AVI</span> ·
+              <span class="fmt-read">MPG</span> ·
+              <span class="fmt-read">MPEG</span> ·
+              <span class="fmt-both">WEBM</span> ·
+              <span class="fmt-both">MKV</span> ·
+              <span class="fmt-both">WMV</span> ·
+              <span class="fmt-read">ASF</span> ·
+              <span class="fmt-both">FLV</span> ·
+              <span class="fmt-read">F4V</span> ·
+              <span class="fmt-both">3GP</span> ·
+              <span class="fmt-read">3G2</span> ·
+              <span class="fmt-both">TS</span> ·
+              <span class="fmt-both">M2TS</span> ·
+              <span class="fmt-read">MTS</span> ·
+              <span class="fmt-both">VOB</span> ·
+              <span class="fmt-both">OGV</span> ·
+              <span class="fmt-both">DV</span> ·
+              <span class="fmt-both">MJPEG</span> ·
+              <span class="fmt-both">APNG</span> ·
+              <span class="fmt-write">animated&nbsp;WebP</span> ·
+              <span class="fmt-write">animated&nbsp;AVIF</span> ·
+              <span class="fmt-both">MXF</span> ·
+              <span class="fmt-both">Y4M</span> ·
+              <span class="fmt-both">M1V</span> ·
+              <span class="fmt-both">M2V</span> ·
+              <span class="fmt-both">NUT</span> ·
+              <span class="fmt-both">SWF</span> ·
+              <span class="fmt-both">WTV</span> ·
+              <span class="fmt-both">IVF</span> ·
+              <span class="fmt-both">AMV</span> ·
+              <span class="fmt-both">GXF</span> ·
+              <span class="fmt-write">animated&nbsp;GIF</span> ·
+              <span class="fmt-write">PNG/DPX&nbsp;sequence</span>
+            </dd>
+            <dt>Audio</dt>
+            <dd>
+              <span class="fmt-both">MP3</span> ·
+              <span class="fmt-both">M4A</span> ·
+              <span class="fmt-read">AAC</span> ·
+              <span class="fmt-both">WAV</span> ·
+              <span class="fmt-both">OGG</span> ·
+              <span class="fmt-both">FLAC</span> ·
+              <span class="fmt-both">OPUS</span> ·
+              <span class="fmt-both">AC-3</span> ·
+              <span class="fmt-both">E-AC-3</span> ·
+              <span class="fmt-both">AIFF</span> ·
+              <span class="fmt-both">CAF</span> ·
+              <span class="fmt-both">AMR-NB</span> ·
+              <span class="fmt-write">AMR-WB</span> ·
+              <span class="fmt-both">MP2</span> ·
+              <span class="fmt-both">WMA</span> ·
+              <span class="fmt-both">AU</span> ·
+              <span class="fmt-both">TTA</span> ·
+              <span class="fmt-both">WavPack</span> ·
+              <span class="fmt-both">Speex</span> ·
+              <span class="fmt-both">GSM</span>
+            </dd>
+            <dt>Subtitles</dt>
+            <dd>
+              <span class="fmt-both">SRT</span> ·
+              <span class="fmt-both">WebVTT</span> ·
+              <span class="fmt-both">ASS</span> ·
+              <span class="fmt-both">SSA</span> ·
+              <span class="fmt-both">TTML</span> ·
+              <span class="fmt-both">LRC</span>
+            </dd>
           </dl>
           <p class="format-note">First video, audio, or subtitle conversion lazy-downloads the FFmpeg engine (~25 MB). Cached after. Some specialised codecs (DNxHR, ProRes, AMR-NB, Speex, WavPack) require the encoder to be compiled into the vendored core; if it isn't, the job fails with a runtime error.</p>
         </div>
