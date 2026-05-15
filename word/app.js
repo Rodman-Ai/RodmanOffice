@@ -1498,7 +1498,7 @@
     if (remembered && fmtSel.querySelector(`option[value="${remembered}"]`)) {
       fmtSel.value = remembered;
     } else {
-      fmtSel.value = 'rwd';
+      fmtSel.value = 'docx';
     }
     // Reset per-format option fields to defaults.
     $('#saveEncPassword').value = '';

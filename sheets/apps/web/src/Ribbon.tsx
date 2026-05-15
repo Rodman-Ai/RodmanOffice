@@ -140,8 +140,8 @@ export function Ribbon({ a }: { a: RibbonActions }) {
             </Group>
             <Group label="Export">
               <Row>
+                <BigBtn icon="XLSX" label="Save XLSX" onClick={a.exportXlsx} />
                 <BigBtn icon="CSV" label="Export CSV" onClick={a.exportCsv} />
-                <BigBtn icon="XLSX" label="Export XLSX" onClick={a.exportXlsx} />
                 <BigBtn icon="PDF" label="Export PDF" onClick={a.exportPdf} />
               </Row>
             </Group>
