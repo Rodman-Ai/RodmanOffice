@@ -1469,6 +1469,23 @@
       scheduleSave();
     },
     openDeck() { $('#deckFileInput').click(); },
+    openSaveDialog() {
+      // Unified Save dialog: pick filename + format. Replaces the
+      // 8 File-panel + 2 Record-panel export buttons.
+      const modal = $('#saveModal');
+      const nameInp = $('#saveFilename');
+      const fmtSel = $('#saveFormat');
+      if (!modal || !nameInp || !fmtSel) return;
+      nameInp.value = (deck.title || 'presentation').replace(/[^\w\-]+/g, '_');
+      const remembered = sessionStorage.getItem('rodmanslides:lastSaveFormat');
+      if (remembered && fmtSel.querySelector(`option[value="${remembered}"]`)) {
+        fmtSel.value = remembered;
+      } else {
+        fmtSel.value = 'pptx';
+      }
+      modal.hidden = false;
+      setTimeout(() => nameInp.focus(), 0);
+    },
     saveDeck() {
       const blob = new Blob([JSON.stringify(deck, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
@@ -1893,6 +1910,48 @@
     if (e.target === e.currentTarget) closeHelpTopic();
   });
 
+  // ---------- Unified Save dialog wiring ----------
+  function closeSaveModal() {
+    const m = $('#saveModal');
+    if (m) m.hidden = true;
+  }
+  function performSave() {
+    const fmt = $('#saveFormat').value;
+    const rawName = $('#saveFilename').value || (deck.title || 'presentation');
+    const cleanName = rawName.replace(/[^\w\-]+/g, '_') || 'presentation';
+    sessionStorage.setItem('rodmanslides:lastSaveFormat', fmt);
+    // Stash + restore deck.title — every existing exporter reads
+    // it for the filename. Same pattern as Word's Save dialog.
+    const origTitle = deck.title;
+    deck.title = cleanName;
+    try {
+      switch (fmt) {
+        case 'pptx': COMMANDS.exportPptx(); break;
+        case 'pdf':  COMMANDS.exportPdf();  break;
+        case 'json': COMMANDS.saveDeck();   break;
+        case 'odp':  COMMANDS.exportOdp();  break;
+        case 'docx': COMMANDS.exportDocx(); break;
+        case 'md':   COMMANDS.exportMd();   break;
+        case 'html': COMMANDS.exportHtml(); break;
+        case 'txt':  COMMANDS.exportTxt();  break;
+        default: alert('Unknown format: ' + fmt); return;
+      }
+    } finally {
+      deck.title = origTitle;
+    }
+    closeSaveModal();
+  }
+  $('#saveModalCloseBtn')?.addEventListener('click', closeSaveModal);
+  $('#saveModalCancelBtn')?.addEventListener('click', closeSaveModal);
+  $('#saveModalConfirmBtn')?.addEventListener('click', performSave);
+  $('#saveModal')?.addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) closeSaveModal();
+  });
+  $('#saveFilename')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); performSave(); }
+    else if (e.key === 'Escape') { e.preventDefault(); closeSaveModal(); }
+  });
+
   // ---------- Export to PDF (engine writer in lib/docs/pdfio.js) ----------
   //
   // Deck → HTML (via the shared deckToHtml in lib/slides/html-bridge.js)
@@ -2048,8 +2107,8 @@
       e.preventDefault(); COMMANDS.insertLink(); return;
     }
     if (mod && (e.key === 's' || e.key === 'S') && !e.shiftKey && !e.altKey) {
-      // Save = export .pptx (the default save format for Slides).
-      e.preventDefault(); COMMANDS.exportPptx(); return;
+      // Save opens the unified Save dialog (filename + format).
+      e.preventDefault(); COMMANDS.openSaveDialog(); return;
     }
 
     // Clipboard operations only fire when we're not capturing the
