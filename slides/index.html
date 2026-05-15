@@ -108,20 +108,9 @@
       </div>
       <div class="group">
         <div class="group-row">
-          <button class="ribbon-btn wide" data-cmd="exportPptx">Save .pptx</button>
-          <button class="ribbon-btn wide" data-cmd="exportPdf">Export PDF</button>
-          <button class="ribbon-btn wide" data-cmd="saveDeck">Export .json</button>
+          <button class="ribbon-btn wide" data-cmd="openSaveDialog">💾 Save…</button>
         </div>
-        <div class="group-row">
-          <button class="ribbon-btn wide" data-cmd="exportOdp">Export .odp</button>
-          <button class="ribbon-btn wide" data-cmd="exportDocx">Export .docx</button>
-          <button class="ribbon-btn wide" data-cmd="exportMd">Export .md</button>
-        </div>
-        <div class="group-row">
-          <button class="ribbon-btn wide" data-cmd="exportHtml">Export .html</button>
-          <button class="ribbon-btn wide" data-cmd="exportTxt">Export .txt</button>
-        </div>
-        <div class="group-label">Save / Export</div>
+        <div class="group-label">Save</div>
       </div>
       <div class="group">
         <div class="group-row">
@@ -483,10 +472,9 @@
       </div>
       <div class="group">
         <div class="group-row">
-          <button class="ribbon-btn wide" data-cmd="exportPptx">Save .pptx</button>
-          <button class="ribbon-btn wide" data-cmd="exportPdf">Export PDF</button>
+          <button class="ribbon-btn wide" data-cmd="openSaveDialog">💾 Save…</button>
         </div>
-        <div class="group-label">Export</div>
+        <div class="group-label">Save</div>
       </div>
       <div class="group">
         <div class="group-row">
@@ -632,6 +620,44 @@
       <footer>
         <button class="ribbon-btn wide" id="helpInfoActionBtn" type="button" hidden>Open link</button>
         <button class="ribbon-btn wide" id="helpInfoDoneBtn" type="button">Close</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Unified Save dialog: replaces the 8 File-panel + 2 Record-panel
+       export buttons. Format choice + filename live here. -->
+  <div class="help-modal" id="saveModal" hidden role="dialog" aria-modal="true" aria-labelledby="saveModalTitle">
+    <div class="help-modal-card">
+      <header>
+        <h3 id="saveModalTitle">Save deck</h3>
+        <button class="icon-btn" id="saveModalCloseBtn" type="button" aria-label="Close">×</button>
+      </header>
+      <div class="help-modal-body">
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:10px">
+          <span>Filename</span>
+          <input id="saveFilename" type="text" style="font:inherit;font-size:13px;font-weight:400;text-transform:none;padding:6px 10px;border:1px solid var(--border, #cbd2d8);border-radius:4px" />
+        </label>
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.4px">
+          <span>Format</span>
+          <select id="saveFormat" style="font:inherit;font-size:13px;font-weight:400;text-transform:none;padding:6px 10px;border:1px solid var(--border, #cbd2d8);border-radius:4px;background:white">
+            <optgroup label="Slides">
+              <option value="pptx">PowerPoint (.pptx)</option>
+              <option value="odp">OpenDocument Presentation (.odp)</option>
+              <option value="json">RodmanSlides deck (.json)</option>
+            </optgroup>
+            <optgroup label="Document">
+              <option value="pdf">PDF</option>
+              <option value="docx">Word (.docx)</option>
+              <option value="html">HTML</option>
+              <option value="md">Markdown</option>
+              <option value="txt">Plain text</option>
+            </optgroup>
+          </select>
+        </label>
+      </div>
+      <footer>
+        <button class="ribbon-btn wide" id="saveModalCancelBtn" type="button">Cancel</button>
+        <button class="ribbon-btn wide" id="saveModalConfirmBtn" type="button">Save</button>
       </footer>
     </div>
   </div>

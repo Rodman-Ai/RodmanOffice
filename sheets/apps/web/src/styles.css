@@ -992,6 +992,68 @@ body,
   cursor: not-allowed;
 }
 
+/* Unified Save dialog (replaces 13 separate Export buttons). */
+.save-dialog {
+  width: 460px;
+  max-width: 92vw;
+}
+.save-dialog-body {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.save-dialog-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--aicell-header-fg);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.save-dialog-row > input[type="text"],
+.save-dialog-row > select {
+  border: 1px solid var(--aicell-border);
+  border-radius: 4px;
+  padding: 6px 10px;
+  font: inherit;
+  font-size: 13px;
+  text-transform: none;
+  font-weight: 400;
+  background: white;
+}
+.save-dialog-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+  padding: 10px 14px 14px;
+}
+.save-dialog-actions button {
+  padding: 5px 12px;
+  border: 1px solid var(--aicell-border);
+  background: white;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.save-dialog-actions button:hover:not(:disabled) {
+  background: #f0f0f3;
+}
+.save-dialog-actions button.primary {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+.save-dialog-actions button.primary:hover:not(:disabled) {
+  background: var(--primary-dark);
+}
+.save-dialog-actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* Conditional formatting modal */
 .cf-modal {
   width: 560px;

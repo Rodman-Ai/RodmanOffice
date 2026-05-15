@@ -10,20 +10,11 @@ export type RibbonActions = {
   // File
   newWorkbook: () => void;
   importFile: () => void;
-  exportCsv: () => void;
-  exportXlsx: () => void;
-  // Part 12: extra exports.
-  exportTsv: () => void;
-  exportPsv: () => void;
-  exportJson: () => void;
-  exportNdjson: () => void;
-  exportHtml: () => void;
-  exportMd: () => void;
-  exportXml: () => void;
-  exportOds: () => void;
-  exportVcf: () => void;
-  exportIcs: () => void;
-  exportPdf: () => void;
+  // The 13 separate Export buttons (XLSX, CSV, PDF, TSV, PSV, JSON,
+  // NDJSON, HTML, MD, XML, ODS, vCard, iCal) folded into the
+  // unified Save dialog — App.tsx renders <SaveDialog> and the
+  // dialog handles its own dispatch.
+  openSaveDialog: () => void;
   // Edit
   undo: () => void;
   redo: () => void;
@@ -138,25 +129,9 @@ export function Ribbon({ a }: { a: RibbonActions }) {
                 <BigBtn icon="Open" label="Import" onClick={a.importFile} />
               </Row>
             </Group>
-            <Group label="Export">
+            <Group label="Save">
               <Row>
-                <BigBtn icon="XLSX" label="Save XLSX" onClick={a.exportXlsx} />
-                <BigBtn icon="CSV" label="Export CSV" onClick={a.exportCsv} />
-                <BigBtn icon="PDF" label="Export PDF" onClick={a.exportPdf} />
-              </Row>
-            </Group>
-            <Group label="More formats">
-              <Row>
-                <BigBtn icon="TSV" label="TSV" onClick={a.exportTsv} />
-                <BigBtn icon="PSV" label="PSV" onClick={a.exportPsv} />
-                <BigBtn icon="JSON" label="JSON" onClick={a.exportJson} />
-                <BigBtn icon="ND" label="NDJSON" onClick={a.exportNdjson} />
-                <BigBtn icon="HTML" label="HTML" onClick={a.exportHtml} />
-                <BigBtn icon="MD" label="Markdown" onClick={a.exportMd} />
-                <BigBtn icon="XML" label="Excel XML" onClick={a.exportXml} />
-                <BigBtn icon="ODS" label="ODS" onClick={a.exportOds} />
-                <BigBtn icon="VCF" label="vCard" onClick={a.exportVcf} />
-                <BigBtn icon="ICS" label="iCal" onClick={a.exportIcs} />
+                <BigBtn icon="💾" label="Save…" onClick={a.openSaveDialog} />
               </Row>
             </Group>
           </div>

@@ -1660,25 +1660,10 @@
     if (e.shiftKey) { resetAll(); return; }
     if (confirm('Clear the canvas?')) { pushUndo(); clearCanvas('#ffffff'); scheduleAutosave(); }
   });
-  $('btn-save').addEventListener('click', async () => {
-    // Default save format: PNG for flat documents, Photoshop PDF
-    // when the active doc has more than one layer (so layered work
-    // doesn't get silently flattened on a quick save).
-    const d = activeDoc();
-    const hasLayers = !!(d && Array.isArray(d.layers) && d.layers.length > 1);
-    const stamp = `retro-paint-${state.mode}-${Date.now()}`;
-    if (hasLayers) {
-      const pdfMod = await import('../../lib/images/pdf.js');
-      const blob = await pdfMod.encodePdfFromCanvas(canvas, {
-        format: 'jpeg',
-        quality: 0.92,
-      });
-      IO.triggerDownload(blob, IO.suggestFilename(stamp, 'pdf'));
-    } else {
-      const blob = await IO.encodePNG(canvas);
-      IO.triggerDownload(blob, stamp + '.png');
-    }
-  });
+  // Plain click → unified Save dialog (defined below as
+  // openSaveDialog). Shift-click upscale handler is registered
+  // separately further down and intercepts via capture phase.
+  $('btn-save').addEventListener('click', () => { openSaveDialog(); });
   $('primary-swatch').addEventListener('click', () => openHsvPicker(true));
   $('secondary-swatch').addEventListener('click', () => openHsvPicker(false));
   $('primary-swatch').addEventListener('contextmenu', (e) => { e.preventDefault(); pickColorPrompt(true); });
@@ -1797,31 +1782,9 @@
     }
   });
 
-  // ---- Save as PSD / Save as Photoshop PDF ----
-  // Both routes use the merged-display canvas (composite()'s output)
-  // so brushes / layers / filter previews are all baked in.
-  const btnSavePsd = $('btn-save-psd');
-  if (btnSavePsd) btnSavePsd.addEventListener('click', async () => {
-    try {
-      const psdMod = await import('../../lib/images/psd.js');
-      const blob = psdMod.encodePsd(canvas);
-      IO.triggerDownload(blob, IO.suggestFilename(`retropaint-${Date.now()}`, 'psd'));
-    } catch (e) {
-      console.error(e);
-      alert('Could not save .psd: ' + (e && e.message ? e.message : e));
-    }
-  });
-  const btnSavePdf = $('btn-save-pdf');
-  if (btnSavePdf) btnSavePdf.addEventListener('click', async () => {
-    try {
-      const pdfMod = await import('../../lib/images/pdf.js');
-      const blob = await pdfMod.encodePdfFromCanvas(canvas, { format: 'jpeg', quality: 0.92 });
-      IO.triggerDownload(blob, IO.suggestFilename(`retropaint-${Date.now()}`, 'pdf'));
-    } catch (e) {
-      console.error(e);
-      alert('Could not save .pdf: ' + (e && e.message ? e.message : e));
-    }
-  });
+  // The standalone "Save as PSD" and "Save as Photoshop PDF"
+  // toolbar buttons were removed — both formats live inside the
+  // unified Save dialog now (openSaveDialog below).
 
   // ---- Save As… (format + quality + resolution + colors) ----
   const SAVE_AS_FORMATS = [
@@ -1854,23 +1817,29 @@
     { ext: 'cbz',  label: 'Comic Book ZIP', lossy: false, palette: false },
   ];
 
-  const btnSaveAs = $('btn-save-as');
-  if (btnSaveAs) btnSaveAs.addEventListener('click', async () => {
+  // The unified Save dialog. Triggered by btn-save (above) and the
+  // global Ctrl+S keybinding (further down).
+  async function openSaveDialog() {
     let avifSupported = false;
     try { avifSupported = await IO.isAvifEncodeSupported(); } catch { /* probe failed; treat as no */ }
     const formats = SAVE_AS_FORMATS.filter((f) => !f.gated || avifSupported);
 
-    // Default selection mirrors the quick-Save rule: PDF for layered
-    // documents (so Photoshop-style work doesn't get flattened by
-    // accident), PNG otherwise.
+    // Default selection mirrors the rule we surface in the tooltip:
+    // PDF for layered documents (so Photoshop-style work doesn't get
+    // flattened by accident), PNG otherwise.
     const d = activeDoc();
     const defaultExt = (d && Array.isArray(d.layers) && d.layers.length > 1)
       ? 'pdf' : 'png';
     const fmtOptions = formats.map((f) =>
       `<option value="${f.ext}"${f.ext === defaultExt ? ' selected' : ''}>${f.label}</option>`
     ).join('');
+    const defaultName = `retropaint-${state.mode}-${Date.now()}`;
     const html = `
       <div class="save-as-form" style="display:flex;flex-direction:column;gap:10px;font-size:13px">
+        <label style="display:flex;justify-content:space-between;gap:10px;align-items:center">
+          <span>Filename</span>
+          <input id="sa-filename" type="text" value="${defaultName}" style="flex:1;min-width:180px;padding:4px 8px;border:1px solid #ccc;border-radius:4px;font:inherit;font-size:13px">
+        </label>
         <label style="display:flex;justify-content:space-between;gap:10px;align-items:center">
           <span>Format</span>
           <select id="sa-format">${fmtOptions}</select>
@@ -1922,7 +1891,7 @@
       refreshFieldVisibility();
     };
     // showModal sets the body, then we wire on the next tick.
-    const okPromise = showModal('Save As…', html, { okText: 'Save' });
+    const okPromise = showModal('Save', html, { okText: 'Save' });
     setTimeout(wireForm, 0);
     const ok = await okPromise;
     if (!ok) return;
@@ -1932,14 +1901,15 @@
     const scale = parseFloat($('sa-scale').value);
     const colorsRaw = $('sa-colors').value;
     const colors = colorsRaw ? parseInt(colorsRaw, 10) : null;
+    const userName = ($('sa-filename').value || defaultName).trim();
+    const stamp = userName.replace(/[^\w.\- ]+/g, '_') || defaultName;
 
     let work = canvas;
     if (scale && scale !== 1) work = IO.resize(work, scale, { smoothing: scale < 1 });
     if (colors) work = IO.quantizeCanvas(work, colors);
 
-    const stamp = `retropaint-${Date.now()}`;
     // XBM / XPM emit C source where the symbol name has to be a
-    // valid identifier (no dashes). Derive a stem from the stamp.
+    // valid identifier (no dashes). Derive a stem from the filename.
     const stem = stamp.replace(/[^A-Za-z0-9_]/g, '_') || 'image';
     try {
       let blob, filename;
@@ -1978,7 +1948,7 @@
       console.error(e);
       alert('Could not save .' + ext + ': ' + (e && e.message ? e.message : e));
     }
-  });
+  }
 
   // ---- Autosave + restore ----
   let saveTimer = null;
