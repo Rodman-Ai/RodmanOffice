@@ -1661,8 +1661,23 @@
     if (confirm('Clear the canvas?')) { pushUndo(); clearCanvas('#ffffff'); scheduleAutosave(); }
   });
   $('btn-save').addEventListener('click', async () => {
-    const blob = await IO.encodePNG(canvas);
-    IO.triggerDownload(blob, `retro-paint-${state.mode}-${Date.now()}.png`);
+    // Default save format: PNG for flat documents, Photoshop PDF
+    // when the active doc has more than one layer (so layered work
+    // doesn't get silently flattened on a quick save).
+    const d = activeDoc();
+    const hasLayers = !!(d && Array.isArray(d.layers) && d.layers.length > 1);
+    const stamp = `retro-paint-${state.mode}-${Date.now()}`;
+    if (hasLayers) {
+      const pdfMod = await import('../../lib/images/pdf.js');
+      const blob = await pdfMod.encodePdfFromCanvas(canvas, {
+        format: 'jpeg',
+        quality: 0.92,
+      });
+      IO.triggerDownload(blob, IO.suggestFilename(stamp, 'pdf'));
+    } else {
+      const blob = await IO.encodePNG(canvas);
+      IO.triggerDownload(blob, stamp + '.png');
+    }
   });
   $('primary-swatch').addEventListener('click', () => openHsvPicker(true));
   $('secondary-swatch').addEventListener('click', () => openHsvPicker(false));
@@ -1845,8 +1860,14 @@
     try { avifSupported = await IO.isAvifEncodeSupported(); } catch { /* probe failed; treat as no */ }
     const formats = SAVE_AS_FORMATS.filter((f) => !f.gated || avifSupported);
 
-    const fmtOptions = formats.map((f, i) =>
-      `<option value="${f.ext}"${i === 0 ? ' selected' : ''}>${f.label}</option>`
+    // Default selection mirrors the quick-Save rule: PDF for layered
+    // documents (so Photoshop-style work doesn't get flattened by
+    // accident), PNG otherwise.
+    const d = activeDoc();
+    const defaultExt = (d && Array.isArray(d.layers) && d.layers.length > 1)
+      ? 'pdf' : 'png';
+    const fmtOptions = formats.map((f) =>
+      `<option value="${f.ext}"${f.ext === defaultExt ? ' selected' : ''}>${f.label}</option>`
     ).join('');
     const html = `
       <div class="save-as-form" style="display:flex;flex-direction:column;gap:10px;font-size:13px">

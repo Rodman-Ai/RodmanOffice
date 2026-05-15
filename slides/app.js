@@ -2047,6 +2047,10 @@
     if (mod && (e.key === 'k' || e.key === 'K')) {
       e.preventDefault(); COMMANDS.insertLink(); return;
     }
+    if (mod && (e.key === 's' || e.key === 'S') && !e.shiftKey && !e.altKey) {
+      // Save = export .pptx (the default save format for Slides).
+      e.preventDefault(); COMMANDS.exportPptx(); return;
+    }
 
     // Clipboard operations only fire when we're not capturing the
     // browser's native clipboard for text editing.

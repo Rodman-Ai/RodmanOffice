@@ -368,6 +368,12 @@ export function App() {
         if (inEditable) return;
         e.preventDefault();
         applyFormatPatch({ underline: !anchorFormat?.underline });
+      } else if (mod && (e.key === "s" || e.key === "S") && !e.shiftKey && !e.altKey) {
+        // Save = Export XLSX (the default save format for Sheets).
+        e.preventDefault();
+        void import("./csv").then(({ exportWorkbookAsXLSX }) =>
+          exportWorkbookAsXLSX(api.workbook),
+        );
       }
     };
     window.addEventListener("keydown", handler);
