@@ -36,7 +36,7 @@ one request and is not stored by RodmanWord.
 
 | Tab | What's in it |
 |---|---|
-| **File** | Backstage with Home / New / Open / Save & Save As / Print / Share / Cloud sync / Export / Info / Tools / About sections, a search box, recent docs. |
+| **File** | Backstage with Home / New / Open / Save / Print / Share / Cloud sync / Info / Tools / About sections. The Save section has a single **Save…** tile that opens a unified dialog (filename + format select + per-format options) — formerly the separate Save and Export tabs. `Ctrl+S` opens the same dialog. |
 | **Home** | Clipboard / Font (with colour swatches + recent colours) / Paragraph (lists, alignment, indent, line spacing) / Styles / Editing (Undo, Redo, Find) / Voice (Dictate). |
 | **Insert** | Pages, Tables (incl. Text↔Table), Illustrations (Picture / Gallery / Carousel / Linked / Shapes / Chart), Media (Online Video / Audio / Iframe / QR / Barcode), Links, Comments, Header & Footer, Text (Word art / Drop cap / Pull quote / Code block / Quick parts / Tab stop / Lorem / Date / HR), Symbols, Forms. |
 | **Design** | Document themes, paragraph spacing presets, watermark. |
@@ -88,9 +88,11 @@ from browser cache or the network.
 
 ### Compress PDF
 
-When the active document was imported from a `.pdf`, the **Compress PDF…**
-tile in the Export menu re-rasterizes the original bytes at a chosen
-quality level and reassembles a smaller PDF. Levels (Acrobat-style):
+When the active document was imported from a `.pdf`, the unified
+**Save…** dialog reveals a **Re-encode from the source PDF (Compress)**
+checkbox under the PDF format option. Tick it to re-rasterize the
+original bytes at a chosen quality level and reassemble a smaller
+PDF. Levels (Acrobat-style):
 
 | Level   | JPEG quality | Page scale | Notes |
 |---------|--------------|-----------|-------|
