@@ -1496,6 +1496,7 @@
       setTimeout(() => URL.revokeObjectURL(url), 0);
     },
     importPptx() { $('#pptxFileInput').click(); },
+    importPdf() { $('#pdfFileInput').click(); },
     exportPptx() {
       if (!window.RodmanSlidesIO || !window.RodmanSlidesIO.savePptx) {
         alert('PPTX engine failed to load. Reload the page and try again.');
@@ -1712,6 +1713,55 @@
       scheduleSave();
     } catch (err) {
       alert('Could not import .pptx: ' + (err.message || err));
+    }
+  });
+
+  // PDF → deck import. Each page rasterises to a canvas via the
+  // shared lib/images/pdf.js engine and lands as a single full-bleed
+  // image element on its own slide. Letterboxed to preserve the
+  // page aspect inside the deck's 1280×720 canvas.
+  $('#pdfFileInput').addEventListener('change', async (e) => {
+    const f = e.target.files[0];
+    e.target.value = '';
+    if (!f) return;
+    if (!window.RodmanImagePdf || !window.RodmanImagePdf.decodePdfPage) {
+      alert('PDF engine failed to load. Reload the page and try again.');
+      return;
+    }
+    try {
+      const buf = await f.arrayBuffer();
+      const bytes = new Uint8Array(buf);
+      const pageCount = await window.RodmanImagePdf.pdfPageCount(bytes);
+      if (!pageCount) { alert('No pages found in this PDF.'); return; }
+      const fresh = D.newDeck();
+      fresh.title = f.name.replace(/\.pdf$/i, '');
+      fresh.slides = [];
+      const deckW = fresh.size.w;
+      const deckH = fresh.size.h;
+      for (let i = 0; i < pageCount; i++) {
+        const { canvas } = await window.RodmanImagePdf.decodePdfPage(bytes, i, { scale: 2 });
+        const dataUrl = canvas.toDataURL('image/png');
+        const pageAspect = canvas.width / canvas.height;
+        const deckAspect = deckW / deckH;
+        let w, h, x, y;
+        if (pageAspect > deckAspect) {
+          w = deckW; h = Math.round(deckW / pageAspect);
+          x = 0; y = Math.round((deckH - h) / 2);
+        } else {
+          h = deckH; w = Math.round(deckH * pageAspect);
+          x = Math.round((deckW - w) / 2); y = 0;
+        }
+        const slide = D.newSlide({ layout: 'blank', theme: fresh.theme });
+        slide.elements = [D.newImageElement({ x, y, w, h, src: dataUrl })];
+        fresh.slides.push(slide);
+      }
+      deck = sanitizeDeck(fresh);
+      state.selectedSlideId = deck.slides[0] ? deck.slides[0].id : null;
+      clearSelection();
+      bootstrap();
+      scheduleSave();
+    } catch (err) {
+      alert('Could not import .pdf: ' + (err.message || err));
     }
   });
 
