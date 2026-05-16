@@ -929,11 +929,13 @@ label.adjust select {
   }
   .title-actions { gap: 4px; }
   .title-bar .ask-claude {
+    /* On mobile the visible label collapses to just the 🤖 glyph
+       so the title-actions cluster fits within iPhone-width. The
+       aria-label="Ask Claude" on the button keeps the accessible
+       name intact for screen readers. */
     padding: 4px 8px;
-    max-width: 126px;
-    overflow: hidden;
-    text-overflow: ellipsis;
   }
+  .title-bar .ask-claude .ask-claude-text { display: none; }
   .tab { padding: 8px 14px; font-size: 12px; }
   .ribbon { overflow: visible; }
   .ribbon-panel {
