@@ -103,6 +103,7 @@ const TABS: { id: Tab; label: string }[] = [
 
 export function Ribbon({ a }: { a: RibbonActions }) {
   const [tab, setTab] = useState<Tab>("home");
+  const [collapsed, setCollapsed] = useState(false);
   const fmt = a.format ?? {};
   return (
     <>
@@ -113,14 +114,25 @@ export function Ribbon({ a }: { a: RibbonActions }) {
             role="tab"
             aria-selected={tab === t.id}
             className={`tab${tab === t.id ? " active" : ""}`}
-            onClick={() => setTab(t.id)}
+            title="Double-click to collapse the ribbon"
+            onClick={() => {
+              // Mirror Word: clicking a *different* tab while
+              // collapsed re-expands the ribbon. Clicking the
+              // active tab is a no-op — use dblclick to toggle.
+              if (collapsed && tab !== t.id) setCollapsed(false);
+              setTab(t.id);
+            }}
+            onDoubleClick={() => setCollapsed((c) => !c)}
           >
             {t.label}
           </button>
         ))}
       </nav>
 
-      <section className="ribbon" role="tabpanel">
+      <section
+        className={`ribbon${collapsed ? " collapsed" : ""}`}
+        role="tabpanel"
+      >
         {tab === "file" && (
           <div className="ribbon-panel active">
             <Group label="Workbook">
