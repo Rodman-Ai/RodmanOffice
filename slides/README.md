@@ -11,34 +11,40 @@ step.
 - Use a PowerPoint-style ribbon layout: File, Home, Insert, Design, Transitions, Animations, Slide Show, Record, Review, View, and Help.
 - Edit text, shapes, images, video/audio embeds, tables, notes, footers, slide numbers, themes, transitions, and simple animations.
 - Cut, copy, and paste slide elements inside the deck.
-- Save/open the native `.json` deck format.
-- Import/export `.pptx` through the shared `../lib/slides/` engine.
-- Export `.odp`, `.docx`, `.md`, `.html`, `.txt` — every slide flows
-  through the shared `deckToHtml` bridge (`../lib/slides/html-bridge.js`)
-  into the doc-family writers in `../lib/docs/`.
-- Export PDF through the engine writer in `../lib/docs/pdfio.js`. See
-  the PDF fidelity caveat below.
+- Open the native `.json` deck format, or import `.pptx` through the
+  shared `../lib/slides/` engine.
+- **Save…** — a single ribbon button (and `Ctrl+S` / `Cmd+S`) opens
+  the unified Save dialog where you pick a filename and one of eight
+  formats: `.pptx`, `.odp`, the RodmanSlides deck `.json`, `.pdf`,
+  `.docx`, `.md`, `.html`, or `.txt`. The default is `.pptx`. PPTX
+  goes through `../lib/slides/pptx.js`; ODP / DOCX / MD / HTML / TXT
+  flow through the shared `deckToHtml` bridge
+  (`../lib/slides/html-bridge.js`) into the doc-family writers in
+  `../lib/docs/`; PDF rides the engine writer at
+  `../lib/docs/pdfio.js` (see the fidelity caveat below).
 - Present from the start, current slide, or a one-off custom slide range, with optional automatic slide advance timing.
 - Use View controls for ruler, gridlines, guides, color, grayscale, and black-and-white editor previews.
 - Open Ask Claude from the title bar, Insert, Review, or Help. The panel
   supports per-request BYOK chat; the Claude API key is entered for one
   request and is not stored by RodmanSlides.
 
-## PDF export fidelity
+## PDF fidelity
 
-`Export PDF` runs the deck through `deckToHtml(deck) → savePdf(html)`
-using the suite's hand-rolled PDF writer in `../lib/docs/pdfio.js`.
-Output is deterministic across browsers and doesn't invoke the print
-dialog, but the engine renders text-only Helvetica with simple layout —
-slide theme colors, backgrounds, and image elements are **not**
-preserved. For pixel-perfect PDF that matches the on-screen slide,
-open the deck in PowerPoint or Keynote (via the `.pptx` export) and
-print to PDF from there.
+Picking PDF in the Save dialog runs the deck through
+`deckToHtml(deck) → savePdf(html)` using the suite's hand-rolled PDF
+writer in `../lib/docs/pdfio.js`. Output is deterministic across
+browsers and doesn't invoke the print dialog, but the engine renders
+text-only Helvetica with simple layout — slide theme colors,
+backgrounds, and image elements are **not** preserved. For
+pixel-perfect PDF that matches the on-screen slide, save the deck
+as `.pptx` first, open it in PowerPoint or Keynote, and print to PDF
+from there.
 
 ## Storage
 
 Autosave writes the current deck to `localStorage` under `slides.deck.v1`.
-Use native `.json` export for backups and handoff between browsers.
+Pick the RodmanSlides deck `.json` format in the Save dialog for
+backups and handoff between browsers.
 
 ## Offline And PWA Behavior
 

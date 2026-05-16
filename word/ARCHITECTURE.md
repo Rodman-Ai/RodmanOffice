@@ -75,7 +75,7 @@ calls into them:
    │          below). 400 ms debounce.  │
    └────────────────────────────────────┘
                      │
-                     │  user clicks Export …
+                     │  user opens the Save dialog and picks a non-native format …
                      ▼
    ┌────────────────────────────────────┐
    │ Tier 3:  on-demand shared engines  │
@@ -106,8 +106,10 @@ is a `<button class="tab" data-tab="…">` and each panel is a
 
 Two-pane layout. The left rail is a static `<ul class="backstage-rail">`
 of `<button data-section="…">` items (Home / New / Open / Save /
-Print / Share / Cloud sync / Export / Info / Tools / About). The
-right pane is dynamic.
+Print / Share / Cloud sync / Info / Tools / About). The right pane
+is dynamic. The standalone "Export" section was retired when Save
+was unified into a single dialog — every format is now picked
+inside the dialog instead of from a separate ribbon tab.
 
 `renderBackstageSection(name)` reads from a `BACKSTAGE_SECTIONS` map
 keyed by section name. Each section is `{ title, render?, tiles? }`:

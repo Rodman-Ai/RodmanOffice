@@ -4,6 +4,34 @@ All meaningful releases on `claude/build-word-clone-cXSXu`. Versions
 follow `RW_BUILD.version` in `app.js`. Cache key in
 `sw.js VERSION` is in lock-step.
 
+## Unreleased — Save dialog unification
+
+The File backstage's Save and Export surfaces collapsed into one
+**Save…** tile that opens a unified dialog (PRs #40 / #41 / #42).
+
+- New modal `#saveModal` in `index.html` with filename input,
+  grouped format select (Native / Office / OpenDocument / Portable
+  / Markup / Structured), and per-format options: rwd.enc password,
+  markdown YAML frontmatter toggle, PDF re-encode-from-source with
+  five compression levels + searchable-text checkbox when the doc
+  was imported from a PDF.
+- `Ctrl+S` / `Cmd+S` is wired for the first time (the shortcut was
+  silently dead — only the command palette reached it). Default
+  format = `.docx` on a fresh tab; the last pick is remembered per
+  tab in `sessionStorage`.
+- The backstage rail loses the **Export** tab (now 10 sections, not
+  11) and Print loses its duplicate **Export PDF** tile. The
+  standalone `compress-pdf` flow folds into the PDF branch of the
+  dialog. Side tiles **Save to file…** (File System Access) and
+  **Save as template** stay separate because they're not
+  format-choice operations.
+- Encryption logic was extracted to a shared
+  `encryptAndDownload(password)` helper used by both the legacy
+  "Save with password" modal and the new dialog.
+- Sister apps (Sheets / Slides / Image Editor) gained the same
+  one-button-opens-the-dialog pattern in PR #42; their `Ctrl+S`
+  also opens their respective dialogs.
+
 ## [2.1.0] — 2026-05-02 · cache `rwd-v10`
 
 UI polish + plumbing.
