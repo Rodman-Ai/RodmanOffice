@@ -8,7 +8,7 @@
 // keeps the install footprint of the converter small and avoids
 // an outsized SW cache quota hit for users who never convert
 // video.
-const VERSION = 'rconv-v2';
+const VERSION = 'rconv-v3';
 const CACHE_PREFIX = 'rconv-';
 const APP_SHELL = [
   './',
