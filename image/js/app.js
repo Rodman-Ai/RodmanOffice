@@ -2655,18 +2655,24 @@
   }
 
   // ---- HD export (2x / 3x) ----
-  // Triple-click 💾 Save to choose scale
+  // Shift-click 💾 Save to choose scale (legacy PNG-upscale shortcut)
   let saveClicks = 0, saveTimer2 = null;
   $('btn-save').addEventListener('click', async (e) => {
-    if (e.shiftKey) {
-      const scale = +(prompt('Save at scale?', '2') || '1');
-      if (scale > 0 && scale <= 8) {
-        const off = IO.resize(canvas, scale);
-        const blob = await IO.encodePNG(off);
-        IO.triggerDownload(blob, `retro-paint-${state.mode}-${scale}x-${Date.now()}.png`);
-        e.stopImmediatePropagation();
-      }
+    if (!e.shiftKey) return;
+    // Always stop propagation on Shift+click so the regular Save
+    // dialog never opens behind the prompt — even if the user
+    // cancels or types an invalid scale.
+    e.stopImmediatePropagation();
+    const raw = prompt('Save at scale?', '2');
+    if (raw == null) return; // user cancelled
+    const scale = +raw;
+    if (!(scale > 0 && scale <= 8)) {
+      alert('Scale must be a number between 0 and 8.');
+      return;
     }
+    const off = IO.resize(canvas, scale);
+    const blob = await IO.encodePNG(off);
+    IO.triggerDownload(blob, `retro-paint-${state.mode}-${scale}x-${Date.now()}.png`);
   }, true);
 
   // ---- Background pattern picker (via dblclick on canvas frame) ----

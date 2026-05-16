@@ -25,6 +25,7 @@ export function SaveDialog({ workbook, activeSheet, onClose }: Props) {
     return (remembered as Format) || "xlsx";
   });
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const ref = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -35,33 +36,42 @@ export function SaveDialog({ workbook, activeSheet, onClose }: Props) {
   const submit = async () => {
     if (busy) return;
     setBusy(true);
+    setError(null);
     sessionStorage.setItem(STORE_KEY, format);
     // Pure clones with the user's filename — exporters read .name
     // for the download filename, so this overrides without mutating
     // the live workbook state.
     const wb: Workbook = { ...workbook, name: filename || "workbook" };
     const sh: Sheet = { ...activeSheet, name: filename || activeSheet.name };
+    let ok = false;
     try {
       const csv = await import("./csv");
+      // Every dispatch is awaited so the dialog stays open (with a
+      // disabled Save button) until the encoder finishes. Closing
+      // before await would race the download against unmount and
+      // could swallow the file on a fast-navigation user.
       switch (format) {
-        case "xlsx":   csv.exportWorkbookAsXLSX(wb); break;
-        case "ods":    csv.exportWorkbookAsODS(wb);  break;
-        case "xml":    csv.exportWorkbookAsXML(wb);  break;
-        case "csv":    csv.exportSheetAsCSV(sh);     break;
-        case "tsv":    csv.exportSheetAsTSV(sh);     break;
-        case "psv":    csv.exportSheetAsPSV(sh);     break;
-        case "pdf":    await csv.exportWorkbookAsPDF(wb); break;
-        case "html":   csv.exportWorkbookAsHTML(wb); break;
-        case "md":     csv.exportWorkbookAsMD(wb);   break;
-        case "json":   csv.exportWorkbookAsJSON(wb); break;
-        case "ndjson": csv.exportSheetAsNDJSON(sh);  break;
-        case "ics":    csv.exportWorkbookAsICS(wb);  break;
-        case "vcf":    csv.exportWorkbookAsVCF(wb); break;
+        case "xlsx":   await csv.exportWorkbookAsXLSX(wb); break;
+        case "ods":    await csv.exportWorkbookAsODS(wb);  break;
+        case "xml":    await csv.exportWorkbookAsXML(wb);  break;
+        case "csv":    await csv.exportSheetAsCSV(sh);     break;
+        case "tsv":    await csv.exportSheetAsTSV(sh);     break;
+        case "psv":    await csv.exportSheetAsPSV(sh);     break;
+        case "pdf":    await csv.exportWorkbookAsPDF(wb);  break;
+        case "html":   await csv.exportWorkbookAsHTML(wb); break;
+        case "md":     await csv.exportWorkbookAsMD(wb);   break;
+        case "json":   await csv.exportWorkbookAsJSON(wb); break;
+        case "ndjson": await csv.exportSheetAsNDJSON(sh);  break;
+        case "ics":    await csv.exportWorkbookAsICS(wb);  break;
+        case "vcf":    await csv.exportWorkbookAsVCF(wb);  break;
       }
-      onClose();
+      ok = true;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
       setBusy(false);
     }
+    if (ok) onClose();
   };
 
   return (
@@ -122,11 +132,16 @@ export function SaveDialog({ workbook, activeSheet, onClose }: Props) {
               </optgroup>
             </select>
           </label>
+          {error && (
+            <div className="save-dialog-error" role="alert">
+              Save failed: {error}
+            </div>
+          )}
         </div>
         <footer className="modal-footer save-dialog-actions">
           <button type="button" onClick={onClose}>Cancel</button>
           <button type="button" className="primary" onClick={submit} disabled={busy}>
-            Save
+            {busy ? "Saving…" : "Save"}
           </button>
         </footer>
       </div>
