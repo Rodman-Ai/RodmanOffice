@@ -9,7 +9,7 @@
 // paths. Everything else falls through to the network — including the
 // initial /word/ navigation request, which the word SW will own from
 // then on.
-const VERSION = 'rodmanoffice-launcher-v1';
+const VERSION = 'rodmanoffice-launcher-v2';
 const CACHE_PREFIX = 'rodmanoffice-launcher-';
 const SHELL = [
   './',
