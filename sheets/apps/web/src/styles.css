@@ -180,6 +180,7 @@ body,
   overflow-y: visible;
   box-sizing: border-box;
 }
+.ribbon.collapsed { display: none; }
 .ribbon-panel {
   display: none;
   flex-wrap: wrap;

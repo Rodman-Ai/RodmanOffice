@@ -337,6 +337,9 @@
     const nextTab = $(`.tab[data-tab="${tabId}"]`) || $('.tab[data-tab="home"]');
     if (!nextTab) return;
     const nextId = nextTab.dataset.tab || 'home';
+    const ribbon = $('#ribbon');
+    const wasCollapsed = ribbon?.classList.contains('collapsed');
+    const wasActive = nextTab.classList.contains('active');
     $$('.tab').forEach((t) => {
       const active = t === nextTab;
       t.classList.toggle('active', active);
@@ -348,6 +351,10 @@
       p.classList.toggle('active', active);
       p.hidden = !active;
     });
+    // Single-clicking a different tab while collapsed re-expands
+    // the ribbon (mirrors word/app.js:220-222). Clicking the
+    // currently active tab is a no-op — use dblclick to toggle.
+    if (wasCollapsed && !wasActive) ribbon.classList.remove('collapsed');
   }
 
   document.addEventListener('click', (e) => {
@@ -355,6 +362,15 @@
     if (!tab) return;
     activateRibbonTab(tab.dataset.tab);
   });
+
+  // Double-click any tab title to collapse / expand the ribbon
+  // (Office-classic gesture; matches word/app.js:225-229).
+  document.addEventListener('dblclick', (e) => {
+    const tab = e.target.closest('.tab');
+    if (!tab) return;
+    $('#ribbon')?.classList.toggle('collapsed');
+  });
+
   activateRibbonTab($('.tab.active')?.dataset.tab || 'home');
 
   // ---------- Theme strip ----------
