@@ -81,6 +81,10 @@ const IMAGE_OUTPUTS = [
   { ext: 'sgi',  mime: 'image/x-sgi', label: 'SGI Image (.sgi)' },
   { ext: 'ras',  mime: 'image/x-cmu-raster', label: 'Sun Raster (.ras)' },
   { ext: 'ff',   mime: 'image/x-farbfeld', label: 'Farbfeld (.ff)' },
+  // GIF (single frame) and SVG (raster wrapper) — the SVG output
+  // is a 1-element document embedding a base64 PNG, not real vector.
+  { ext: 'gif',  mime: 'image/gif', label: 'GIF (.gif)' },
+  { ext: 'svg',  mime: 'image/svg+xml', label: 'SVG (.svg, raster wrapper)' },
 ];
 
 // AVIF encoder support is browser-dependent; probe once at module

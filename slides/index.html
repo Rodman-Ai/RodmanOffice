@@ -103,6 +103,7 @@
           <button class="ribbon-btn wide" data-cmd="newDeck">New</button>
           <button class="ribbon-btn wide" data-cmd="openDeck">Open .json…</button>
           <button class="ribbon-btn wide" data-cmd="importPptx">Import .pptx…</button>
+          <button class="ribbon-btn wide" data-cmd="importPdf">Import .pdf…</button>
         </div>
         <div class="group-label">Deck</div>
       </div>
@@ -609,6 +610,7 @@
   <input type="file" id="imageFileInput" accept="image/*" hidden />
   <input type="file" id="deckFileInput" accept="application/json,.json" hidden />
   <input type="file" id="pptxFileInput" accept=".pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation" hidden />
+  <input type="file" id="pdfFileInput" accept=".pdf,application/pdf" hidden />
 
   <div class="help-modal" id="helpInfoModal" hidden role="dialog" aria-modal="true" aria-labelledby="helpInfoTitle">
     <div class="help-modal-card">
@@ -670,6 +672,7 @@
     // the deck/render/app scripts below.
     import * as slidesio from '../lib/slides/index.js';
     import * as docs from '../lib/docs/index.js';
+    import * as images from '../lib/images/index.js';
     import * as claude from '../lib/claude/index.js';
     window.RodmanSlidesIO = {
       savePptx: slidesio.savePptx,
@@ -683,6 +686,12 @@
     window.RodmanInterop = {
       mdExport: docs.mdExport,
       odpExport: docs.odpExport,
+    };
+    // PDF → deck import uses the same pdf.js renderer that powers
+    // Compress PDF in the image editor and Word's PDF reader.
+    window.RodmanImagePdf = {
+      decodePdfPage: images.decodePdfPage,
+      pdfPageCount: images.pdfPageCount,
     };
     window.RodmanClaude = claude;
   </script>

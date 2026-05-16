@@ -1815,6 +1815,8 @@
     { ext: 'ras',  label: 'Sun Raster',   lossy: false, palette: false },
     { ext: 'ff',   label: 'Farbfeld',     lossy: false, palette: false },
     { ext: 'cbz',  label: 'Comic Book ZIP', lossy: false, palette: false },
+    { ext: 'gif',  label: 'GIF (single frame)', lossy: false, palette: true  },
+    { ext: 'svg',  label: 'SVG (raster wrapper)', lossy: false, palette: false },
   ];
 
   // The unified Save dialog. Triggered by btn-save (above) and the
@@ -1941,6 +1943,8 @@
         case 'ras':  blob = IO.encodeRAS(work);  filename = IO.suggestFilename(stamp, 'ras'); break;
         case 'ff':   blob = IO.encodeFarbfeld(work); filename = IO.suggestFilename(stamp, 'ff'); break;
         case 'cbz':  blob = await IO.encodeCbzFromCanvas(work); filename = IO.suggestFilename(stamp, 'cbz'); break;
+        case 'gif':  blob = await IO.encodeGIF(work); filename = IO.suggestFilename(stamp, 'gif'); break;
+        case 'svg':  blob = await IO.encodeSVG(work); filename = IO.suggestFilename(stamp, 'svg'); break;
         default: throw new Error('Unknown format: ' + ext);
       }
       IO.triggerDownload(blob, filename);
@@ -4952,104 +4956,12 @@
   };
 
   // ---- Real GIF89a encoder (minimal) ----
-  // Uses LZW compression on indexed-color frames.
-  function quantizeFrame(imgData) {
-    // Simple uniform 6-3-3 cube quantization → 256-color indexed.
-    const palette = [];
-    const w = imgData.width, h = imgData.height;
-    const indices = new Uint8Array(w * h);
-    const map = {};
-    let nColors = 0;
-    const d = imgData.data;
-    for (let i = 0, j = 0; i < d.length; i += 4, j++) {
-      const r = (d[i] >> 5) << 5, g = (d[i+1] >> 5) << 5, b = (d[i+2] >> 6) << 6;
-      const key = r * 65536 + g * 256 + b;
-      if (!(key in map)) {
-        if (nColors >= 256) { map[key] = 0; }
-        else { map[key] = nColors; palette.push([r, g, b]); nColors++; }
-      }
-      indices[j] = map[key];
-    }
-    while (palette.length < 256) palette.push([0, 0, 0]);
-    return { indices, palette, w, h };
-  }
-  // Tiny LZW encoder for GIF
-  function lzwEncode(indices, minCodeSize) {
-    const clearCode = 1 << minCodeSize;
-    const eoi = clearCode + 1;
-    let codeSize = minCodeSize + 1;
-    let nextCode = eoi + 1;
-    let dict = {};
-    for (let i = 0; i < clearCode; i++) dict[String.fromCharCode(i)] = i;
-    const out = [];
-    let buffer = 0, bufferBits = 0;
-    const writeCode = (c) => {
-      buffer |= c << bufferBits;
-      bufferBits += codeSize;
-      while (bufferBits >= 8) { out.push(buffer & 0xff); buffer >>>= 8; bufferBits -= 8; }
-    };
-    writeCode(clearCode);
-    let prev = String.fromCharCode(indices[0]);
-    for (let i = 1; i < indices.length; i++) {
-      const cur = String.fromCharCode(indices[i]);
-      const combined = prev + cur;
-      if (combined in dict) prev = combined;
-      else {
-        writeCode(dict[prev]);
-        if (nextCode < 4096) {
-          dict[combined] = nextCode++;
-          if (nextCode > (1 << codeSize) && codeSize < 12) codeSize++;
-        }
-        prev = cur;
-      }
-    }
-    writeCode(dict[prev]);
-    writeCode(eoi);
-    if (bufferBits > 0) out.push(buffer & 0xff);
-    return new Uint8Array(out);
-  }
-  function encodeGIF89a(frames, delayCs) {
-    if (!frames.length) return null;
-    const w = frames[0].w, h = frames[0].h;
-    const out = [];
-    const w8 = (n) => out.push(n & 0xff);
-    const w16 = (n) => { out.push(n & 0xff); out.push((n >> 8) & 0xff); };
-    // Header
-    'GIF89a'.split('').forEach(c => w8(c.charCodeAt(0)));
-    w16(w); w16(h);
-    w8(0xf7); // global color table flag, 256 colors
-    w8(0); w8(0);
-    // Global palette = first frame's palette
-    for (let i = 0; i < 256; i++) {
-      const c = frames[0].palette[i] || [0,0,0];
-      w8(c[0]); w8(c[1]); w8(c[2]);
-    }
-    // Loop extension
-    w8(0x21); w8(0xff); w8(0x0b);
-    'NETSCAPE2.0'.split('').forEach(c => w8(c.charCodeAt(0)));
-    w8(0x03); w8(0x01); w16(0); w8(0);
-    // Each frame
-    for (const f of frames) {
-      // Graphic Control
-      w8(0x21); w8(0xf9); w8(0x04); w8(0); w16(delayCs); w8(0); w8(0);
-      // Image Descriptor
-      w8(0x2c); w16(0); w16(0); w16(w); w16(h); w8(0);
-      // LZW
-      w8(8); // min code size
-      const compressed = lzwEncode(f.indices, 8);
-      // Sub-blocks
-      let p = 0;
-      while (p < compressed.length) {
-        const len = Math.min(255, compressed.length - p);
-        w8(len);
-        for (let k = 0; k < len; k++) w8(compressed[p + k]);
-        p += len;
-      }
-      w8(0);
-    }
-    w8(0x3b);
-    return new Uint8Array(out);
-  }
+  // The LZW + GIF89a + quantization helpers moved to
+  // lib/images/gif.js so the unified Save dialog and the converter
+  // can also emit static GIFs. The animation-export tool below
+  // keeps using them through the window.IO shim.
+  const quantizeFrame = IO.quantizeFrameForGif;
+  const encodeGIF89a = IO.encodeGIF89a;
   Tools.exportRealGif = {
     down() {
       if (!state.frames || state.frames.length < 2) { alert('Add frames first.'); return; }
