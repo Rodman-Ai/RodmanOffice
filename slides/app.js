@@ -1754,7 +1754,21 @@
       fresh.slides = [];
       const deckW = fresh.size.w;
       const deckH = fresh.size.h;
+      // Progress feedback: a 30-page PDF can take 10-30s to
+      // rasterise. Reuse the title-bar save indicator to show
+      // "Loading PDF… N / M" and yield to the event loop between
+      // pages so the browser repaints (otherwise the tab freezes
+      // and the browser may show "page not responding").
+      const indicatorEl = $('#saveIndicator');
+      const restoreIndicator = indicatorEl ? indicatorEl.textContent : '';
       for (let i = 0; i < pageCount; i++) {
+        if (indicatorEl) {
+          indicatorEl.textContent = `Loading PDF… ${i + 1} / ${pageCount}`;
+          indicatorEl.style.opacity = 1;
+          indicatorEl.style.color = '';
+        }
+        // Yield once per iteration so paint + input handlers run.
+        await new Promise((resolve) => setTimeout(resolve, 0));
         const { canvas } = await window.RodmanImagePdf.decodePdfPage(bytes, i, { scale: 2 });
         const dataUrl = canvas.toDataURL('image/png');
         const pageAspect = canvas.width / canvas.height;
@@ -1771,6 +1785,7 @@
         slide.elements = [D.newImageElement({ x, y, w, h, src: dataUrl })];
         fresh.slides.push(slide);
       }
+      if (indicatorEl) indicatorEl.textContent = restoreIndicator;
       deck = sanitizeDeck(fresh);
       state.selectedSlideId = deck.slides[0] ? deck.slides[0].id : null;
       clearSelection();
