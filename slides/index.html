@@ -101,9 +101,7 @@
       <div class="group">
         <div class="group-row">
           <button class="ribbon-btn wide" data-cmd="newDeck">New</button>
-          <button class="ribbon-btn wide" data-cmd="openDeck">Open .json…</button>
-          <button class="ribbon-btn wide" data-cmd="importPptx">Import .pptx…</button>
-          <button class="ribbon-btn wide" data-cmd="importPdf">Import .pdf…</button>
+          <button class="ribbon-btn wide" data-cmd="openFile" title="Open .json, .pptx, or .pdf">📂 Open…</button>
         </div>
         <div class="group-label">Deck</div>
       </div>
@@ -608,9 +606,7 @@
   </footer>
 
   <input type="file" id="imageFileInput" accept="image/*" hidden />
-  <input type="file" id="deckFileInput" accept="application/json,.json" hidden />
-  <input type="file" id="pptxFileInput" accept=".pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation" hidden />
-  <input type="file" id="pdfFileInput" accept=".pdf,application/pdf" hidden />
+  <input type="file" id="openFileInput" accept=".json,.pptx,.pdf,application/json,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/pdf" hidden />
 
   <div class="help-modal" id="helpInfoModal" hidden role="dialog" aria-modal="true" aria-labelledby="helpInfoTitle">
     <div class="help-modal-card">

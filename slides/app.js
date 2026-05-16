@@ -363,11 +363,11 @@
     activateRibbonTab(tab.dataset.tab);
   });
 
-  // Double-click any tab title to collapse / expand the ribbon
-  // (Office-classic gesture; matches word/app.js:225-229).
-  document.addEventListener('dblclick', (e) => {
-    const tab = e.target.closest('.tab');
-    if (!tab) return;
+  // Listener scoped to the tabs nav itself (not document) so it
+  // doesn't add page-wide dblclick handling that can interfere
+  // with iOS Safari momentum-pan detection on the ribbon.
+  $('.tabs')?.addEventListener('dblclick', (e) => {
+    if (!e.target.closest('.tab')) return;
     $('#ribbon')?.classList.toggle('collapsed');
   });
 
@@ -1500,7 +1500,7 @@
       bootstrap();
       scheduleSave();
     },
-    openDeck() { $('#deckFileInput').click(); },
+    openFile() { $('#openFileInput').click(); },
     openSaveDialog() {
       // Unified Save dialog: pick filename + format. Replaces the
       // 8 File-panel + 2 Record-panel export buttons.
@@ -1527,8 +1527,6 @@
       a.click();
       setTimeout(() => URL.revokeObjectURL(url), 0);
     },
-    importPptx() { $('#pptxFileInput').click(); },
-    importPdf() { $('#pdfFileInput').click(); },
     exportPptx() {
       if (!window.RodmanSlidesIO || !window.RodmanSlidesIO.savePptx) {
         alert('PPTX engine failed to load. Reload the page and try again.');
@@ -1701,9 +1699,13 @@
     e.target.value = '';
   });
 
-  $('#deckFileInput').addEventListener('change', (e) => {
-    const f = e.target.files[0];
-    if (!f) return;
+  // Unified open: one file input + one dispatcher that sniffs the
+  // extension and hands off to the appropriate loader. Mirrors the
+  // unified-Save-dialog pattern at slides/app.js:1505 and replaces
+  // the previous trio of file inputs / change handlers / ribbon
+  // buttons (Open .json… / Import .pptx… / Import .pdf…).
+
+  function loadJsonFile(f) {
     const reader = new FileReader();
     reader.onload = () => {
       try {
@@ -1719,13 +1721,9 @@
       }
     };
     reader.readAsText(f);
-    e.target.value = '';
-  });
+  }
 
-  $('#pptxFileInput').addEventListener('change', async (e) => {
-    const f = e.target.files[0];
-    e.target.value = '';
-    if (!f) return;
+  async function loadPptxFile(f) {
     if (!window.RodmanSlidesIO || !window.RodmanSlidesIO.loadPptx) {
       alert('PPTX engine failed to load. Reload the page and try again.');
       return;
@@ -1746,16 +1744,13 @@
     } catch (err) {
       alert('Could not import .pptx: ' + (err.message || err));
     }
-  });
+  }
 
   // PDF → deck import. Each page rasterises to a canvas via the
   // shared lib/images/pdf.js engine and lands as a single full-bleed
   // image element on its own slide. Letterboxed to preserve the
   // page aspect inside the deck's 1280×720 canvas.
-  $('#pdfFileInput').addEventListener('change', async (e) => {
-    const f = e.target.files[0];
-    e.target.value = '';
-    if (!f) return;
+  async function loadPdfFile(f) {
     if (!window.RodmanImagePdf || !window.RodmanImagePdf.decodePdfPage) {
       alert('PDF engine failed to load. Reload the page and try again.');
       return;
@@ -1810,6 +1805,17 @@
     } catch (err) {
       alert('Could not import .pdf: ' + (err.message || err));
     }
+  }
+
+  $('#openFileInput').addEventListener('change', async (e) => {
+    const f = e.target.files[0];
+    e.target.value = '';
+    if (!f) return;
+    const ext = (f.name.match(/\.([^.]+)$/)?.[1] || '').toLowerCase();
+    if (ext === 'json') return loadJsonFile(f);
+    if (ext === 'pptx') return loadPptxFile(f);
+    if (ext === 'pdf')  return loadPdfFile(f);
+    alert(`Unsupported file type: .${ext}\nSupported: .json, .pptx, .pdf`);
   });
 
   // ---------- Notes pane ----------
