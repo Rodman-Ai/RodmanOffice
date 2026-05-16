@@ -49,21 +49,37 @@
 
   // ---------- Autosave ----------
   let saveTimer = null;
+  let quotaWarned = false;
   function scheduleSave() {
     setSaveIndicator('saving');
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
       const ok = D.save(deck);
       setSaveIndicator(ok ? 'saved' : 'error');
+      // localStorage quota is ~5-10 MB per origin. A PDF import
+      // with many pages produces base64 PNGs that easily exceed it.
+      // Warn once per session — repeated autosaves would otherwise
+      // fail silently and the user could lose work on reload.
+      if (!ok && !quotaWarned) {
+        quotaWarned = true;
+        setTimeout(() => {
+          alert(
+            'This deck is too large to autosave to browser storage ' +
+            '(localStorage quota exceeded). It stays in memory while ' +
+            'this tab is open. Use File → Save… to export to .pptx ' +
+            'or another format before closing the tab to preserve it.'
+          );
+        }, 0);
+      }
     }, 400);
   }
 
   function setSaveIndicator(kind) {
     const el = $('#saveIndicator');
     if (!el) return;
-    if (kind === 'saving') { el.textContent = 'Saving…'; el.style.opacity = 0.7; }
-    else if (kind === 'saved') { el.textContent = 'Saved'; el.style.opacity = 0.85; }
-    else { el.textContent = 'Save error'; el.style.opacity = 1; }
+    if (kind === 'saving') { el.textContent = 'Saving…'; el.style.opacity = 0.7; el.style.color = ''; }
+    else if (kind === 'saved') { el.textContent = 'Saved'; el.style.opacity = 0.85; el.style.color = ''; }
+    else { el.textContent = 'Not autosaved'; el.style.opacity = 1; el.style.color = '#fca5a5'; }
   }
 
   // ---------- Helpers ----------

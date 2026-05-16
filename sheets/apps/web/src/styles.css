@@ -1025,6 +1025,18 @@ body,
   font-weight: 400;
   background: white;
 }
+.save-dialog-error {
+  margin-top: 6px;
+  padding: 6px 10px;
+  border: 1px solid #fca5a5;
+  background: #fef2f2;
+  color: #991b1b;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+}
 .save-dialog-actions {
   display: flex;
   gap: 6px;
