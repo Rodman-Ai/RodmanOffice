@@ -2806,6 +2806,13 @@ textarea {
   .app-subtitle { display: none; }
   .doc-title { max-width: 50vw; font-size: 13px; }
   .tab { padding: 8px 14px; font-size: 12px; }
+  /* The focus, help, and toggle-ribbon icon buttons collide with
+     the Ask Claude pill in a cramped iPhone title bar and aren't
+     useful on mobile (browser owns full-screen, no keyboard for
+     the shortcuts list, ribbon-toggle is a power-user knob). Hide
+     them — desktop keeps all three. F11 / ? keyboard shortcuts
+     are unchanged. */
+  .title-bar .title-actions .icon-btn { display: none; }
   /* On mobile, ditch wrapping entirely: the ribbon becomes a single
      horizontally-scrolling row of controls. That guarantees the
      ribbon is exactly ONE row tall regardless of how many features
