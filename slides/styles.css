@@ -922,20 +922,19 @@ label.adjust select {
   .save-indicator {
     display: none;
   }
+  /* The present (▶) and help (?) icon buttons aren't useful on
+     mobile (F5 / ? are keyboard-only shortcuts) and the cluster
+     otherwise overflows the right edge of the title bar — hiding
+     them makes room for the Ask Claude pill. Mirrors the Word
+     title bar's iPhone treatment. */
+  .title-bar .title-actions .icon-btn { display: none; }
   .doc-title {
     width: min(160px, 42vw);
     max-width: 42vw;
     font-size: 13px;
   }
   .title-actions { gap: 4px; }
-  .title-bar .ask-claude {
-    /* On mobile the visible label collapses to just the 🤖 glyph
-       so the title-actions cluster fits within iPhone-width. The
-       aria-label="Ask Claude" on the button keeps the accessible
-       name intact for screen readers. */
-    padding: 4px 8px;
-  }
-  .title-bar .ask-claude .ask-claude-text { display: none; }
+  .title-bar .ask-claude { padding: 4px 8px; }
   .tab { padding: 8px 14px; font-size: 12px; }
   .ribbon { overflow: visible; }
   .ribbon-panel {
