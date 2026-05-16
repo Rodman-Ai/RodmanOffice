@@ -26,11 +26,11 @@ export function MentionsBell() {
     api
       .get<Activity[]>("/api/activity")
       .then(setActs)
-      .catch(() => {});
+      .catch((err) => console.warn("MentionsBell: /api/activity failed", err));
     api
       .get<Contact[]>("/api/contacts")
       .then(setContacts)
-      .catch(() => {});
+      .catch((err) => console.warn("MentionsBell: /api/contacts failed", err));
   }, []);
 
   const me = "you@yourco.example";

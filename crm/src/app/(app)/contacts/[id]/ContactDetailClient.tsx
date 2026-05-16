@@ -42,7 +42,10 @@ export default function ContactDetailPage() {
   const [members, setMembers] = useState<Member[]>([]);
   useEffect(() => {
     api.get<Contact[]>("/api/contacts").then(setAllContacts);
-    api.get<Member[]>("/api/members").then(setMembers).catch(() => {});
+    api
+      .get<Member[]>("/api/members")
+      .then(setMembers)
+      .catch((err) => console.warn("ContactDetailClient: /api/members failed", err));
   }, []);
 
   function followUpSuggestions() {

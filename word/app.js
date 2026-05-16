@@ -2435,7 +2435,11 @@ ${editor.innerHTML}
     const size = new Blob([editor.innerHTML]).size;
     const entry = { title, at: new Date().toISOString(), size };
     list = [entry, ...list.filter((x) => x.title !== title)].slice(0, 10);
-    localStorage.setItem(STORE_RECENT, JSON.stringify(list));
+    try {
+      localStorage.setItem(STORE_RECENT, JSON.stringify(list));
+    } catch (err) {
+      console.warn('RodmanWord: could not save recent-documents list', err);
+    }
   };
 
   // ============================================================
