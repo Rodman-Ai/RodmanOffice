@@ -206,6 +206,18 @@ export function detect(name, bytes) {
   const dot = lower.lastIndexOf('.');
   const ext = dot >= 0 ? lower.slice(dot + 1) : '';
   const byExt = EXT_TABLE[ext];
+  // .json is ambiguous — it's the default spreadsheet output, but
+  // Slides decks also save as .json (see slides/app.js saveDeck).
+  // Peek at the first 2 KB and look for a top-level "slides":[
+  // array to route slides decks to the slides family. Spreadsheet-
+  // shaped JSON keeps the original spreadsheet mapping.
+  if (byExt && byExt.ext === 'json' && bytes) {
+    const u8 = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+    const head = new TextDecoder('utf-8', { fatal: false }).decode(u8.subarray(0, 2048));
+    if (/"slides"\s*:\s*\[/.test(head)) {
+      return { family: 'slides', mime: 'application/json', ext: 'json' };
+    }
+  }
   if (byExt) return byExt;
   const byMagic = bytes ? magicSniff(bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes)) : null;
   if (byMagic) return byMagic;
