@@ -70,7 +70,7 @@ Photoshop mode is the default. The layout:
 
 | Menu     | Items                                                        |
 | -------- | ------------------------------------------------------------ |
-| File     | New Canvas · Open · Save PNG · **Save As…** · Save HD · Clear · Reset All |
+| File     | New Canvas · Open · **Save…** (unified dialog: filename + format + quality / resolution / colours options) · Clear · Reset All |
 | Edit     | Undo · Redo · Keyboard Shortcuts · History · Snapshots       |
 | Image    | Image Size · Adjustments (Levels / HSL / Color Balance / Threshold) · Replay |
 | Layer    | New · Duplicate · Merge Down · Delete                        |
@@ -129,9 +129,14 @@ Highlights:
 - **Open Image** — load any PNG / JPG / GIF / BMP / WebP / SVG / PSD / PSB
   / ICO / TIFF (browser-dependent) into the canvas to trace, color, remix.
   PDF inputs rasterize through the shared `lib/images/pdf.js` engine.
-- **Save PNG** (`Ctrl+S`) — Shift-click for HD export at any scale.
-- **Save As…** — modal picker with format / quality / resolution /
-  colours controls (see *Save As formats* below).
+- **Save…** (`Ctrl+S`, or the 💾 Save toolbar button) — opens a
+  unified Save dialog with filename input, format picker, and
+  per-format options (quality for lossy codecs, resolution scale,
+  palette size; see *Save dialog formats* below). The default selection
+  is **PNG** for flat documents and **Photoshop PDF** for layered
+  documents, so a one-tap Enter never silently flattens layered
+  work. Shift-click 💾 Save bypasses the dialog for a quick PNG
+  upscale prompt (the legacy HD export shortcut).
 - **Live brush cursor preview**, **recent colors** strip,
   **custom HSV color picker**, **brush opacity slider**.
 - **Symmetry / mirror** — Off → H → V → Both → 4-way → 8-way kaleidoscope.
@@ -159,9 +164,9 @@ Highlights:
 
 ---
 
-## Save As formats
+## Save dialog formats
 
-Save As… surfaces every encoder the shared `lib/images/` engine
+The Save dialog surfaces every encoder the shared `lib/images/` engine
 exports. Browser-native targets (PNG / JPEG / WebP / AVIF) accept a
 quality slider; palette-indexed targets (PNG / BMP / ICO / CUR /
 TGA / PCX / SGI / RAS / GIF-via-quantization) accept a Colors choice
