@@ -930,10 +930,11 @@ label.adjust select {
      title bar's iPhone treatment. */
   .title-bar .title-actions .icon-btn { display: none; }
   .doc-title {
-    width: min(160px, 42vw);
-    max-width: 42vw;
+    width: min(120px, 32vw);
+    max-width: 32vw;
     font-size: 13px;
   }
+  .tabs { touch-action: pan-x; }
   .title-actions { gap: 4px; }
   .title-bar .ask-claude { padding: 4px 8px; }
   .tab { padding: 8px 14px; font-size: 12px; }
@@ -952,6 +953,7 @@ label.adjust select {
     gap: 0;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: thin;
+    touch-action: pan-x;
   }
   .group {
     display: flex !important;
