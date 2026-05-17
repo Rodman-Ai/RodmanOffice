@@ -10,20 +10,11 @@ export type RibbonActions = {
   // File
   newWorkbook: () => void;
   importFile: () => void;
-  exportCsv: () => void;
-  exportXlsx: () => void;
-  // Part 12: extra exports.
-  exportTsv: () => void;
-  exportPsv: () => void;
-  exportJson: () => void;
-  exportNdjson: () => void;
-  exportHtml: () => void;
-  exportMd: () => void;
-  exportXml: () => void;
-  exportOds: () => void;
-  exportVcf: () => void;
-  exportIcs: () => void;
-  exportPdf: () => void;
+  // The 13 separate Export buttons (XLSX, CSV, PDF, TSV, PSV, JSON,
+  // NDJSON, HTML, MD, XML, ODS, vCard, iCal) folded into the
+  // unified Save dialog — App.tsx renders <SaveDialog> and the
+  // dialog handles its own dispatch.
+  openSaveDialog: () => void;
   // Edit
   undo: () => void;
   redo: () => void;
@@ -112,6 +103,7 @@ const TABS: { id: Tab; label: string }[] = [
 
 export function Ribbon({ a }: { a: RibbonActions }) {
   const [tab, setTab] = useState<Tab>("home");
+  const [collapsed, setCollapsed] = useState(false);
   const fmt = a.format ?? {};
   return (
     <>
@@ -122,41 +114,36 @@ export function Ribbon({ a }: { a: RibbonActions }) {
             role="tab"
             aria-selected={tab === t.id}
             className={`tab${tab === t.id ? " active" : ""}`}
-            onClick={() => setTab(t.id)}
+            title="Double-click to collapse the ribbon"
+            onClick={() => {
+              // Mirror Word: clicking a *different* tab while
+              // collapsed re-expands the ribbon. Clicking the
+              // active tab is a no-op — use dblclick to toggle.
+              if (collapsed && tab !== t.id) setCollapsed(false);
+              setTab(t.id);
+            }}
+            onDoubleClick={() => setCollapsed((c) => !c)}
           >
             {t.label}
           </button>
         ))}
       </nav>
 
-      <section className="ribbon" role="tabpanel">
+      <section
+        className={`ribbon${collapsed ? " collapsed" : ""}`}
+        role="tabpanel"
+      >
         {tab === "file" && (
           <div className="ribbon-panel active">
             <Group label="Workbook">
               <Row>
                 <BigBtn icon="+" label="New" onClick={a.newWorkbook} />
-                <BigBtn icon="Open" label="Import" onClick={a.importFile} />
+                <BigBtn icon="📂" label="Import" onClick={a.importFile} />
               </Row>
             </Group>
-            <Group label="Export">
+            <Group label="Save">
               <Row>
-                <BigBtn icon="CSV" label="Export CSV" onClick={a.exportCsv} />
-                <BigBtn icon="XLSX" label="Export XLSX" onClick={a.exportXlsx} />
-                <BigBtn icon="PDF" label="Export PDF" onClick={a.exportPdf} />
-              </Row>
-            </Group>
-            <Group label="More formats">
-              <Row>
-                <BigBtn icon="TSV" label="TSV" onClick={a.exportTsv} />
-                <BigBtn icon="PSV" label="PSV" onClick={a.exportPsv} />
-                <BigBtn icon="JSON" label="JSON" onClick={a.exportJson} />
-                <BigBtn icon="ND" label="NDJSON" onClick={a.exportNdjson} />
-                <BigBtn icon="HTML" label="HTML" onClick={a.exportHtml} />
-                <BigBtn icon="MD" label="Markdown" onClick={a.exportMd} />
-                <BigBtn icon="XML" label="Excel XML" onClick={a.exportXml} />
-                <BigBtn icon="ODS" label="ODS" onClick={a.exportOds} />
-                <BigBtn icon="VCF" label="vCard" onClick={a.exportVcf} />
-                <BigBtn icon="ICS" label="iCal" onClick={a.exportIcs} />
+                <BigBtn icon="💾" label="Save…" onClick={a.openSaveDialog} />
               </Row>
             </Group>
           </div>
@@ -166,15 +153,15 @@ export function Ribbon({ a }: { a: RibbonActions }) {
           <div className="ribbon-panel active">
             <Group label="Clipboard">
               <Row>
-                <BigBtn icon="Paste" label="Paste" onClick={a.paste} />
+                <BigBtn icon="📋" label="Paste" onClick={a.paste} />
               </Row>
               <Row>
                 <Btn icon="123" label="Paste Values" onClick={a.pasteValues} title="Paste plain values" />
-                <Btn icon="Cut" label="Cut" onClick={a.cut} title="Cut" />
-                <Btn icon="Copy" label="Copy" onClick={a.copy} title="Copy" />
+                <Btn icon="✂" label="Cut" onClick={a.cut} title="Cut" />
+                <Btn icon="⧉" label="Copy" onClick={a.copy} title="Copy" />
                 <Btn
                   active={a.formatPainterActive}
-                  icon="Brush"
+                  icon="🖌"
                   label="Format Painter"
                   onClick={a.startFormatPainter}
                   title="Copy the active cell format, then select a target range"
@@ -315,7 +302,7 @@ export function Ribbon({ a }: { a: RibbonActions }) {
                 <BigBtn icon="CF" label="Conditional Formatting" onClick={a.openConditionalFormat} />
               </Row>
               <Row>
-                <Btn icon="Clear" label="Clear Formats" onClick={a.clearFormat} title="Clear formatting" />
+                <Btn icon="🧽" label="Clear Formats" onClick={a.clearFormat} title="Clear formatting" />
               </Row>
             </Group>
 
@@ -326,7 +313,7 @@ export function Ribbon({ a }: { a: RibbonActions }) {
                 <Btn icon="Col+" label="Insert Column" onClick={a.insertColLeft} />
               </Row>
               <Row>
-                <Btn icon="Del" label="Clear Contents" onClick={a.clearSelection} title="Delete contents" />
+                <Btn icon="🗑" label="Clear Contents" onClick={a.clearSelection} title="Delete contents" />
                 <Btn icon="Row-" label="Delete Row" onClick={a.deleteRows} />
                 <Btn icon="Col-" label="Delete Column" onClick={a.deleteCols} />
               </Row>
@@ -334,14 +321,14 @@ export function Ribbon({ a }: { a: RibbonActions }) {
 
             <Group label="Editing">
               <Row>
-                <Btn icon="Undo" label="Undo" onClick={a.undo} disabled={!a.canUndo} />
-                <Btn icon="Redo" label="Redo" onClick={a.redo} disabled={!a.canRedo} />
+                <Btn icon="↺" label="Undo" onClick={a.undo} disabled={!a.canUndo} />
+                <Btn icon="↻" label="Redo" onClick={a.redo} disabled={!a.canRedo} />
               </Row>
               <Row>
                 <BigBtn icon="SUM" label="AutoSum" onClick={a.insertSum} title="Insert SUM at the active cell" />
               </Row>
               <Row>
-                <Btn icon="Find" label="Find & Select" onClick={a.openFindReplace} title="Find and replace" />
+                <Btn icon="🔍" label="Find & Select" onClick={a.openFindReplace} title="Find and replace" />
                 <Btn icon="AZ" label="Sort A-Z" onClick={a.sortAsc} title="Sort ascending by selected column" />
                 <Btn icon="ZA" label="Sort Z-A" onClick={a.sortDesc} title="Sort descending by selected column" />
               </Row>
@@ -353,30 +340,30 @@ export function Ribbon({ a }: { a: RibbonActions }) {
           <div className="ribbon-panel active">
             <Group label="Tables">
               <Row>
-                <BigBtn icon="Sheet" label="New Sheet" onClick={a.addSheet} />
-                <BigBtn icon="Copy" label="Duplicate Sheet" onClick={a.duplicateSheet} />
-                <BigBtn icon="Name" label="Rename Sheet" onClick={a.renameSheet} />
+                <BigBtn icon="📑" label="New Sheet" onClick={a.addSheet} />
+                <BigBtn icon="⧉" label="Duplicate Sheet" onClick={a.duplicateSheet} />
+                <BigBtn icon="🏷" label="Rename Sheet" onClick={a.renameSheet} />
               </Row>
             </Group>
             <Group label="Charts">
               <Row>
-                <Btn icon="Bar" label="Bar" onClick={() => a.insertChart("bar")} disabled={!a.canInsertChart} />
-                <Btn icon="Line" label="Line" onClick={() => a.insertChart("line")} disabled={!a.canInsertChart} />
-                <Btn icon="Area" label="Area" onClick={() => a.insertChart("area")} disabled={!a.canInsertChart} />
+                <Btn icon="📊" label="Bar" onClick={() => a.insertChart("bar")} disabled={!a.canInsertChart} />
+                <Btn icon="📈" label="Line" onClick={() => a.insertChart("line")} disabled={!a.canInsertChart} />
+                <Btn icon="🗻" label="Area" onClick={() => a.insertChart("area")} disabled={!a.canInsertChart} />
               </Row>
               <Row>
-                <Btn icon="Pie" label="Pie" onClick={() => a.insertChart("pie")} disabled={!a.canInsertChart} />
-                <Btn icon="Scatter" label="Scatter" onClick={() => a.insertChart("scatter")} disabled={!a.canInsertChart} />
+                <Btn icon="🥧" label="Pie" onClick={() => a.insertChart("pie")} disabled={!a.canInsertChart} />
+                <Btn icon="⨯" label="Scatter" onClick={() => a.insertChart("scatter")} disabled={!a.canInsertChart} />
               </Row>
             </Group>
             <Group label="Comments">
               <Row>
-                <BigBtn icon="Comment" label="Comment" onClick={a.openCommentModal} />
+                <BigBtn icon="💬" label="Comment" onClick={a.openCommentModal} />
               </Row>
             </Group>
             <Group label="Text">
               <Row>
-                <Btn icon="Link" label="Link" onClick={a.insertLink} title="Insert a URL in the active cell" />
+                <Btn icon="🔗" label="Link" onClick={a.insertLink} title="Insert a URL in the active cell" />
                 <Btn icon="Ω" label="Symbol" onClick={a.insertSymbol} title="Insert a symbol in the active cell" />
               </Row>
             </Group>
@@ -419,7 +406,7 @@ export function Ribbon({ a }: { a: RibbonActions }) {
               <Row>
                 <Toggle checked={a.showFormulas} label="Show Formulas" onChange={a.toggleShowFormulas} />
                 <Btn icon="Calc" label="Recalculate" onClick={a.recalculate} title="Recalculate workbook formulas" />
-                <Btn icon="Check" label="Error Checking" onClick={a.openAudit} title="Open formula audit results" />
+                <Btn icon="✓" label="Error Checking" onClick={a.openAudit} title="Open formula audit results" />
               </Row>
             </Group>
           </div>
@@ -429,7 +416,7 @@ export function Ribbon({ a }: { a: RibbonActions }) {
           <div className="ribbon-panel active">
             <Group label="Get Data">
               <Row>
-                <BigBtn icon="Import" label="Import File" onClick={a.importFile} />
+                <BigBtn icon="📥" label="Import File" onClick={a.importFile} />
               </Row>
             </Group>
             <Group label="Sort & Filter">
@@ -451,8 +438,8 @@ export function Ribbon({ a }: { a: RibbonActions }) {
           <div className="ribbon-panel active">
             <Group label="Comments">
               <Row>
-                <BigBtn icon="Comment" label="New Comment" onClick={a.openCommentModal} />
-                <BigBtn icon="Clear" label="Clear Comments" onClick={a.clearComments} />
+                <BigBtn icon="💬" label="New Comment" onClick={a.openCommentModal} />
+                <BigBtn icon="🧽" label="Clear Comments" onClick={a.clearComments} />
               </Row>
             </Group>
             <Group label="Performance">
@@ -468,7 +455,7 @@ export function Ribbon({ a }: { a: RibbonActions }) {
             </Group>
             <Group label="Find">
               <Row>
-                <Btn icon="Find" label="Find & Replace" onClick={a.openFindReplace} />
+                <Btn icon="🔍" label="Find & Replace" onClick={a.openFindReplace} />
               </Row>
             </Group>
           </div>
@@ -488,16 +475,16 @@ export function Ribbon({ a }: { a: RibbonActions }) {
                 <Btn
                   active={a.panelOpen}
                   onClick={a.togglePanel}
-                  icon="Claude"
+                  icon="🤖"
                   label="Ask Claude"
                 />
               </Row>
             </Group>
             <Group label="Workbook">
               <Row>
-                <Btn icon="New" label="New Workbook" onClick={a.newWorkbook} />
-                <Btn icon="Copy" label="Duplicate Sheet" onClick={a.duplicateSheet} />
-                <Btn icon="Name" label="Rename Sheet" onClick={a.renameSheet} />
+                <Btn icon="📄" label="New Workbook" onClick={a.newWorkbook} />
+                <Btn icon="⧉" label="Duplicate Sheet" onClick={a.duplicateSheet} />
+                <Btn icon="🏷" label="Rename Sheet" onClick={a.renameSheet} />
               </Row>
             </Group>
           </div>
@@ -508,26 +495,26 @@ export function Ribbon({ a }: { a: RibbonActions }) {
             <Group label="Help">
               <Row>
                 <BigBtn icon="fx" label="Function Reference" onClick={() => a.openFunctionPicker(null)} />
-                <BigBtn icon="New" label="What's New" onClick={a.openWhatsNew} />
+                <BigBtn icon="🎉" label="What's New" onClick={a.openWhatsNew} />
               </Row>
               <Row>
                 <Btn icon="Audit" label="Audit Formulas" onClick={a.openAudit} />
-                <Btn icon="Learn" label="Training" onClick={a.openTraining} />
+                <Btn icon="🎓" label="Training" onClick={a.openTraining} />
               </Row>
             </Group>
             <Group label="Support">
               <Row>
-                <Btn icon="Help" label="Contact Support" onClick={a.openSupport} />
-                <Btn icon="Feedback" label="Feedback" onClick={a.openFeedback} />
+                <Btn icon="❓" label="Contact Support" onClick={a.openSupport} />
+                <Btn icon="✉" label="Feedback" onClick={a.openFeedback} />
               </Row>
               <Row>
-                <Btn icon="Community" label="Community" onClick={a.openCommunity} />
+                <Btn icon="👥" label="Community" onClick={a.openCommunity} />
               </Row>
             </Group>
             <Group label="About">
               <Row>
-                <Btn icon="Install" label="Install App" onClick={a.openInstallHelp} />
-                <Btn icon="Info" label="About RodmanSheets" onClick={a.about} />
+                <Btn icon="⬇" label="Install App" onClick={a.openInstallHelp} />
+                <Btn icon="ℹ" label="About RodmanSheets" onClick={a.about} />
               </Row>
             </Group>
           </div>

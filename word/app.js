@@ -81,8 +81,8 @@
   // Date is the build date (the day the file was last edited).
   const RW_BUILD = {
     version: '2.1.0',
-    date: '2026-05-02',
-    cache: 'rwd-v10',
+    date: '2026-05-17',
+    cache: 'rwd-v11',
     label: 'RodmanWord 2.1',
   };
   window.RW_BUILD = RW_BUILD;
@@ -1093,8 +1093,13 @@
         });
         break;
       case 'save':
-        saveDocument();
+        // Legacy entry — the new flow opens the unified dialog.
         closeBackstage();
+        openSaveDialog();
+        break;
+      case 'open-save-dialog':
+        closeBackstage();
+        openSaveDialog();
         break;
       case 'save-fs':
         closeBackstage();
@@ -1123,26 +1128,6 @@
         $('#ghGistId').value = localStorage.getItem('rodmanword:ghGistId') || '';
         $('#cloudStatus').textContent = '';
         openModal($('#cloudModal'));
-        break;
-      case 'export-html':
-        exportHtml();
-        closeBackstage();
-        break;
-      case 'export-docx':
-        exportDocx();
-        closeBackstage();
-        break;
-      case 'export-pdf':
-        exportPdf();
-        closeBackstage();
-        break;
-      case 'export-md':
-        exportMarkdown();
-        closeBackstage();
-        break;
-      case 'export-txt':
-        exportTxt();
-        closeBackstage();
         break;
       case 'history':
         renderHistory();
@@ -1221,7 +1206,7 @@
         [
           { ico: '📄', label: 'New', section: 'new' },
           { ico: '📂', label: 'Open from device', action: 'open' },
-          { ico: '💾', label: 'Save .rwd', action: 'save' },
+          { ico: '💾', label: 'Save…', action: 'open-save-dialog' },
           { ico: '🖨', label: 'Print', action: 'print' },
         ].forEach((q) => {
           const b = document.createElement('button');
@@ -1281,11 +1266,10 @@
     },
 
     save: {
-      title: 'Save / Save As',
+      title: 'Save',
       tiles: [
-        { ico: '💾', label: 'Save (.rwd)', desc: 'Download the document as a RodmanWord native .rwd file.', action: 'save' },
+        { ico: '💾', label: 'Save…', desc: 'Pick a file type and any per-format options. Native .rwd, Office, OpenDocument, PDF, EPUB, Markdown, JSON, YAML, PPTX, ODP and more.', action: 'open-save-dialog' },
         { ico: '🗂', label: 'Save to file…', desc: 'Save directly back to the same file via File System Access.', action: 'save-fs' },
-        { ico: '🔒', label: 'Save with password…', desc: 'Encrypt the .rwd with AES-GCM derived from your passphrase.', action: 'encrypt' },
         { ico: '⭐', label: 'Save as template', desc: 'Add the current document to your template gallery.', action: 'save-template' },
       ],
     },
@@ -1295,7 +1279,6 @@
       tiles: [
         { ico: '🖨', label: 'Print / Save as PDF', desc: 'Open the browser print dialog. Choose “Save as PDF” to keep a copy.', action: 'print' },
         { ico: '👁', label: 'Print preview', desc: 'On-screen preview using the current page size and margins.', action: 'printpreview' },
-        { ico: '📤', label: 'Export PDF', desc: 'Generate a real .pdf using the built-in PDF writer.', action: 'export-pdf' },
       ],
     },
 
@@ -1316,32 +1299,6 @@
       tiles: [
         { ico: '☁', label: 'GitHub Gist…', desc: 'Round-trip the .rwd payload through a private gist with your PAT.', action: 'cloud-sync' },
         { ico: '🌐', label: 'WebDAV / Nextcloud…', desc: 'Upload / download via PUT / GET with HTTP Basic auth.', action: 'webdav-sync' },
-      ],
-    },
-
-    export: {
-      title: 'Export',
-      tiles: [
-        { ico: '📝', label: 'Word (.docx)', desc: 'Round-trip OOXML with headers, footers, fields, and styles.', action: 'export-docx' },
-        { ico: '📕', label: 'PDF', desc: 'Built-in PDF writer with the standard 14 Type-1 fonts.', action: 'export-pdf' },
-        { ico: '🌐', label: 'HTML', desc: 'Self-contained HTML with embedded styles.', action: 'export-html' },
-        { ico: 'Md', label: 'Markdown', desc: 'GitHub-flavoured with optional YAML front-matter.', action: 'export-md' },
-        { ico: '📃', label: 'Plain text', desc: 'Strip every tag; keep paragraphs.', action: 'export-txt' },
-        { ico: '📦', label: 'OpenDocument (.odt)', desc: 'LibreOffice / OpenOffice native format.', action: 'export-odt' },
-        { ico: 'RT', label: 'RTF', desc: 'Rich Text Format for legacy word processors.', action: 'export-rtf' },
-        { ico: '📚', label: 'EPUB', desc: 'Split the document into chapters at H1 boundaries.', action: 'export-epub' },
-        { ico: 'AD', label: 'AsciiDoc', desc: 'Lightweight markup popular for technical writing.', action: 'export-asciidoc' },
-        { ico: 'TX', label: 'LaTeX', desc: 'Compile-ready .tex with article preamble.', action: 'export-latex' },
-        { ico: '{}', label: 'JSON',         desc: 'Document tree as nested JSON blocks.',           action: 'export-json' },
-        { ico: 'YL', label: 'YAML',         desc: 'YAML front-matter plus body.',                  action: 'export-yaml' },
-        { ico: 'Wk', label: 'MediaWiki',    desc: 'Wikipedia-style wikitext.',                     action: 'export-wiki' },
-        { ico: 'RS', label: 'reStructuredText', desc: 'Sphinx-friendly .rst with underline headings.', action: 'export-rst' },
-        { ico: '✱', label: 'Org-mode',     desc: 'Emacs Org outline + links.',                    action: 'export-org' },
-        { ico: 'DB', label: 'DocBook',      desc: 'DocBook 5 XML for technical publishing.',       action: 'export-dbk' },
-        { ico: '📖', label: 'FictionBook',  desc: 'FB2 e-book format.',                            action: 'export-fb2' },
-        { ico: '🎞', label: 'PowerPoint (.pptx)', desc: 'Split on H1 to slides; first paragraph becomes the title.', action: 'export-pptx' },
-        { ico: '🗂', label: 'OpenDocument presentation (.odp)', desc: 'LibreOffice Impress / Keynote slides.', action: 'export-odp' },
-        { ico: '🗜', label: 'Compress PDF…', desc: 'Rasterize a PDF you opened, pick a quality level, optional searchable text.', action: 'compress-pdf' },
       ],
     },
 
@@ -1514,6 +1471,178 @@
     addRecent(docTitle.value);
     statusSaved.textContent = 'Saved';
   }
+
+  // ============================================================
+  // Unified Save dialog
+  //
+  // Replaces the old File-backstage "Save" (4 tiles) + "Export"
+  // (20 tiles) + duplicate "Export PDF" in Print. The dialog picks
+  // a file type and any per-format options, then delegates to the
+  // existing exporter for that format.
+  //
+  // The 20 export helpers below (exportDocx / exportPdf /
+  // exportMarkdown / exportWiki / …) all read filename from
+  // docTitle.value. We stash + restore that value so the user can
+  // pick a different filename in the dialog without permanently
+  // renaming the open document.
+  // ============================================================
+
+  function openSaveDialog() {
+    const modal = $('#saveModal');
+    if (!modal) return;
+    const fmtSel = $('#saveFormat');
+    const nameInp = $('#saveFilename');
+    nameInp.value = sanitizeFileName(docTitle.value || 'document');
+    // Restore last-used format choice (sessionStorage scoped to this tab).
+    const remembered = sessionStorage.getItem('rodmanword:lastSaveFormat');
+    if (remembered && fmtSel.querySelector(`option[value="${remembered}"]`)) {
+      fmtSel.value = remembered;
+    } else {
+      fmtSel.value = 'docx';
+    }
+    // Reset per-format option fields to defaults.
+    $('#saveEncPassword').value = '';
+    $('#saveMdFrontmatter').checked = true;
+    $('#saveOptPdfRecode').checked = false;
+    $('#saveOptPdfLevel').value = 'medium';
+    $('#saveOptPdfText').checked = true;
+    refreshSaveOptionsVisibility();
+    openModal(modal);
+    setTimeout(() => nameInp.focus(), 0);
+  }
+
+  function refreshSaveOptionsVisibility() {
+    const fmt = $('#saveFormat').value;
+    $('#saveOptRwdEnc').hidden = fmt !== 'rwd.enc';
+    $('#saveOptMd').hidden = fmt !== 'md';
+    const pdfPanel = $('#saveOptPdf');
+    pdfPanel.hidden = fmt !== 'pdf';
+    if (fmt === 'pdf') {
+      // Show "Re-encode from source PDF" only when the active doc
+      // originated from a PDF (originalPdfBytes is populated).
+      $('#saveOptPdfRecodeWrap').hidden = !originalPdfBytes;
+      $('#saveOptPdfCompress').hidden = !$('#saveOptPdfRecode').checked;
+    }
+  }
+
+  async function performSaveDispatch() {
+    const fmt = $('#saveFormat').value;
+    const rawName = $('#saveFilename').value || sanitizeFileName(docTitle.value || 'document');
+    const filename = sanitizeFileName(rawName);
+    sessionStorage.setItem('rodmanword:lastSaveFormat', fmt);
+
+    // Stash + temporarily override docTitle so every existing
+    // export helper picks up the dialog's filename without
+    // permanently renaming the document.
+    const origTitle = docTitle.value;
+    let restoreTitle = true;
+    docTitle.value = filename;
+    try {
+      switch (fmt) {
+        case 'rwd':       saveDocument(); break;
+        case 'rwd.enc': {
+          const password = $('#saveEncPassword').value;
+          if (!password || password.length < 6) {
+            toast('Password must be at least 6 characters', 'error');
+            return false;
+          }
+          await encryptAndDownload(password);
+          break;
+        }
+        case 'docx':      exportDocx(); break;
+        case 'pdf': {
+          if ($('#saveOptPdfRecode').checked && originalPdfBytes) {
+            const level = $('#saveOptPdfLevel').value;
+            const preserveText = $('#saveOptPdfText').checked;
+            await compressPdfFromDialog({ level, preserveText, filename });
+          } else {
+            exportPdf();
+          }
+          break;
+        }
+        case 'html':      exportHtml(); break;
+        case 'md': {
+          // Toggle the existing YAML-frontmatter hook the same way the
+          // backstage tile does.
+          const includeFrontMatter = $('#saveMdFrontmatter').checked;
+          const prevHook = window.__rwdMdYamlFrontMatter;
+          window.__rwdMdYamlFrontMatter = includeFrontMatter
+            ? (prevHook || true)
+            : false;
+          try { exportMarkdown(); }
+          finally { window.__rwdMdYamlFrontMatter = prevHook; }
+          break;
+        }
+        case 'txt':       exportTxt(); break;
+        case 'odt':       exportOdt(); break;
+        case 'rtf':       exportRtf(); break;
+        case 'epub':      exportEpub(); break;
+        case 'adoc':      exportAsciidoc(); break;
+        case 'tex':       exportLatex(); break;
+        case 'json':      exportJsonDoc(); break;
+        case 'yaml':      exportYaml(); break;
+        case 'wiki':      exportWiki(); break;
+        case 'rst':       exportRst(); break;
+        case 'org':       exportOrg(); break;
+        case 'dbk':       exportDocBook(); break;
+        case 'fb2':       exportFb2(); break;
+        case 'pptx':      await exportPptx(); break;
+        case 'odp':       exportOdp(); break;
+        default:
+          toast('Unknown format: ' + fmt, 'error');
+          return false;
+      }
+    } finally {
+      if (restoreTitle) docTitle.value = origTitle;
+    }
+    return true;
+  }
+
+  // Convenience: re-encode the imported PDF through lib/images/pdf.js
+  // compressPdf, honouring the dialog's filename. Routes through
+  // doExport for the filename override so the user-typed name lands
+  // on the downloaded file regardless of the document's title.
+  async function compressPdfFromDialog({ level, preserveText, filename }) {
+    if (!originalPdfBytes) {
+      toast('Open a PDF first — Compress PDF re-encodes the original bytes.', 'error');
+      return;
+    }
+    if (!window.RodmanImagePdf || !window.RodmanImagePdf.compressPdf) {
+      toast('PDF engine not loaded', 'error');
+      return;
+    }
+    toast('Compressing PDF…', 'info');
+    try {
+      const blob = await window.RodmanImagePdf.compressPdf(
+        originalPdfBytes, { level, preserveText },
+      );
+      doExport(filename + '.pdf', blob);
+      toast(`Compressed PDF (${level}${preserveText ? ', searchable' : ''})`, 'success');
+    } catch (err) {
+      toast('Compress PDF failed: ' + err.message, 'error');
+    }
+  }
+
+  // Dialog wiring — runs once.
+  (function wireSaveDialog() {
+    const modal = $('#saveModal');
+    if (!modal) return;
+    $('#saveFormat').addEventListener('change', refreshSaveOptionsVisibility);
+    $('#saveOptPdfRecode').addEventListener('change', refreshSaveOptionsVisibility);
+    $('#saveDialogConfirm').addEventListener('click', async () => {
+      const ok = await performSaveDispatch();
+      if (ok !== false) closeModal(modal);
+    });
+    // Global Ctrl+S / Cmd+S: open the dialog (no quick-save path).
+    document.addEventListener('keydown', (e) => {
+      const cmd = e.ctrlKey || e.metaKey;
+      if (cmd && !e.altKey && e.key.toLowerCase() === 's') {
+        // Shift+S also opens the dialog (treat same as Ctrl+S).
+        e.preventDefault();
+        openSaveDialog();
+      }
+    });
+  })();
 
   function exportHtml() {
     const html = `<!DOCTYPE html>
@@ -2306,7 +2435,11 @@ ${editor.innerHTML}
     const size = new Blob([editor.innerHTML]).size;
     const entry = { title, at: new Date().toISOString(), size };
     list = [entry, ...list.filter((x) => x.title !== title)].slice(0, 10);
-    localStorage.setItem(STORE_RECENT, JSON.stringify(list));
+    try {
+      localStorage.setItem(STORE_RECENT, JSON.stringify(list));
+    } catch (err) {
+      console.warn('RodmanWord: could not save recent-documents list', err);
+    }
   };
 
   // ============================================================
@@ -2315,7 +2448,7 @@ ${editor.innerHTML}
   const PALETTE = [
     { name: 'New document', shortcut: 'Ctrl+N', run: () => newDocument() },
     { name: 'Open file', shortcut: 'Ctrl+O', run: () => $('#filePicker').click() },
-    { name: 'Save document', shortcut: 'Ctrl+S', run: () => saveDocument() },
+    { name: 'Save document', shortcut: 'Ctrl+S', run: () => openSaveDialog() },
     { name: 'Print / PDF', shortcut: 'Ctrl+P', run: () => { preparePrint(); window.print(); } },
     { name: 'Find & replace', shortcut: 'Ctrl+F', run: () => $('#findBtn').click() },
     { name: 'Insert link', shortcut: 'Ctrl+K', run: () => openLinkModal() },
@@ -2460,11 +2593,11 @@ ${editor.innerHTML}
     return btoa(s);
   }
 
-  $('#encryptSaveBtn').addEventListener('click', async () => {
-    const p1 = $('#encryptPwd').value;
-    const p2 = $('#encryptPwd2').value;
-    if (!p1) { toast('Password is empty', 'error'); return; }
-    if (p1 !== p2) { toast('Passwords do not match', 'error'); return; }
+  // Shared by the legacy "Save with password…" modal and the
+  // unified Save dialog. Returns true on success, false on failure
+  // (errors surface as toasts).
+  async function encryptAndDownload(password) {
+    if (!password) { toast('Password is empty', 'error'); return false; }
     const data = JSON.stringify({
       version: 1,
       title: docTitle.value,
@@ -2479,9 +2612,9 @@ ${editor.innerHTML}
     const salt = crypto.getRandomValues(new Uint8Array(16));
     const iv = crypto.getRandomValues(new Uint8Array(12));
     try {
-      const key = await deriveKey(p1, salt);
+      const key = await deriveKey(password, salt);
       const ct = new Uint8Array(await crypto.subtle.encrypt(
-        { name: 'AES-GCM', iv }, key, new TextEncoder().encode(data)
+        { name: 'AES-GCM', iv }, key, new TextEncoder().encode(data),
       ));
       const payload = JSON.stringify({
         rwdEnc: 1,
@@ -2490,11 +2623,21 @@ ${editor.innerHTML}
         data: bytesToB64(ct),
       });
       downloadBlob(payload, sanitizeFileName(docTitle.value) + '.rwd.enc', 'application/octet-stream');
-      closeModal($('#encryptModal'));
       toast('Saved encrypted .rwd.enc', 'success');
+      return true;
     } catch (err) {
       toast('Encryption failed: ' + err.message, 'error');
+      return false;
     }
+  }
+
+  $('#encryptSaveBtn').addEventListener('click', async () => {
+    const p1 = $('#encryptPwd').value;
+    const p2 = $('#encryptPwd2').value;
+    if (!p1) { toast('Password is empty', 'error'); return; }
+    if (p1 !== p2) { toast('Passwords do not match', 'error'); return; }
+    const ok = await encryptAndDownload(p1);
+    if (ok) closeModal($('#encryptModal'));
   });
 
   // ============================================================
@@ -4029,34 +4172,10 @@ ${editor.innerHTML}
       new Blob([bytes], { type: 'application/vnd.oasis.opendocument.presentation' }));
     toast('Exported .odp', 'success');
   }
-  async function compressPdfAction() {
-    if (!originalPdfBytes) {
-      toast('Open a PDF first — Compress PDF re-encodes the original bytes.', 'error');
-      return;
-    }
-    if (!window.RodmanImagePdf || !window.RodmanImagePdf.compressPdf) {
-      toast('PDF engine not loaded', 'error');
-      return;
-    }
-    const levelRaw = (window.prompt(
-      'Compression level (minimum / low / medium / high / maximum):',
-      'medium',
-    ) || '').trim().toLowerCase();
-    if (!levelRaw) return;
-    const valid = ['minimum', 'low', 'medium', 'high', 'maximum'];
-    const level = valid.includes(levelRaw) ? levelRaw : 'medium';
-    const preserveText = window.confirm(
-      'Preserve searchable text? Click OK to keep text-select / Cmd-F; Cancel for smaller files.',
-    );
-    toast('Compressing PDF…', 'info');
-    try {
-      const blob = await window.RodmanImagePdf.compressPdf(originalPdfBytes, { level, preserveText });
-      doExport(sanitizeFileName(docTitle.value || 'compressed') + '-compressed.pdf', blob);
-      toast(`Compressed PDF (${level}${preserveText ? ', searchable' : ''})`, 'success');
-    } catch (err) {
-      toast('Compress PDF failed: ' + err.message, 'error');
-    }
-  }
+  // The old compressPdfAction() (prompt + confirm-based UX) was
+  // replaced by compressPdfFromDialog() inside the unified Save
+  // dialog flow. See openSaveDialog above.
+  //
   // Module-scope slot for the original PDF bytes when the active
   // document was imported from a .pdf. Compress PDF re-rasterizes
   // these bytes through lib/images/pdf.js compressPdf.
@@ -4107,24 +4226,12 @@ ${editor.innerHTML}
     queueAutosave();
   });
 
-  // Hook into backstage
+  // Hook into backstage. The 20 export actions plus compress-pdf
+  // moved into the unified Save dialog (openSaveDialog above); the
+  // dialog dispatches to each exporter directly. Only md-preview
+  // remains as a legacy backstage shortcut.
   setBackstageView = (function (orig) {
     return function (action) {
-      if (action === 'export-odt') { exportOdt(); closeBackstage(); return; }
-      if (action === 'export-rtf') { exportRtf(); closeBackstage(); return; }
-      if (action === 'export-epub') { exportEpub(); closeBackstage(); return; }
-      if (action === 'export-asciidoc') { exportAsciidoc(); closeBackstage(); return; }
-      if (action === 'export-latex') { exportLatex(); closeBackstage(); return; }
-      if (action === 'export-json') { exportJsonDoc(); closeBackstage(); return; }
-      if (action === 'export-yaml') { exportYaml(); closeBackstage(); return; }
-      if (action === 'export-wiki') { exportWiki(); closeBackstage(); return; }
-      if (action === 'export-rst')  { exportRst(); closeBackstage(); return; }
-      if (action === 'export-org')  { exportOrg(); closeBackstage(); return; }
-      if (action === 'export-dbk')  { exportDocBook(); closeBackstage(); return; }
-      if (action === 'export-fb2')  { exportFb2(); closeBackstage(); return; }
-      if (action === 'export-pptx') { exportPptx(); closeBackstage(); return; }
-      if (action === 'export-odp')  { exportOdp(); closeBackstage(); return; }
-      if (action === 'compress-pdf') { compressPdfAction(); closeBackstage(); return; }
       if (action === 'md-preview') { closeBackstage(); openMdPreview(); return; }
       return orig(action);
     };

@@ -49,21 +49,37 @@
 
   // ---------- Autosave ----------
   let saveTimer = null;
+  let quotaWarned = false;
   function scheduleSave() {
     setSaveIndicator('saving');
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
       const ok = D.save(deck);
       setSaveIndicator(ok ? 'saved' : 'error');
+      // localStorage quota is ~5-10 MB per origin. A PDF import
+      // with many pages produces base64 PNGs that easily exceed it.
+      // Warn once per session — repeated autosaves would otherwise
+      // fail silently and the user could lose work on reload.
+      if (!ok && !quotaWarned) {
+        quotaWarned = true;
+        setTimeout(() => {
+          alert(
+            'This deck is too large to autosave to browser storage ' +
+            '(localStorage quota exceeded). It stays in memory while ' +
+            'this tab is open. Use File → Save… to export to .pptx ' +
+            'or another format before closing the tab to preserve it.'
+          );
+        }, 0);
+      }
     }, 400);
   }
 
   function setSaveIndicator(kind) {
     const el = $('#saveIndicator');
     if (!el) return;
-    if (kind === 'saving') { el.textContent = 'Saving…'; el.style.opacity = 0.7; }
-    else if (kind === 'saved') { el.textContent = 'Saved'; el.style.opacity = 0.85; }
-    else { el.textContent = 'Save error'; el.style.opacity = 1; }
+    if (kind === 'saving') { el.textContent = 'Saving…'; el.style.opacity = 0.7; el.style.color = ''; }
+    else if (kind === 'saved') { el.textContent = 'Saved'; el.style.opacity = 0.85; el.style.color = ''; }
+    else { el.textContent = 'Not autosaved'; el.style.opacity = 1; el.style.color = '#fca5a5'; }
   }
 
   // ---------- Helpers ----------
@@ -321,6 +337,9 @@
     const nextTab = $(`.tab[data-tab="${tabId}"]`) || $('.tab[data-tab="home"]');
     if (!nextTab) return;
     const nextId = nextTab.dataset.tab || 'home';
+    const ribbon = $('#ribbon');
+    const wasCollapsed = ribbon?.classList.contains('collapsed');
+    const wasActive = nextTab.classList.contains('active');
     $$('.tab').forEach((t) => {
       const active = t === nextTab;
       t.classList.toggle('active', active);
@@ -332,6 +351,10 @@
       p.classList.toggle('active', active);
       p.hidden = !active;
     });
+    // Single-clicking a different tab while collapsed re-expands
+    // the ribbon (mirrors word/app.js:220-222). Clicking the
+    // currently active tab is a no-op — use dblclick to toggle.
+    if (wasCollapsed && !wasActive) ribbon.classList.remove('collapsed');
   }
 
   document.addEventListener('click', (e) => {
@@ -339,6 +362,15 @@
     if (!tab) return;
     activateRibbonTab(tab.dataset.tab);
   });
+
+  // Listener scoped to the tabs nav itself (not document) so it
+  // doesn't add page-wide dblclick handling that can interfere
+  // with iOS Safari momentum-pan detection on the ribbon.
+  $('.tabs')?.addEventListener('dblclick', (e) => {
+    if (!e.target.closest('.tab')) return;
+    $('#ribbon')?.classList.toggle('collapsed');
+  });
+
   activateRibbonTab($('.tab.active')?.dataset.tab || 'home');
 
   // ---------- Theme strip ----------
@@ -1468,7 +1500,24 @@
       bootstrap();
       scheduleSave();
     },
-    openDeck() { $('#deckFileInput').click(); },
+    openFile() { $('#openFileInput').click(); },
+    openSaveDialog() {
+      // Unified Save dialog: pick filename + format. Replaces the
+      // 8 File-panel + 2 Record-panel export buttons.
+      const modal = $('#saveModal');
+      const nameInp = $('#saveFilename');
+      const fmtSel = $('#saveFormat');
+      if (!modal || !nameInp || !fmtSel) return;
+      nameInp.value = (deck.title || 'presentation').replace(/[^\w\-]+/g, '_');
+      const remembered = sessionStorage.getItem('rodmanslides:lastSaveFormat');
+      if (remembered && fmtSel.querySelector(`option[value="${remembered}"]`)) {
+        fmtSel.value = remembered;
+      } else {
+        fmtSel.value = 'pptx';
+      }
+      modal.hidden = false;
+      setTimeout(() => nameInp.focus(), 0);
+    },
     saveDeck() {
       const blob = new Blob([JSON.stringify(deck, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
@@ -1478,7 +1527,6 @@
       a.click();
       setTimeout(() => URL.revokeObjectURL(url), 0);
     },
-    importPptx() { $('#pptxFileInput').click(); },
     exportPptx() {
       if (!window.RodmanSlidesIO || !window.RodmanSlidesIO.savePptx) {
         alert('PPTX engine failed to load. Reload the page and try again.');
@@ -1651,9 +1699,13 @@
     e.target.value = '';
   });
 
-  $('#deckFileInput').addEventListener('change', (e) => {
-    const f = e.target.files[0];
-    if (!f) return;
+  // Unified open: one file input + one dispatcher that sniffs the
+  // extension and hands off to the appropriate loader. Mirrors the
+  // unified-Save-dialog pattern at slides/app.js:1505 and replaces
+  // the previous trio of file inputs / change handlers / ribbon
+  // buttons (Open .json… / Import .pptx… / Import .pdf…).
+
+  function loadJsonFile(f) {
     const reader = new FileReader();
     reader.onload = () => {
       try {
@@ -1669,13 +1721,9 @@
       }
     };
     reader.readAsText(f);
-    e.target.value = '';
-  });
+  }
 
-  $('#pptxFileInput').addEventListener('change', async (e) => {
-    const f = e.target.files[0];
-    e.target.value = '';
-    if (!f) return;
+  async function loadPptxFile(f) {
     if (!window.RodmanSlidesIO || !window.RodmanSlidesIO.loadPptx) {
       alert('PPTX engine failed to load. Reload the page and try again.');
       return;
@@ -1696,6 +1744,78 @@
     } catch (err) {
       alert('Could not import .pptx: ' + (err.message || err));
     }
+  }
+
+  // PDF → deck import. Each page rasterises to a canvas via the
+  // shared lib/images/pdf.js engine and lands as a single full-bleed
+  // image element on its own slide. Letterboxed to preserve the
+  // page aspect inside the deck's 1280×720 canvas.
+  async function loadPdfFile(f) {
+    if (!window.RodmanImagePdf || !window.RodmanImagePdf.decodePdfPage) {
+      alert('PDF engine failed to load. Reload the page and try again.');
+      return;
+    }
+    try {
+      const buf = await f.arrayBuffer();
+      const bytes = new Uint8Array(buf);
+      const pageCount = await window.RodmanImagePdf.pdfPageCount(bytes);
+      if (!pageCount) { alert('No pages found in this PDF.'); return; }
+      const fresh = D.newDeck();
+      fresh.title = f.name.replace(/\.pdf$/i, '');
+      fresh.slides = [];
+      const deckW = fresh.size.w;
+      const deckH = fresh.size.h;
+      // Progress feedback: a 30-page PDF can take 10-30s to
+      // rasterise. Reuse the title-bar save indicator to show
+      // "Loading PDF… N / M" and yield to the event loop between
+      // pages so the browser repaints (otherwise the tab freezes
+      // and the browser may show "page not responding").
+      const indicatorEl = $('#saveIndicator');
+      const restoreIndicator = indicatorEl ? indicatorEl.textContent : '';
+      for (let i = 0; i < pageCount; i++) {
+        if (indicatorEl) {
+          indicatorEl.textContent = `Loading PDF… ${i + 1} / ${pageCount}`;
+          indicatorEl.style.opacity = 1;
+          indicatorEl.style.color = '';
+        }
+        // Yield once per iteration so paint + input handlers run.
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        const { canvas } = await window.RodmanImagePdf.decodePdfPage(bytes, i, { scale: 2 });
+        const dataUrl = canvas.toDataURL('image/png');
+        const pageAspect = canvas.width / canvas.height;
+        const deckAspect = deckW / deckH;
+        let w, h, x, y;
+        if (pageAspect > deckAspect) {
+          w = deckW; h = Math.round(deckW / pageAspect);
+          x = 0; y = Math.round((deckH - h) / 2);
+        } else {
+          h = deckH; w = Math.round(deckH * pageAspect);
+          x = Math.round((deckW - w) / 2); y = 0;
+        }
+        const slide = D.newSlide({ layout: 'blank', theme: fresh.theme });
+        slide.elements = [D.newImageElement({ x, y, w, h, src: dataUrl })];
+        fresh.slides.push(slide);
+      }
+      if (indicatorEl) indicatorEl.textContent = restoreIndicator;
+      deck = sanitizeDeck(fresh);
+      state.selectedSlideId = deck.slides[0] ? deck.slides[0].id : null;
+      clearSelection();
+      bootstrap();
+      scheduleSave();
+    } catch (err) {
+      alert('Could not import .pdf: ' + (err.message || err));
+    }
+  }
+
+  $('#openFileInput').addEventListener('change', async (e) => {
+    const f = e.target.files[0];
+    e.target.value = '';
+    if (!f) return;
+    const ext = (f.name.match(/\.([^.]+)$/)?.[1] || '').toLowerCase();
+    if (ext === 'json') return loadJsonFile(f);
+    if (ext === 'pptx') return loadPptxFile(f);
+    if (ext === 'pdf')  return loadPdfFile(f);
+    alert(`Unsupported file type: .${ext}\nSupported: .json, .pptx, .pdf`);
   });
 
   // ---------- Notes pane ----------
@@ -1893,6 +2013,48 @@
     if (e.target === e.currentTarget) closeHelpTopic();
   });
 
+  // ---------- Unified Save dialog wiring ----------
+  function closeSaveModal() {
+    const m = $('#saveModal');
+    if (m) m.hidden = true;
+  }
+  function performSave() {
+    const fmt = $('#saveFormat').value;
+    const rawName = $('#saveFilename').value || (deck.title || 'presentation');
+    const cleanName = rawName.replace(/[^\w\-]+/g, '_') || 'presentation';
+    sessionStorage.setItem('rodmanslides:lastSaveFormat', fmt);
+    // Stash + restore deck.title — every existing exporter reads
+    // it for the filename. Same pattern as Word's Save dialog.
+    const origTitle = deck.title;
+    deck.title = cleanName;
+    try {
+      switch (fmt) {
+        case 'pptx': COMMANDS.exportPptx(); break;
+        case 'pdf':  COMMANDS.exportPdf();  break;
+        case 'json': COMMANDS.saveDeck();   break;
+        case 'odp':  COMMANDS.exportOdp();  break;
+        case 'docx': COMMANDS.exportDocx(); break;
+        case 'md':   COMMANDS.exportMd();   break;
+        case 'html': COMMANDS.exportHtml(); break;
+        case 'txt':  COMMANDS.exportTxt();  break;
+        default: alert('Unknown format: ' + fmt); return;
+      }
+    } finally {
+      deck.title = origTitle;
+    }
+    closeSaveModal();
+  }
+  $('#saveModalCloseBtn')?.addEventListener('click', closeSaveModal);
+  $('#saveModalCancelBtn')?.addEventListener('click', closeSaveModal);
+  $('#saveModalConfirmBtn')?.addEventListener('click', performSave);
+  $('#saveModal')?.addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) closeSaveModal();
+  });
+  $('#saveFilename')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); performSave(); }
+    else if (e.key === 'Escape') { e.preventDefault(); closeSaveModal(); }
+  });
+
   // ---------- Export to PDF (engine writer in lib/docs/pdfio.js) ----------
   //
   // Deck → HTML (via the shared deckToHtml in lib/slides/html-bridge.js)
@@ -2046,6 +2208,10 @@
     }
     if (mod && (e.key === 'k' || e.key === 'K')) {
       e.preventDefault(); COMMANDS.insertLink(); return;
+    }
+    if (mod && (e.key === 's' || e.key === 'S') && !e.shiftKey && !e.altKey) {
+      // Save opens the unified Save dialog (filename + format).
+      e.preventDefault(); COMMANDS.openSaveDialog(); return;
     }
 
     // Clipboard operations only fire when we're not capturing the

@@ -29,11 +29,10 @@ of action cards.
 | **Home**       | Quick actions (New, Open, Save, Print) + Recent documents list. |
 | **New**        | Templates gallery (Resume, Cover letter, Report, Memo, Meeting notes, Blank, plus user-saved templates from STORE_USER_TEMPLATES). |
 | **Open**       | Browse from device · Open from File System (FSA API) · Recent. |
-| **Save / Save As** | Save .rwd · Save to file (FSA) · Save with password (.rwd.enc, AES-GCM) · Save as template. |
-| **Print**      | Print / Save as PDF (Ctrl+P) · Print preview · Export PDF. |
+| **Save**       | Single **Save…** tile that opens the unified Save dialog (filename + format select with all 20 supported formats — `.rwd`, `.rwd.enc` encrypted, `.docx`, `.pdf`, `.html`, `.md`, `.txt`, `.odt`, `.rtf`, `.epub`, `.adoc`, `.tex`, `.json`, `.yaml`, `.wiki`, `.rst`, `.org`, `.dbk`, `.fb2`, `.pptx`, `.odp` — plus per-format options like the rwd.enc password, the markdown YAML frontmatter toggle, and PDF re-encode from a source PDF). Plus secondary tiles: Save to file (FSA) and Save as template. |
+| **Print**      | Print / Save as PDF (Ctrl+P) · Print preview. |
 | **Share**      | Share link (URL hash) · Share read-only · Share comment-only · Collaborate (P2P) · Email this doc · Copy Slack-Markdown. |
 | **Cloud sync** | GitHub Gist · WebDAV / Nextcloud. |
-| **Export**     | Word .docx · PDF · HTML · Markdown · Plain text · ODT · RTF · EPUB · AsciiDoc · LaTeX. |
 | **Info**       | Properties · Version history · Writing goal · Inspect document. |
 | **Tools**      | Mail merge · Compare · Markdown live preview · Translate · Document themes · Brand kit · Custom CSS · Styles import / export · Save as template · Reset to template · Style cleaner. |
 | **About**      | Version + build date + cache key (read from `RW_BUILD`). |

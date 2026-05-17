@@ -856,11 +856,10 @@
         <li><button data-section="home" class="active">🏠 Home</button></li>
         <li><button data-section="new">📄 New</button></li>
         <li><button data-section="open">📂 Open</button></li>
-        <li><button data-section="save">💾 Save / Save As</button></li>
+        <li><button data-section="save">💾 Save</button></li>
         <li><button data-section="print">🖨 Print</button></li>
         <li><button data-section="share">🔗 Share</button></li>
         <li><button data-section="cloud">☁ Cloud sync</button></li>
-        <li><button data-section="export">📤 Export</button></li>
         <li><button data-section="info">ⓘ Info</button></li>
         <li><button data-section="tools">🛠 Tools</button></li>
         <li><button data-section="about">❓ About</button></li>
@@ -1006,6 +1005,94 @@
       <footer>
         <button class="btn" data-close-modal>Cancel</button>
         <button class="btn primary" id="insertTableConfirm">Insert</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Save dialog: unified Save + Export from the File backstage. -->
+  <div class="modal" id="saveModal" hidden>
+    <div class="modal-card">
+      <header><h3>Save document</h3>
+        <button class="icon-btn" data-close-modal aria-label="Close">✕</button>
+      </header>
+      <div class="modal-body">
+        <label>Filename <input id="saveFilename" type="text" placeholder="document" /></label>
+        <label>Format
+          <select id="saveFormat">
+            <optgroup label="Native">
+              <option value="rwd">RodmanWord (.rwd)</option>
+              <option value="rwd.enc">RodmanWord encrypted (.rwd.enc)</option>
+            </optgroup>
+            <optgroup label="Office">
+              <option value="docx">Word (.docx)</option>
+              <option value="pptx">PowerPoint (.pptx)</option>
+            </optgroup>
+            <optgroup label="OpenDocument">
+              <option value="odt">OpenDocument Text (.odt)</option>
+              <option value="odp">OpenDocument Presentation (.odp)</option>
+            </optgroup>
+            <optgroup label="Portable">
+              <option value="pdf">PDF (.pdf)</option>
+              <option value="epub">EPUB (.epub)</option>
+              <option value="rtf">RTF (.rtf)</option>
+              <option value="html">HTML (.html)</option>
+              <option value="txt">Plain text (.txt)</option>
+            </optgroup>
+            <optgroup label="Markup">
+              <option value="md">Markdown (.md)</option>
+              <option value="adoc">AsciiDoc (.adoc)</option>
+              <option value="tex">LaTeX (.tex)</option>
+              <option value="wiki">MediaWiki (.wiki)</option>
+              <option value="rst">reStructuredText (.rst)</option>
+              <option value="org">Org-mode (.org)</option>
+              <option value="dbk">DocBook (.dbk)</option>
+              <option value="fb2">FictionBook (.fb2)</option>
+            </optgroup>
+            <optgroup label="Structured">
+              <option value="json">JSON document (.json)</option>
+              <option value="yaml">YAML document (.yaml)</option>
+            </optgroup>
+          </select>
+        </label>
+
+        <!-- Per-format options. Each row is shown only when its
+             format is selected; toggling is done in app.js. -->
+        <div id="saveOptRwdEnc" class="save-opt" hidden>
+          <label>Password
+            <input id="saveEncPassword" type="password" placeholder="At least 6 characters" />
+          </label>
+        </div>
+        <div id="saveOptMd" class="save-opt" hidden>
+          <label class="row">
+            <input id="saveMdFrontmatter" type="checkbox" checked />
+            Include YAML front-matter (title / date / author)
+          </label>
+        </div>
+        <div id="saveOptPdf" class="save-opt" hidden>
+          <label class="row" id="saveOptPdfRecodeWrap" hidden>
+            <input id="saveOptPdfRecode" type="checkbox" />
+            Re-encode from the source PDF (Compress)
+          </label>
+          <div id="saveOptPdfCompress" hidden>
+            <label>Compression level
+              <select id="saveOptPdfLevel">
+                <option value="minimum">Minimum (largest file)</option>
+                <option value="low">Low</option>
+                <option value="medium" selected>Medium</option>
+                <option value="high">High</option>
+                <option value="maximum">Maximum (smallest file)</option>
+              </select>
+            </label>
+            <label class="row">
+              <input id="saveOptPdfText" type="checkbox" checked />
+              Preserve searchable text overlay
+            </label>
+          </div>
+        </div>
+      </div>
+      <footer>
+        <button class="btn" data-close-modal>Cancel</button>
+        <button class="btn primary" id="saveDialogConfirm">Save</button>
       </footer>
     </div>
   </div>

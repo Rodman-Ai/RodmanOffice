@@ -4,7 +4,7 @@
 // Note: the new PPTX engine lives at /lib/slides/ which is outside this
 // SW's scope (./), so we cannot precache it here. It's fetched from the
 // network on first PPTX import / export and HTTP-cached after that.
-const VERSION = 'rodman-slides-v2';
+const VERSION = 'rodman-slides-v3';
 const CACHE_PREFIX = 'rodman-slides-';
 const APP_SHELL = [
   './',

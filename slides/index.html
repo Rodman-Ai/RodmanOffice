@@ -39,7 +39,7 @@
         aria-label="Ask Claude"
         aria-controls="askClaudePanel"
         aria-expanded="false"
-      >&#129302; Ask Claude</button>
+      ><span class="ask-claude-icon" aria-hidden="true">&#129302;</span><span class="ask-claude-text"> Ask Claude</span></button>
       <span id="saveIndicator" class="save-indicator">Saved</span>
       <button class="icon-btn" id="presentBtn" title="Start presentation (F5)" aria-label="Present">▶</button>
       <button class="icon-btn" id="helpBtn" title="Help" aria-label="Help">?</button>
@@ -82,17 +82,17 @@
   </aside>
 
   <nav class="tabs" role="tablist" aria-label="Ribbon tabs">
-    <button class="tab" role="tab" data-tab="file">File</button>
-    <button class="tab active" role="tab" aria-selected="true" data-tab="home">Home</button>
-    <button class="tab" role="tab" data-tab="insert">Insert</button>
-    <button class="tab" role="tab" data-tab="design">Design</button>
-    <button class="tab" role="tab" data-tab="transitions">Transitions</button>
-    <button class="tab" role="tab" data-tab="animations">Animations</button>
-    <button class="tab" role="tab" data-tab="slideshow">Slide Show</button>
-    <button class="tab" role="tab" data-tab="record">Record</button>
-    <button class="tab" role="tab" data-tab="review">Review</button>
-    <button class="tab" role="tab" data-tab="view">View</button>
-    <button class="tab" role="tab" data-tab="help">Help</button>
+    <button class="tab" role="tab" data-tab="file" title="Double-click to collapse the ribbon">File</button>
+    <button class="tab active" role="tab" aria-selected="true" data-tab="home" title="Double-click to collapse the ribbon">Home</button>
+    <button class="tab" role="tab" data-tab="insert" title="Double-click to collapse the ribbon">Insert</button>
+    <button class="tab" role="tab" data-tab="design" title="Double-click to collapse the ribbon">Design</button>
+    <button class="tab" role="tab" data-tab="transitions" title="Double-click to collapse the ribbon">Transitions</button>
+    <button class="tab" role="tab" data-tab="animations" title="Double-click to collapse the ribbon">Animations</button>
+    <button class="tab" role="tab" data-tab="slideshow" title="Double-click to collapse the ribbon">Slide Show</button>
+    <button class="tab" role="tab" data-tab="record" title="Double-click to collapse the ribbon">Record</button>
+    <button class="tab" role="tab" data-tab="review" title="Double-click to collapse the ribbon">Review</button>
+    <button class="tab" role="tab" data-tab="view" title="Double-click to collapse the ribbon">View</button>
+    <button class="tab" role="tab" data-tab="help" title="Double-click to collapse the ribbon">Help</button>
   </nav>
 
   <section class="ribbon" id="ribbon">
@@ -101,27 +101,15 @@
       <div class="group">
         <div class="group-row">
           <button class="ribbon-btn wide" data-cmd="newDeck">New</button>
-          <button class="ribbon-btn wide" data-cmd="openDeck">Open .json…</button>
-          <button class="ribbon-btn wide" data-cmd="importPptx">Import .pptx…</button>
+          <button class="ribbon-btn wide" data-cmd="openFile" title="Open .json, .pptx, or .pdf">📂 Open…</button>
         </div>
         <div class="group-label">Deck</div>
       </div>
       <div class="group">
         <div class="group-row">
-          <button class="ribbon-btn wide" data-cmd="saveDeck">Save .json</button>
-          <button class="ribbon-btn wide" data-cmd="exportPptx">Export .pptx</button>
-          <button class="ribbon-btn wide" data-cmd="exportPdf">Export PDF</button>
+          <button class="ribbon-btn wide" data-cmd="openSaveDialog">💾 Save…</button>
         </div>
-        <div class="group-row">
-          <button class="ribbon-btn wide" data-cmd="exportOdp">Export .odp</button>
-          <button class="ribbon-btn wide" data-cmd="exportDocx">Export .docx</button>
-          <button class="ribbon-btn wide" data-cmd="exportMd">Export .md</button>
-        </div>
-        <div class="group-row">
-          <button class="ribbon-btn wide" data-cmd="exportHtml">Export .html</button>
-          <button class="ribbon-btn wide" data-cmd="exportTxt">Export .txt</button>
-        </div>
-        <div class="group-label">Save / Export</div>
+        <div class="group-label">Save</div>
       </div>
       <div class="group">
         <div class="group-row">
@@ -483,10 +471,9 @@
       </div>
       <div class="group">
         <div class="group-row">
-          <button class="ribbon-btn wide" data-cmd="exportPptx">Export .pptx</button>
-          <button class="ribbon-btn wide" data-cmd="exportPdf">Export PDF</button>
+          <button class="ribbon-btn wide" data-cmd="openSaveDialog">💾 Save…</button>
         </div>
-        <div class="group-label">Export</div>
+        <div class="group-label">Save</div>
       </div>
       <div class="group">
         <div class="group-row">
@@ -619,8 +606,7 @@
   </footer>
 
   <input type="file" id="imageFileInput" accept="image/*" hidden />
-  <input type="file" id="deckFileInput" accept="application/json,.json" hidden />
-  <input type="file" id="pptxFileInput" accept=".pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation" hidden />
+  <input type="file" id="openFileInput" accept=".json,.pptx,.pdf,application/json,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/pdf" hidden />
 
   <div class="help-modal" id="helpInfoModal" hidden role="dialog" aria-modal="true" aria-labelledby="helpInfoTitle">
     <div class="help-modal-card">
@@ -636,6 +622,44 @@
     </div>
   </div>
 
+  <!-- Unified Save dialog: replaces the 8 File-panel + 2 Record-panel
+       export buttons. Format choice + filename live here. -->
+  <div class="help-modal" id="saveModal" hidden role="dialog" aria-modal="true" aria-labelledby="saveModalTitle">
+    <div class="help-modal-card">
+      <header>
+        <h3 id="saveModalTitle">Save deck</h3>
+        <button class="icon-btn" id="saveModalCloseBtn" type="button" aria-label="Close">×</button>
+      </header>
+      <div class="help-modal-body">
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:10px">
+          <span>Filename</span>
+          <input id="saveFilename" type="text" style="font:inherit;font-size:13px;font-weight:400;text-transform:none;padding:6px 10px;border:1px solid var(--border, #cbd2d8);border-radius:4px" />
+        </label>
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.4px">
+          <span>Format</span>
+          <select id="saveFormat" style="font:inherit;font-size:13px;font-weight:400;text-transform:none;padding:6px 10px;border:1px solid var(--border, #cbd2d8);border-radius:4px;background:white">
+            <optgroup label="Slides">
+              <option value="pptx">PowerPoint (.pptx)</option>
+              <option value="odp">OpenDocument Presentation (.odp)</option>
+              <option value="json">RodmanSlides deck (.json)</option>
+            </optgroup>
+            <optgroup label="Document">
+              <option value="pdf">PDF</option>
+              <option value="docx">Word (.docx)</option>
+              <option value="html">HTML</option>
+              <option value="md">Markdown</option>
+              <option value="txt">Plain text</option>
+            </optgroup>
+          </select>
+        </label>
+      </div>
+      <footer>
+        <button class="ribbon-btn wide" id="saveModalCancelBtn" type="button">Cancel</button>
+        <button class="ribbon-btn wide" id="saveModalConfirmBtn" type="button">Save</button>
+      </footer>
+    </div>
+  </div>
+
   <script type="module">
     // Bridge the shared /lib/slides/ PPTX engine onto window.RodmanSlidesIO
     // so the classic-script app.js can import / export .pptx without
@@ -644,6 +668,7 @@
     // the deck/render/app scripts below.
     import * as slidesio from '../lib/slides/index.js';
     import * as docs from '../lib/docs/index.js';
+    import * as images from '../lib/images/index.js';
     import * as claude from '../lib/claude/index.js';
     window.RodmanSlidesIO = {
       savePptx: slidesio.savePptx,
@@ -657,6 +682,12 @@
     window.RodmanInterop = {
       mdExport: docs.mdExport,
       odpExport: docs.odpExport,
+    };
+    // PDF → deck import uses the same pdf.js renderer that powers
+    // Compress PDF in the image editor and Word's PDF reader.
+    window.RodmanImagePdf = {
+      decodePdfPage: images.decodePdfPage,
+      pdfPageCount: images.pdfPageCount,
     };
     window.RodmanClaude = claude;
   </script>

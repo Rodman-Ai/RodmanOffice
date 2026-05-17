@@ -138,6 +138,7 @@ body,
   font-size: 12.5px;
   font-weight: 500;
   cursor: pointer;
+  white-space: nowrap;
 }
 .title-bar .ask-claude:hover { background: rgba(255, 255, 255, 0.28); }
 
@@ -179,6 +180,7 @@ body,
   overflow-y: visible;
   box-sizing: border-box;
 }
+.ribbon.collapsed { display: none; }
 .ribbon-panel {
   display: none;
   flex-wrap: wrap;
@@ -992,6 +994,80 @@ body,
   cursor: not-allowed;
 }
 
+/* Unified Save dialog (replaces 13 separate Export buttons). */
+.save-dialog {
+  width: 460px;
+  max-width: 92vw;
+}
+.save-dialog-body {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.save-dialog-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--aicell-header-fg);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.save-dialog-row > input[type="text"],
+.save-dialog-row > select {
+  border: 1px solid var(--aicell-border);
+  border-radius: 4px;
+  padding: 6px 10px;
+  font: inherit;
+  font-size: 13px;
+  text-transform: none;
+  font-weight: 400;
+  background: white;
+}
+.save-dialog-error {
+  margin-top: 6px;
+  padding: 6px 10px;
+  border: 1px solid #fca5a5;
+  background: #fef2f2;
+  color: #991b1b;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.save-dialog-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+  padding: 10px 14px 14px;
+}
+.save-dialog-actions button {
+  padding: 5px 12px;
+  border: 1px solid var(--aicell-border);
+  background: white;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.save-dialog-actions button:hover:not(:disabled) {
+  background: #f0f0f3;
+}
+.save-dialog-actions button.primary {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+.save-dialog-actions button.primary:hover:not(:disabled) {
+  background: var(--primary-dark);
+}
+.save-dialog-actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* Conditional formatting modal */
 .cf-modal {
   width: 560px;
@@ -1643,4 +1719,17 @@ body,
 .panel-intro-chip:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* Mobile title-bar — mirrors Word's @media (max-width: 720px) so
+   the "Ask Claude" pill doesn't wrap on iPhone-width. Drop the
+   "RodmanSheets" subtitle, hide the verbose Demo-mode status text,
+   cap the doc title, and shrink the actions cluster. */
+@media (max-width: 720px) {
+  .title-bar { gap: 6px; padding: 4px 8px; }
+  .title-bar .brand-subtitle { display: none; }
+  .title-bar .doc-title { max-width: 38vw; font-size: 13px; }
+  .title-bar .title-actions { gap: 4px; }
+  .title-bar .title-actions .status { display: none; }
+  .title-bar .ask-claude { font-size: 12px; padding: 3px 8px; }
 }

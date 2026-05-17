@@ -312,6 +312,16 @@ async function encodeCanvasToTarget(canvas, target, name, options) {
     const buf = await images.encodeFarbfeld(canvas).arrayBuffer();
     return { bytes: buf, mime: target.mime };
   }
+  if (target.ext === 'gif') {
+    const blob = await images.encodeGIF(canvas);
+    const buf = await blob.arrayBuffer();
+    return { bytes: buf, mime: target.mime };
+  }
+  if (target.ext === 'svg') {
+    const blob = await images.encodeSVG(canvas);
+    const buf = await blob.arrayBuffer();
+    return { bytes: buf, mime: target.mime };
+  }
   // Container-style encoders that wrap PNG entries — both async.
   if (target.ext === 'icns') {
     const blob = await images.encodeICNS(canvas);

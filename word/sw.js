@@ -8,7 +8,7 @@
 //
 // Keep VERSION in sync with RW_BUILD.cache in app.js so the About
 // dialog displays the same version users actually have cached.
-const VERSION = 'rwd-v10';
+const VERSION = 'rwd-v11';
 const CACHE_PREFIX = 'rwd-';
 // Note: the doc engines now live in /lib/docs/ which is outside this
 // SW's scope (./), so we cannot precache them here. They're fetched

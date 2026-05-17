@@ -23,6 +23,7 @@ const FunctionPicker = lazy(() => import("./FunctionPicker").then((m) => ({ defa
 const FindReplace = lazy(() => import("./FindReplace").then((m) => ({ default: m.FindReplace })));
 const ConditionalFormatModal = lazy(() => import("./ConditionalFormatModal").then((m) => ({ default: m.ConditionalFormatModal })));
 const CommentModal = lazy(() => import("./CommentModal").then((m) => ({ default: m.CommentModal })));
+const SaveDialog = lazy(() => import("./SaveDialog").then((m) => ({ default: m.SaveDialog })));
 const AuditPanel = lazy(() => import("./AuditPanel").then((m) => ({ default: m.AuditPanel })));
 
 const AUTOSAVE_DEBOUNCE_MS = 800;
@@ -64,6 +65,7 @@ export function App() {
   const [cfOpen, setCfOpen] = useState(false);
   const [commentOpen, setCommentOpen] = useState(false);
   const [auditOpen, setAuditOpen] = useState(false);
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);
   const [helpTopic, setHelpTopic] = useState<HelpTopic | null>(null);
@@ -368,6 +370,11 @@ export function App() {
         if (inEditable) return;
         e.preventDefault();
         applyFormatPatch({ underline: !anchorFormat?.underline });
+      } else if (mod && (e.key === "s" || e.key === "S") && !e.shiftKey && !e.altKey) {
+        // Save opens the unified Save dialog where the user picks
+        // a filename, format, and any per-format options.
+        e.preventDefault();
+        setSaveDialogOpen(true);
       }
     };
     window.addEventListener("keydown", handler);
@@ -627,19 +634,7 @@ export function App() {
       setSelection(ORIGIN_RANGE);
     },
     importFile: triggerImport,
-    exportCsv: () => void import("./csv").then(({ exportSheetAsCSV }) => exportSheetAsCSV(api.activeSheet)),
-    exportXlsx: () => void import("./csv").then(({ exportWorkbookAsXLSX }) => exportWorkbookAsXLSX(api.workbook)),
-    exportTsv: () => void import("./csv").then(({ exportSheetAsTSV }) => exportSheetAsTSV(api.activeSheet)),
-    exportPsv: () => void import("./csv").then(({ exportSheetAsPSV }) => exportSheetAsPSV(api.activeSheet)),
-    exportJson: () => void import("./csv").then(({ exportWorkbookAsJSON }) => exportWorkbookAsJSON(api.workbook)),
-    exportNdjson: () => void import("./csv").then(({ exportSheetAsNDJSON }) => exportSheetAsNDJSON(api.activeSheet)),
-    exportHtml: () => void import("./csv").then(({ exportWorkbookAsHTML }) => exportWorkbookAsHTML(api.workbook)),
-    exportMd: () => void import("./csv").then(({ exportWorkbookAsMD }) => exportWorkbookAsMD(api.workbook)),
-    exportXml: () => void import("./csv").then(({ exportWorkbookAsXML }) => exportWorkbookAsXML(api.workbook)),
-    exportOds: () => void import("./csv").then(({ exportWorkbookAsODS }) => exportWorkbookAsODS(api.workbook)),
-    exportVcf: () => void import("./csv").then(({ exportWorkbookAsVCF }) => exportWorkbookAsVCF(api.workbook)),
-    exportIcs: () => void import("./csv").then(({ exportWorkbookAsICS }) => exportWorkbookAsICS(api.workbook)),
-    exportPdf: () => void import("./csv").then(({ exportWorkbookAsPDF }) => exportWorkbookAsPDF(api.workbook)),
+    openSaveDialog: () => setSaveDialogOpen(true),
     undo: api.undo,
     redo: api.redo,
     canUndo: api.canUndo,
@@ -891,6 +886,15 @@ export function App() {
               setSelection({ startRow: row, startCol: col, endRow: row, endCol: col })
             }
             onApply={(sheetName, edits) => api.setCellsOnSheetBatch(sheetName, edits)}
+          />
+        </Suspense>
+      )}
+      {saveDialogOpen && (
+        <Suspense fallback={null}>
+          <SaveDialog
+            workbook={api.workbook}
+            activeSheet={api.activeSheet}
+            onClose={() => setSaveDialogOpen(false)}
           />
         </Suspense>
       )}

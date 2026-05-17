@@ -33,19 +33,25 @@ See [`docs/SHIPPED.md`](docs/SHIPPED.md) for the per-sprint changelog, [`docs/ar
 
 ## Supported formats
 
-The File ribbon exposes Import + Export to every format the shared
-`@aicell/codecs` package can speak. Codecs are thin TypeScript wrappers
-over the canonical engine at `../../lib/sheets/`.
+The File ribbon exposes Import and a single **💾 Save…** tile that
+opens the unified Save dialog (`Ctrl+S` / `Cmd+S` opens it too). The
+dialog covers every format the shared `@aicell/codecs` package can
+speak. Codecs are thin TypeScript wrappers over the canonical engine
+at `../../lib/sheets/`. The default selection is `.xlsx`; the
+last-picked format is remembered per tab in `sessionStorage`.
 
 | Direction | Formats |
 |-----------|---------|
 | Import    | CSV · TSV · XLSX · XLS · JSON · NDJSON / JSONL · YAML · HTML tables · Markdown tables · vCard · iCalendar |
-| Export    | CSV · XLSX · TSV · PSV · JSON · NDJSON · HTML tables · Markdown tables · Excel 2003 XML · ODS · vCard · iCalendar · PDF |
+| Save      | XLSX · ODS · Excel 2003 XML · CSV · TSV · PSV · PDF · HTML tables · Markdown tables · JSON · NDJSON · iCalendar · vCard |
 
-PDF export composes `exportWorkbookAsHtml` with the engine PDF writer
-at `../../lib/docs/pdfio.js` — the workbook renders as HTML tables and
+PDF composes `exportWorkbookAsHtml` with the engine PDF writer at
+`../../lib/docs/pdfio.js` — the workbook renders as HTML tables and
 flows through the same `savePdf` used by the Word app, so the output
-is text-only Helvetica without external font hosting.
+is text-only Helvetica without external font hosting. The dialog
+dispatches to the existing exporter helpers in `src/csv.ts` via
+`src/SaveDialog.tsx`; no new encoder code was added when Save was
+unified.
 
 JSON detects the shape of the input on import: arrays-of-objects
 collect into header-keyed rows; `{ sheets: [...] }` envelopes preserve

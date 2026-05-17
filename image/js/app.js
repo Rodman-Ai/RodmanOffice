@@ -1660,10 +1660,10 @@
     if (e.shiftKey) { resetAll(); return; }
     if (confirm('Clear the canvas?')) { pushUndo(); clearCanvas('#ffffff'); scheduleAutosave(); }
   });
-  $('btn-save').addEventListener('click', async () => {
-    const blob = await IO.encodePNG(canvas);
-    IO.triggerDownload(blob, `retro-paint-${state.mode}-${Date.now()}.png`);
-  });
+  // Plain click → unified Save dialog (defined below as
+  // openSaveDialog). Shift-click upscale handler is registered
+  // separately further down and intercepts via capture phase.
+  $('btn-save').addEventListener('click', () => { openSaveDialog(); });
   $('primary-swatch').addEventListener('click', () => openHsvPicker(true));
   $('secondary-swatch').addEventListener('click', () => openHsvPicker(false));
   $('primary-swatch').addEventListener('contextmenu', (e) => { e.preventDefault(); pickColorPrompt(true); });
@@ -1782,31 +1782,177 @@
     }
   });
 
-  // ---- Save as PSD / Save as Photoshop PDF ----
-  // Both routes use the merged-display canvas (composite()'s output)
-  // so brushes / layers / filter previews are all baked in.
-  const btnSavePsd = $('btn-save-psd');
-  if (btnSavePsd) btnSavePsd.addEventListener('click', async () => {
+  // The standalone "Save as PSD" and "Save as Photoshop PDF"
+  // toolbar buttons were removed — both formats live inside the
+  // unified Save dialog now (openSaveDialog below).
+
+  // ---- Save As… (format + quality + resolution + colors) ----
+  const SAVE_AS_FORMATS = [
+    { ext: 'png',  label: 'PNG',          lossy: false, palette: true  },
+    { ext: 'jpg',  label: 'JPEG',         lossy: true,  palette: false },
+    { ext: 'webp', label: 'WebP',         lossy: true,  palette: false },
+    { ext: 'avif', label: 'AVIF',         lossy: true,  palette: false, gated: true },
+    { ext: 'bmp',  label: 'BMP',          lossy: false, palette: true  },
+    { ext: 'ico',  label: 'Icon (.ico)',  lossy: false, palette: true  },
+    { ext: 'icns', label: 'Apple Icon',   lossy: false, palette: false },
+    { ext: 'cur',  label: 'Windows Cursor', lossy: false, palette: true },
+    { ext: 'tif',  label: 'TIFF',         lossy: false, palette: false },
+    { ext: 'tif-multi', label: 'TIFF (multi-page wrapper)', lossy: false, palette: false },
+    { ext: 'psd',  label: 'Photoshop',    lossy: false, palette: false },
+    { ext: 'pdf',  label: 'PDF (Photoshop)', lossy: true, palette: false },
+    // Part 10 niche image formats — same encoders as the converter.
+    { ext: 'ppm',  label: 'Netpbm PPM',   lossy: false, palette: false },
+    { ext: 'pgm',  label: 'Netpbm PGM (grayscale)', lossy: false, palette: false },
+    { ext: 'pbm',  label: 'Netpbm PBM (1-bit)', lossy: false, palette: false },
+    { ext: 'pam',  label: 'Netpbm PAM (RGBA)', lossy: false, palette: false },
+    { ext: 'tga',  label: 'Targa (.tga)', lossy: false, palette: false },
+    { ext: 'pcx',  label: 'PCX',          lossy: false, palette: false },
+    { ext: 'hdr',  label: 'Radiance HDR', lossy: false, palette: false },
+    { ext: 'xbm',  label: 'X11 Bitmap (.xbm)', lossy: false, palette: false },
+    { ext: 'xpm',  label: 'X11 PixMap (.xpm)', lossy: false, palette: false },
+    { ext: 'wbmp', label: 'WAP Bitmap',   lossy: false, palette: false },
+    { ext: 'sgi',  label: 'SGI Image',    lossy: false, palette: false },
+    { ext: 'ras',  label: 'Sun Raster',   lossy: false, palette: false },
+    { ext: 'ff',   label: 'Farbfeld',     lossy: false, palette: false },
+    { ext: 'cbz',  label: 'Comic Book ZIP', lossy: false, palette: false },
+    { ext: 'gif',  label: 'GIF (single frame)', lossy: false, palette: true  },
+    { ext: 'svg',  label: 'SVG (raster wrapper)', lossy: false, palette: false },
+  ];
+
+  // The unified Save dialog. Triggered by btn-save (above) and the
+  // global Ctrl+S keybinding (further down).
+  async function openSaveDialog() {
+    let avifSupported = false;
+    try { avifSupported = await IO.isAvifEncodeSupported(); } catch { /* probe failed; treat as no */ }
+    const formats = SAVE_AS_FORMATS.filter((f) => !f.gated || avifSupported);
+
+    // Default selection mirrors the rule we surface in the tooltip:
+    // PDF for layered documents (so Photoshop-style work doesn't get
+    // flattened by accident), PNG otherwise.
+    const d = activeDoc();
+    const defaultExt = (d && Array.isArray(d.layers) && d.layers.length > 1)
+      ? 'pdf' : 'png';
+    const fmtOptions = formats.map((f) =>
+      `<option value="${f.ext}"${f.ext === defaultExt ? ' selected' : ''}>${f.label}</option>`
+    ).join('');
+    const defaultName = `retropaint-${state.mode}-${Date.now()}`;
+    const html = `
+      <div class="save-as-form" style="display:flex;flex-direction:column;gap:10px;font-size:13px">
+        <label style="display:flex;justify-content:space-between;gap:10px;align-items:center">
+          <span>Filename</span>
+          <input id="sa-filename" type="text" value="${defaultName}" style="flex:1;min-width:180px;padding:4px 8px;border:1px solid #ccc;border-radius:4px;font:inherit;font-size:13px">
+        </label>
+        <label style="display:flex;justify-content:space-between;gap:10px;align-items:center">
+          <span>Format</span>
+          <select id="sa-format">${fmtOptions}</select>
+        </label>
+        <label id="sa-quality-row" style="display:flex;justify-content:space-between;gap:10px;align-items:center">
+          <span>Quality</span>
+          <span style="display:inline-flex;align-items:center;gap:6px">
+            <input id="sa-quality" type="range" min="0.1" max="1" step="0.05" value="0.85" style="width:140px">
+            <span id="sa-quality-value" style="min-width:40px;text-align:right">85%</span>
+          </span>
+        </label>
+        <label style="display:flex;justify-content:space-between;gap:10px;align-items:center">
+          <span>Resolution</span>
+          <select id="sa-scale">
+            <option value="1" selected>100% (original)</option>
+            <option value="0.75">75%</option>
+            <option value="0.5">50%</option>
+            <option value="0.25">25%</option>
+            <option value="2">200% (upscale)</option>
+            <option value="4">400% (upscale)</option>
+          </select>
+        </label>
+        <label id="sa-colors-row" style="display:flex;justify-content:space-between;gap:10px;align-items:center">
+          <span>Colors</span>
+          <select id="sa-colors">
+            <option value="" selected>Full colour</option>
+            <option value="256">256</option>
+            <option value="128">128</option>
+            <option value="64">64</option>
+            <option value="16">16</option>
+          </select>
+        </label>
+      </div>
+    `;
+    // Use the showModal helper but populate the body, then attach
+    // live form listeners that update the readouts. The OK button
+    // resolves the promise; we read the form values after.
+    const sel = () => $('sa-format');
+    const refreshFieldVisibility = () => {
+      const fmt = formats.find((f) => f.ext === sel().value);
+      $('sa-quality-row').style.display = fmt && fmt.lossy ? '' : 'none';
+      $('sa-colors-row').style.display = fmt && fmt.palette ? '' : 'none';
+    };
+    const wireForm = () => {
+      sel().addEventListener('change', refreshFieldVisibility);
+      const q = $('sa-quality');
+      const qv = $('sa-quality-value');
+      q.addEventListener('input', () => { qv.textContent = `${Math.round(parseFloat(q.value) * 100)}%`; });
+      refreshFieldVisibility();
+    };
+    // showModal sets the body, then we wire on the next tick.
+    const okPromise = showModal('Save', html, { okText: 'Save' });
+    setTimeout(wireForm, 0);
+    const ok = await okPromise;
+    if (!ok) return;
+
+    const ext = $('sa-format').value;
+    const quality = parseFloat($('sa-quality').value);
+    const scale = parseFloat($('sa-scale').value);
+    const colorsRaw = $('sa-colors').value;
+    const colors = colorsRaw ? parseInt(colorsRaw, 10) : null;
+    const userName = ($('sa-filename').value || defaultName).trim();
+    const stamp = userName.replace(/[^\w.\- ]+/g, '_') || defaultName;
+
+    let work = canvas;
+    if (scale && scale !== 1) work = IO.resize(work, scale, { smoothing: scale < 1 });
+    if (colors) work = IO.quantizeCanvas(work, colors);
+
+    // XBM / XPM emit C source where the symbol name has to be a
+    // valid identifier (no dashes). Derive a stem from the filename.
+    const stem = stamp.replace(/[^A-Za-z0-9_]/g, '_') || 'image';
     try {
-      const psdMod = await import('../../lib/images/psd.js');
-      const blob = psdMod.encodePsd(canvas);
-      IO.triggerDownload(blob, IO.suggestFilename(`retropaint-${Date.now()}`, 'psd'));
+      let blob, filename;
+      switch (ext) {
+        case 'png':  blob = await IO.encodePNG(work);  filename = IO.suggestFilename(stamp, 'png'); break;
+        case 'jpg':  blob = await IO.encodeJPEG(work, quality); filename = IO.suggestFilename(stamp, 'jpg'); break;
+        case 'webp': blob = await IO.encodeWebP(work, quality); filename = IO.suggestFilename(stamp, 'webp'); break;
+        case 'avif': blob = await IO.encodeAVIF(work, quality); filename = IO.suggestFilename(stamp, 'avif'); break;
+        case 'bmp':  blob = IO.encodeBMP(work); filename = IO.suggestFilename(stamp, 'bmp'); break;
+        case 'ico':  blob = await IO.encodeICO(work); filename = IO.suggestFilename(stamp, 'ico'); break;
+        case 'icns': blob = await IO.encodeICNS(work); filename = IO.suggestFilename(stamp, 'icns'); break;
+        case 'cur':  blob = await IO.encodeCUR(work); filename = IO.suggestFilename(stamp, 'cur'); break;
+        case 'tif':  blob = IO.encodeTIFF(work); filename = IO.suggestFilename(stamp, 'tif'); break;
+        case 'tif-multi': blob = IO.encodeMultiTIFF([work]); filename = IO.suggestFilename(stamp, 'tif'); break;
+        case 'psd':  blob = IO.encodePsd(work); filename = IO.suggestFilename(stamp, 'psd'); break;
+        case 'pdf':  blob = await IO.encodePdfFromCanvas(work, { format: 'jpeg', quality }); filename = IO.suggestFilename(stamp, 'pdf'); break;
+        // Part 10 niche image formats.
+        case 'ppm':  blob = IO.encodePPM(work);  filename = IO.suggestFilename(stamp, 'ppm'); break;
+        case 'pgm':  blob = IO.encodePGM(work);  filename = IO.suggestFilename(stamp, 'pgm'); break;
+        case 'pbm':  blob = IO.encodePBM(work);  filename = IO.suggestFilename(stamp, 'pbm'); break;
+        case 'pam':  blob = IO.encodePAM(work);  filename = IO.suggestFilename(stamp, 'pam'); break;
+        case 'tga':  blob = IO.encodeTGA(work);  filename = IO.suggestFilename(stamp, 'tga'); break;
+        case 'pcx':  blob = IO.encodePCX(work);  filename = IO.suggestFilename(stamp, 'pcx'); break;
+        case 'hdr':  blob = IO.encodeHDR(work);  filename = IO.suggestFilename(stamp, 'hdr'); break;
+        case 'xbm':  blob = IO.encodeXBM(work, stem); filename = IO.suggestFilename(stamp, 'xbm'); break;
+        case 'xpm':  blob = IO.encodeXPM(work, stem); filename = IO.suggestFilename(stamp, 'xpm'); break;
+        case 'wbmp': blob = IO.encodeWBMP(work); filename = IO.suggestFilename(stamp, 'wbmp'); break;
+        case 'sgi':  blob = IO.encodeSGI(work);  filename = IO.suggestFilename(stamp, 'sgi'); break;
+        case 'ras':  blob = IO.encodeRAS(work);  filename = IO.suggestFilename(stamp, 'ras'); break;
+        case 'ff':   blob = IO.encodeFarbfeld(work); filename = IO.suggestFilename(stamp, 'ff'); break;
+        case 'cbz':  blob = await IO.encodeCbzFromCanvas(work); filename = IO.suggestFilename(stamp, 'cbz'); break;
+        case 'gif':  blob = await IO.encodeGIF(work); filename = IO.suggestFilename(stamp, 'gif'); break;
+        case 'svg':  blob = await IO.encodeSVG(work); filename = IO.suggestFilename(stamp, 'svg'); break;
+        default: throw new Error('Unknown format: ' + ext);
+      }
+      IO.triggerDownload(blob, filename);
     } catch (e) {
       console.error(e);
-      alert('Could not save .psd: ' + (e && e.message ? e.message : e));
+      alert('Could not save .' + ext + ': ' + (e && e.message ? e.message : e));
     }
-  });
-  const btnSavePdf = $('btn-save-pdf');
-  if (btnSavePdf) btnSavePdf.addEventListener('click', async () => {
-    try {
-      const pdfMod = await import('../../lib/images/pdf.js');
-      const blob = await pdfMod.encodePdfFromCanvas(canvas, { format: 'jpeg', quality: 0.92 });
-      IO.triggerDownload(blob, IO.suggestFilename(`retropaint-${Date.now()}`, 'pdf'));
-    } catch (e) {
-      console.error(e);
-      alert('Could not save .pdf: ' + (e && e.message ? e.message : e));
-    }
-  });
+  }
 
   // ---- Save As… (format + quality + resolution + colors) ----
   const SAVE_AS_FORMATS = [
@@ -2660,18 +2806,24 @@
   }
 
   // ---- HD export (2x / 3x) ----
-  // Triple-click 💾 Save to choose scale
+  // Shift-click 💾 Save to choose scale (legacy PNG-upscale shortcut)
   let saveClicks = 0, saveTimer2 = null;
   $('btn-save').addEventListener('click', async (e) => {
-    if (e.shiftKey) {
-      const scale = +(prompt('Save at scale?', '2') || '1');
-      if (scale > 0 && scale <= 8) {
-        const off = IO.resize(canvas, scale);
-        const blob = await IO.encodePNG(off);
-        IO.triggerDownload(blob, `retro-paint-${state.mode}-${scale}x-${Date.now()}.png`);
-        e.stopImmediatePropagation();
-      }
+    if (!e.shiftKey) return;
+    // Always stop propagation on Shift+click so the regular Save
+    // dialog never opens behind the prompt — even if the user
+    // cancels or types an invalid scale.
+    e.stopImmediatePropagation();
+    const raw = prompt('Save at scale?', '2');
+    if (raw == null) return; // user cancelled
+    const scale = +raw;
+    if (!(scale > 0 && scale <= 8)) {
+      alert('Scale must be a number between 0 and 8.');
+      return;
     }
+    const off = IO.resize(canvas, scale);
+    const blob = await IO.encodePNG(off);
+    IO.triggerDownload(blob, `retro-paint-${state.mode}-${scale}x-${Date.now()}.png`);
   }, true);
 
   // ---- Background pattern picker (via dblclick on canvas frame) ----
@@ -4961,104 +5113,12 @@
   };
 
   // ---- Real GIF89a encoder (minimal) ----
-  // Uses LZW compression on indexed-color frames.
-  function quantizeFrame(imgData) {
-    // Simple uniform 6-3-3 cube quantization → 256-color indexed.
-    const palette = [];
-    const w = imgData.width, h = imgData.height;
-    const indices = new Uint8Array(w * h);
-    const map = {};
-    let nColors = 0;
-    const d = imgData.data;
-    for (let i = 0, j = 0; i < d.length; i += 4, j++) {
-      const r = (d[i] >> 5) << 5, g = (d[i+1] >> 5) << 5, b = (d[i+2] >> 6) << 6;
-      const key = r * 65536 + g * 256 + b;
-      if (!(key in map)) {
-        if (nColors >= 256) { map[key] = 0; }
-        else { map[key] = nColors; palette.push([r, g, b]); nColors++; }
-      }
-      indices[j] = map[key];
-    }
-    while (palette.length < 256) palette.push([0, 0, 0]);
-    return { indices, palette, w, h };
-  }
-  // Tiny LZW encoder for GIF
-  function lzwEncode(indices, minCodeSize) {
-    const clearCode = 1 << minCodeSize;
-    const eoi = clearCode + 1;
-    let codeSize = minCodeSize + 1;
-    let nextCode = eoi + 1;
-    let dict = {};
-    for (let i = 0; i < clearCode; i++) dict[String.fromCharCode(i)] = i;
-    const out = [];
-    let buffer = 0, bufferBits = 0;
-    const writeCode = (c) => {
-      buffer |= c << bufferBits;
-      bufferBits += codeSize;
-      while (bufferBits >= 8) { out.push(buffer & 0xff); buffer >>>= 8; bufferBits -= 8; }
-    };
-    writeCode(clearCode);
-    let prev = String.fromCharCode(indices[0]);
-    for (let i = 1; i < indices.length; i++) {
-      const cur = String.fromCharCode(indices[i]);
-      const combined = prev + cur;
-      if (combined in dict) prev = combined;
-      else {
-        writeCode(dict[prev]);
-        if (nextCode < 4096) {
-          dict[combined] = nextCode++;
-          if (nextCode > (1 << codeSize) && codeSize < 12) codeSize++;
-        }
-        prev = cur;
-      }
-    }
-    writeCode(dict[prev]);
-    writeCode(eoi);
-    if (bufferBits > 0) out.push(buffer & 0xff);
-    return new Uint8Array(out);
-  }
-  function encodeGIF89a(frames, delayCs) {
-    if (!frames.length) return null;
-    const w = frames[0].w, h = frames[0].h;
-    const out = [];
-    const w8 = (n) => out.push(n & 0xff);
-    const w16 = (n) => { out.push(n & 0xff); out.push((n >> 8) & 0xff); };
-    // Header
-    'GIF89a'.split('').forEach(c => w8(c.charCodeAt(0)));
-    w16(w); w16(h);
-    w8(0xf7); // global color table flag, 256 colors
-    w8(0); w8(0);
-    // Global palette = first frame's palette
-    for (let i = 0; i < 256; i++) {
-      const c = frames[0].palette[i] || [0,0,0];
-      w8(c[0]); w8(c[1]); w8(c[2]);
-    }
-    // Loop extension
-    w8(0x21); w8(0xff); w8(0x0b);
-    'NETSCAPE2.0'.split('').forEach(c => w8(c.charCodeAt(0)));
-    w8(0x03); w8(0x01); w16(0); w8(0);
-    // Each frame
-    for (const f of frames) {
-      // Graphic Control
-      w8(0x21); w8(0xf9); w8(0x04); w8(0); w16(delayCs); w8(0); w8(0);
-      // Image Descriptor
-      w8(0x2c); w16(0); w16(0); w16(w); w16(h); w8(0);
-      // LZW
-      w8(8); // min code size
-      const compressed = lzwEncode(f.indices, 8);
-      // Sub-blocks
-      let p = 0;
-      while (p < compressed.length) {
-        const len = Math.min(255, compressed.length - p);
-        w8(len);
-        for (let k = 0; k < len; k++) w8(compressed[p + k]);
-        p += len;
-      }
-      w8(0);
-    }
-    w8(0x3b);
-    return new Uint8Array(out);
-  }
+  // The LZW + GIF89a + quantization helpers moved to
+  // lib/images/gif.js so the unified Save dialog and the converter
+  // can also emit static GIFs. The animation-export tool below
+  // keeps using them through the window.IO shim.
+  const quantizeFrame = IO.quantizeFrameForGif;
+  const encodeGIF89a = IO.encodeGIF89a;
   Tools.exportRealGif = {
     down() {
       if (!state.frames || state.frames.length < 2) { alert('Add frames first.'); return; }

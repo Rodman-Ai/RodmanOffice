@@ -121,10 +121,7 @@
         <button id="btn-new" title="New canvas" aria-label="New">📄 New</button>
         <button id="btn-clear" title="Clear canvas" aria-label="Clear">✕ Clear</button>
         <button id="btn-open" title="Open image" aria-label="Open">📂 Open</button>
-        <button id="btn-save" title="Save PNG (Ctrl+S — Shift-click to upscale)" aria-label="Save">💾 Save</button>
-        <button id="btn-save-as" title="Save As… (pick format and quality)" aria-label="Save As">Save As…</button>
-        <button id="btn-save-psd" title="Save as Photoshop (.psd)" aria-label="Save as PSD">PSD</button>
-        <button id="btn-save-pdf" title="Save as Photoshop PDF" aria-label="Save as PDF">PDF</button>
+        <button id="btn-save" title="Save… (Ctrl+S — pick a format and options; defaults to PNG for flat images, Photoshop PDF when the doc has layers. Shift-click for the quick PNG-upscale shortcut.)" aria-label="Save">💾 Save…</button>
         <button id="btn-filter" title="Image filters" aria-label="Filters">🎛️ FX</button>
         <button id="btn-replay" title="Replay last drawing" aria-label="Replay">▶ Replay</button>
         <span class="zoom-group" role="group" aria-label="Zoom">
@@ -312,6 +309,11 @@
       encodeRAS: imageio.encodeRAS,
       encodeFarbfeld: imageio.encodeFarbfeld,
       encodeCbzFromCanvas: imageio.encodeCbzFromCanvas,
+      encodeSVG: imageio.encodeSVG,
+      encodeGIF: imageio.encodeGIF,
+      encodeGIF89a: imageio.encodeGIF89a,
+      lzwEncode: imageio.lzwEncode,
+      quantizeFrameForGif: imageio.quantizeFrameForGif,
       isAvifEncodeSupported: imageio.isAvifEncodeSupported,
       to1Bit: imageio.to1Bit,
       resize: imageio.resize,
