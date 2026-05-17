@@ -308,8 +308,15 @@
     }
     const svg = R.renderPage(page, diagram.layers, { showGrid: state.showGrid });
     shadow.appendChild(svg);
-    shadow.style.width = page.w + 'px';
-    shadow.style.height = page.h + 'px';
+    // Use a layout box sized to the *scaled* canvas so flex centering
+     // in .canvas-scroll works. The transform: scale() still applies
+     // visually to children (selection handles, port dots, etc.)
+     // positioned in page-coord space, so no overlay math needs to
+     // change. Without this, the layout box stayed at page.w×page.h
+     // even when zoom shrank the visual, leaving the centering
+     // calculation off and the canvas mostly off-screen on mobile.
+    shadow.style.width = (page.w * state.zoom) + 'px';
+    shadow.style.height = (page.h * state.zoom) + 'px';
     shadow.style.background = page.bg || '#ffffff';
     shadow.style.transform = `scale(${state.zoom})`;
     bindCanvasInteractions(svg, shadow);
@@ -3082,8 +3089,18 @@
         },
       });
     }
-    // Resize fit-to-window on first paint
-    setTimeout(() => commands.zoomFit(), 0);
+    // Mobile: ensure both side panes start closed so the canvas has
+    // the full viewport. The `is-open` class is only flipped via the
+    // ▦ / ⚙ title-bar buttons.
+    if (window.matchMedia && window.matchMedia('(max-width: 720px)').matches) {
+      $('#stencilPane')?.classList.remove('is-open');
+      $('#sidePane')?.classList.remove('is-open');
+    }
+    // Resize fit-to-window on first paint. Double-rAF guarantees the
+    // workspace has reflowed before we measure clientWidth — single
+    // setTimeout(0) raced layout on mobile and produced a zoom of 1.0
+    // (canvas pushed off-screen).
+    requestAnimationFrame(() => requestAnimationFrame(() => commands.zoomFit()));
   }
 
   function bindCsvImportDialog() {

@@ -94,7 +94,7 @@ body {
 .title-actions {
   margin-left: auto;
   display: flex; align-items: center; gap: 8px;
-  min-width: 0;
+  flex-shrink: 0;
 }
 .title-bar .ask-claude {
   padding: 4px 10px;
@@ -107,6 +107,7 @@ body {
   font-family: inherit;
   white-space: nowrap;
   cursor: pointer;
+  flex-shrink: 0;
 }
 .title-bar .ask-claude:hover,
 .title-bar .ask-claude[aria-expanded="true"] { background: rgba(255, 255, 255, 0.28); }
@@ -423,7 +424,7 @@ body {
      pans the parent .canvas-scroll and pinches state.zoom. */
   touch-action: none;
 }
-.canvas-svg { display: block; }
+.canvas-svg { display: block; width: 100%; height: 100%; }
 
 /* Shape interactions */
 .shape { cursor: move; }
@@ -1003,18 +1004,34 @@ body.format-painter-active .canvas-svg { cursor: crosshair; }
   }
   .app-subtitle,
   .save-indicator { display: none; }
-  .title-bar .icon-btn { display: none; }
+  /* Hide only the Help icon — the stencils (▦) and properties (⚙)
+     toggles are the only way to open those panes on mobile, so they
+     must stay. Help lives in the Help ribbon tab anyway. */
+  .title-bar #helpBtn { display: none; }
   .doc-title {
     width: min(120px, 32vw);
     max-width: 32vw;
     font-size: 13px;
   }
-  .title-actions { gap: 4px; }
+  .title-actions { gap: 2px; }
+  /* Mobile Ask Claude: shrink the "🤖 Ask Claude" pill to a 30px
+     emoji-only button to free up title-bar room for the pane toggles.
+     The button still has the same id/aria-label/click handler — only
+     the visible content changes. */
   .title-bar .ask-claude {
-    padding: 4px 8px;
-    max-width: 126px;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    padding: 0;
+    width: 30px;
+    height: 28px;
+    font-size: 0;          /* hide the original "🤖 Ask Claude" text */
+    line-height: 0;
+    border-radius: 4px;
+    display: grid;
+    place-items: center;
+  }
+  .title-bar .ask-claude::before {
+    content: '🤖';
+    font-size: 16px;
+    line-height: 1;
   }
   .tab { padding: 8px 14px; font-size: 12px; }
   .ribbon { overflow: visible; }
@@ -1057,26 +1074,33 @@ body.format-painter-active .canvas-svg { cursor: crosshair; }
   .color-input { width: 32px; height: 32px; flex-shrink: 0; }
   .theme-card { width: 76px; height: 46px; flex-shrink: 0; }
   .workspace { grid-template-columns: 1fr; }
+  /* Both panes are hidden off-screen by default on mobile. The
+     `bottom: -100vh` mechanic guarantees the entire pane sits below
+     the viewport — replaces the old transform: translateY(100%) which
+     left ~100 px of the pane visible because the pane's bottom edge
+     started inside the viewport (bottom: 100px). When .is-open is
+     applied (by toggleStencils / toggleSidePane), the pane slides up
+     to bottom: 100px, sitting above the page-strip. */
   .stencil-pane {
-    position: fixed; inset: auto 0 100px 0;
+    position: fixed; left: 0; right: 0; top: auto;
+    bottom: -100vh;
     z-index: 800;
     max-height: 45vh;
     border-top: 1px solid var(--pane-border);
     border-right: 0;
-    transform: translateY(100%);
-    transition: transform 0.2s;
+    transition: bottom 0.2s;
   }
-  .stencil-pane.is-open { transform: translateY(0); }
+  .stencil-pane.is-open { bottom: 100px; }
   .side-pane {
-    position: fixed; inset: auto 0 100px 0;
+    position: fixed; left: 0; right: 0; top: auto;
+    bottom: -100vh;
     z-index: 800;
     max-height: 45vh;
     border-top: 1px solid var(--pane-border);
     border-left: 0;
-    transform: translateY(100%);
-    transition: transform 0.2s;
+    transition: bottom 0.2s;
   }
-  .side-pane.is-open { transform: translateY(0); }
+  .side-pane.is-open { bottom: 100px; }
   .canvas-scroll { padding: 12px; }
   .claude-panel {
     top: 42px; right: 8px; bottom: 8px;
