@@ -81,8 +81,8 @@
   // Date is the build date (the day the file was last edited).
   const RW_BUILD = {
     version: '2.1.0',
-    date: '2026-05-02',
-    cache: 'rwd-v10',
+    date: '2026-05-17',
+    cache: 'rwd-v11',
     label: 'RodmanWord 2.1',
   };
   window.RW_BUILD = RW_BUILD;

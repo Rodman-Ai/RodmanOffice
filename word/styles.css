@@ -2833,7 +2833,9 @@ textarea {
     gap: 0;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: thin;
+    touch-action: pan-x;
   }
+  .tabs { touch-action: pan-x; }
   .group {
     display: flex !important;
     flex-direction: row !important;
