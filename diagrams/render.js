@@ -72,14 +72,30 @@
   }
 
   function renderShape(shape, parent, layerOpacity) {
+    const transforms = [`translate(${shape.x},${shape.y})`];
+    if (shape.rotation) transforms.push(`rotate(${shape.rotation} ${shape.w / 2} ${shape.h / 2})`);
+    if (shape.flipH || shape.flipV) {
+      const sx = shape.flipH ? -1 : 1;
+      const sy = shape.flipV ? -1 : 1;
+      // Scale around the shape's center: move center → origin, scale, move back.
+      transforms.push(`translate(${shape.w / 2},${shape.h / 2})`);
+      transforms.push(`scale(${sx},${sy})`);
+      transforms.push(`translate(${-shape.w / 2},${-shape.h / 2})`);
+    }
     const g = el('g', {
       class: 'shape',
       'data-shape-id': shape.id,
-      transform: shape.rotation
-        ? `translate(${shape.x},${shape.y}) rotate(${shape.rotation} ${shape.w / 2} ${shape.h / 2})`
-        : `translate(${shape.x},${shape.y})`,
+      transform: transforms.join(' '),
       opacity: (shape.opacity ?? 1) * (layerOpacity ?? 1),
     }, parent);
+
+    // Native tooltip — stencil name + dimensions (+ shape data summary in later phases)
+    if (window.RodmanStencils) {
+      const stDef = window.RodmanStencils.getStencil(shape.stencil || 'rectangle');
+      const title = document.createElementNS(SVG_NS, 'title');
+      title.textContent = `${stDef.name} • ${Math.round(shape.w)}×${Math.round(shape.h)}`;
+      g.appendChild(title);
+    }
 
     const st = STENCILS.getStencil(shape.stencil || 'rectangle');
     const body = st.draw(shape.w, shape.h);
@@ -111,7 +127,99 @@
     }
 
     if (shape.text) renderShapeText(shape, g);
+    renderDataGraphicsOverlay(shape, g);
+    renderShapeIndicators(shape, g);
     return g;
+  }
+
+  // Hyperlink / comment indicator badges in the top-right corner.
+  function renderShapeIndicators(shape, g) {
+    const has = (Array.isArray(shape.hyperlinks) && shape.hyperlinks.length)
+             || (Array.isArray(shape.comments)   && shape.comments.length);
+    if (!has) return;
+    const cx = shape.w - 6;
+    const cy = 8;
+    if (Array.isArray(shape.comments) && shape.comments.length) {
+      const c = el('circle', {
+        cx, cy, r: 5, fill: '#f59e0b', stroke: '#fff', 'stroke-width': 1,
+        class: 'shape-indicator comment',
+      }, g);
+      const t = el('text', {
+        x: cx, y: cy + 3,
+        'font-family': 'Segoe UI, sans-serif', 'font-size': 8,
+        fill: '#fff', 'text-anchor': 'middle',
+        'pointer-events': 'none',
+      }, g);
+      t.textContent = String(shape.comments.length);
+    }
+    if (Array.isArray(shape.hyperlinks) && shape.hyperlinks.length) {
+      const x = cx - (shape.comments?.length ? 14 : 0);
+      el('circle', {
+        cx: x, cy, r: 5, fill: '#3b82f6', stroke: '#fff', 'stroke-width': 1,
+        class: 'shape-indicator hyperlink',
+      }, g);
+      const t = el('text', {
+        x, y: cy + 3,
+        'font-family': 'Segoe UI, sans-serif', 'font-size': 8,
+        fill: '#fff', 'text-anchor': 'middle',
+        'pointer-events': 'none',
+      }, g);
+      t.textContent = '↗';
+    }
+  }
+
+  // Data graphics overlay: re-tint background, draw a corner icon, or
+  // overlay a bar based on a numeric field. Driven by the diagram-level
+  // dataGraphics config exposed via window.RodmanRender.dataGraphicsCfg.
+  function renderDataGraphicsOverlay(shape, g) {
+    const cfg = window.RodmanRender && window.RodmanRender.dataGraphicsCfg;
+    if (!cfg || !cfg.field) return;
+    const entry = shape.data && shape.data[cfg.field];
+    if (!entry) return;
+    const value = entry.value != null ? entry.value : entry;
+    if (cfg.mode === 'color' && cfg.palette) {
+      const color = cfg.palette[String(value)] || pickColorByHash(String(value), cfg.fallback || ['#fef3c7', '#dbeafe', '#dcfce7', '#fee2e2', '#fae8ff']);
+      // Overlay a translucent recolor rectangle.
+      el('rect', {
+        x: 0, y: 0, width: shape.w, height: shape.h,
+        fill: color, opacity: 0.5,
+        'pointer-events': 'none',
+        class: 'data-graphic color',
+      }, g);
+    } else if (cfg.mode === 'icon' && cfg.iconMap) {
+      const icon = cfg.iconMap[String(value)] || '•';
+      const t = el('text', {
+        x: 8, y: shape.h - 6,
+        'font-family': 'Segoe UI, sans-serif', 'font-size': 14,
+        fill: cfg.iconColor || '#0f172a',
+        class: 'data-graphic icon',
+        'pointer-events': 'none',
+      }, g);
+      t.textContent = icon;
+    } else if (cfg.mode === 'bar') {
+      const num = parseFloat(value);
+      if (!isFinite(num)) return;
+      const max = cfg.max || 100;
+      const min = cfg.min || 0;
+      const pct = Math.max(0, Math.min(1, (num - min) / (max - min)));
+      el('rect', {
+        x: 4, y: 2, width: Math.max(2, (shape.w - 8) * pct), height: 6,
+        fill: cfg.barColor || '#0ea5e9',
+        class: 'data-graphic bar',
+        'pointer-events': 'none',
+      }, g);
+      el('rect', {
+        x: 4, y: 2, width: shape.w - 8, height: 6,
+        fill: 'none', stroke: cfg.barColor || '#0ea5e9', 'stroke-width': 0.5, opacity: 0.5,
+        'pointer-events': 'none',
+      }, g);
+    }
+  }
+
+  function pickColorByHash(s, palette) {
+    let h = 0;
+    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+    return palette[Math.abs(h) % palette.length];
   }
 
   function renderShapeText(shape, parent) {
@@ -147,7 +255,23 @@
 
     const a = portPoint(fromShape, conn.fromPort);
     const b = portPoint(toShape, conn.toPort);
-    const d = orthogonalPath(a, b, conn.fromPort, conn.toPort);
+    const route = conn.routeStyle || 'orthogonal';
+    const wp = Array.isArray(conn.waypoints) ? conn.waypoints : [];
+    let d;
+    if (route === 'straight') {
+      d = `M${a.x},${a.y} L${b.x},${b.y}`;
+    } else if (route === 'curved') {
+      const dx = b.x - a.x;
+      d = `M${a.x},${a.y} C${a.x + dx * 0.4},${a.y} ${b.x - dx * 0.4},${b.y} ${b.x},${b.y}`;
+    } else if (route === 'tree') {
+      const midX = (a.x + b.x) / 2;
+      d = `M${a.x},${a.y} L${midX},${a.y} L${midX},${b.y} L${b.x},${b.y}`;
+    } else if (wp.length) {
+      // Orthogonal with user-placed waypoints.
+      d = `M${a.x},${a.y}` + wp.map((p) => ` L${p.x},${p.y}`).join('') + ` L${b.x},${b.y}`;
+    } else {
+      d = orthogonalPath(a, b, conn.fromPort, conn.toPort);
+    }
 
     const g = el('g', {
       class: 'connector',
@@ -155,15 +279,29 @@
       opacity: (layerOpacity ?? 1),
     }, parent);
 
-    el('path', {
+    const stroke = conn.stroke || '#444';
+    const sw = conn.strokeWidth || 1.5;
+    const dashAttr = lineStyleDash(conn.lineStyle, sw);
+
+    const lineAttrs = {
       d,
       fill: 'none',
-      stroke: conn.stroke || '#444',
-      'stroke-width': conn.strokeWidth || 1.5,
+      stroke,
+      'stroke-width': sw,
       class: 'connector-path',
-      ...(conn.endStart === 'arrow' ? { 'marker-start': 'url(#arr)' } : {}),
-      ...(conn.endEnd === 'arrow' ? { 'marker-end': 'url(#arr)' } : {}),
-    }, g);
+    };
+    if (dashAttr) lineAttrs['stroke-dasharray'] = dashAttr;
+    if (conn.endStart === 'arrow') lineAttrs['marker-start'] = 'url(#arr)';
+    if (conn.endEnd === 'arrow') lineAttrs['marker-end'] = 'url(#arr)';
+
+    el('path', lineAttrs, g);
+
+    // Double-line: render a second offset path. Quick approximation —
+    // not a true parallel offset, but matches the visual of double-rule
+    // borders close enough for diagram use.
+    if (conn.lineStyle === 'double') {
+      el('path', { d, fill: 'none', stroke, 'stroke-width': Math.max(1, sw + 2), opacity: 0.4 }, g);
+    }
 
     // Wider invisible hit path for easier clicking
     el('path', {
@@ -192,7 +330,28 @@
     return g;
   }
 
+  function lineStyleDash(style, sw) {
+    switch (style) {
+      case 'dashed': return `${sw * 3} ${sw * 2}`;
+      case 'dotted': return `${sw} ${sw * 1.5}`;
+      case 'double': return null;
+      default: return null;
+    }
+  }
+
   function portPoint(shape, port) {
+    // Custom ports are stored as fractional offsets in [0..1] and
+    // addressed as "custom:<index>".
+    if (typeof port === 'string' && port.startsWith('custom:')) {
+      const idx = parseInt(port.slice(7), 10);
+      const custom = shape.customPorts && shape.customPorts[idx];
+      if (custom) {
+        return {
+          x: shape.x + custom.fx * shape.w,
+          y: shape.y + custom.fy * shape.h,
+        };
+      }
+    }
     switch (port) {
       case 'top':    return { x: shape.x + shape.w / 2, y: shape.y };
       case 'right':  return { x: shape.x + shape.w,     y: shape.y + shape.h / 2 };
@@ -236,5 +395,7 @@
     renderPage, renderShape, renderConnector,
     portPoint, orthogonalPath,
     renderStencilThumb,
+    // Live data-graphics config the app sets before re-rendering.
+    dataGraphicsCfg: null,
   };
 })();

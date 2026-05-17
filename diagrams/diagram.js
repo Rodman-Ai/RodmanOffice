@@ -31,6 +31,7 @@
       bg: opts.bg || '#ffffff',
       shapes: [],
       connectors: [],
+      groups: [],
     };
   }
 
@@ -58,6 +59,10 @@
       }, opts.textStyle || {}),
       layerId: opts.layerId || null,
       _themed: opts._themed !== false,
+      data: opts.data ? { ...opts.data } : {},        // shape data fields { name: { value, type } }
+      hyperlinks: Array.isArray(opts.hyperlinks) ? [...opts.hyperlinks] : [], // [{ kind, target, label }]
+      comments: Array.isArray(opts.comments) ? [...opts.comments] : [],       // [{ author, ts, text }]
+      customPorts: Array.isArray(opts.customPorts) ? [...opts.customPorts] : [],
     };
   }
 
@@ -75,6 +80,17 @@
       label: opts.label || '',
       layerId: opts.layerId || null,
       _themed: opts._themed !== false,
+      routeStyle: opts.routeStyle || 'orthogonal', // 'orthogonal' | 'straight' | 'curved' | 'tree'
+      lineStyle: opts.lineStyle || 'solid',        // 'solid' | 'dashed' | 'dotted' | 'double'
+      waypoints: Array.isArray(opts.waypoints) ? [...opts.waypoints] : [], // [{ x, y }]
+    };
+  }
+
+  function newGroup(opts = {}) {
+    return {
+      id: newId('g'),
+      name: opts.name || 'Group',
+      shapeIds: Array.isArray(opts.shapeIds) ? [...opts.shapeIds] : [],
     };
   }
 
@@ -87,6 +103,8 @@
       pages: [newPage()],
       layers: [layer],
       activeLayerId: layer.id,
+      // Data graphics config: { field, mode: 'color'|'icon'|'bar', palette? }
+      dataGraphics: null,
     };
   }
 
@@ -184,7 +202,52 @@
     page.connectors = page.connectors.filter((c) =>
       c.fromShapeId !== shapeId && c.toShapeId !== shapeId
     );
+    // Cascade: prune from groups.
+    if (Array.isArray(page.groups)) {
+      for (const g of page.groups) {
+        const i = g.shapeIds.indexOf(shapeId);
+        if (i !== -1) g.shapeIds.splice(i, 1);
+      }
+      page.groups = page.groups.filter((g) => g.shapeIds.length >= 2);
+    }
     return true;
+  }
+
+  function findGroupContaining(page, shapeId) {
+    if (!Array.isArray(page.groups)) return null;
+    return page.groups.find((g) => g.shapeIds.includes(shapeId)) || null;
+  }
+
+  function expandSelectionToGroups(page, shapeIds) {
+    if (!Array.isArray(page.groups) || !page.groups.length) return new Set(shapeIds);
+    const out = new Set(shapeIds);
+    for (const id of shapeIds) {
+      const g = findGroupContaining(page, id);
+      if (g) g.shapeIds.forEach((sid) => out.add(sid));
+    }
+    return out;
+  }
+
+  function groupShapes(page, shapeIds, name) {
+    if (!Array.isArray(shapeIds) || shapeIds.length < 2) return null;
+    page.groups = page.groups || [];
+    // Pull any of these shapes out of an existing group first.
+    for (const g of page.groups) {
+      g.shapeIds = g.shapeIds.filter((sid) => !shapeIds.includes(sid));
+    }
+    page.groups = page.groups.filter((g) => g.shapeIds.length >= 2);
+    const group = newGroup({ shapeIds, name });
+    page.groups.push(group);
+    return group;
+  }
+
+  function ungroupShapes(page, shapeIds) {
+    if (!Array.isArray(page.groups) || !page.groups.length) return false;
+    const before = page.groups.length;
+    page.groups = page.groups.filter((g) =>
+      !g.shapeIds.some((sid) => shapeIds.includes(sid))
+    );
+    return page.groups.length !== before;
   }
 
   function removeConnector(page, connId) {
@@ -234,12 +297,14 @@
 
   window.RodmanDiagram = {
     SCHEMA, DEFAULT_W, DEFAULT_H,
-    newDiagram, newPage, newShape, newConnector, newLayer,
+    newDiagram, newPage, newShape, newConnector, newLayer, newGroup,
     save, load, clear, validate,
     addPage, removePage, duplicatePage,
     findPage, findShape, findConnector,
     removeShape, removeConnector,
     bringForward, sendBackward, cloneShape,
     snapTo, boundsOfShapes,
+    findGroupContaining, expandSelectionToGroups,
+    groupShapes, ungroupShapes,
   };
 })();

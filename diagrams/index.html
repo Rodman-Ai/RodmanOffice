@@ -195,7 +195,29 @@
           <button class="ribbon-btn" data-cmd="group" title="Group (Ctrl+G)">Group</button>
           <button class="ribbon-btn" data-cmd="ungroup" title="Ungroup (Ctrl+Shift+G)">Ungroup</button>
         </div>
+        <div class="group-row">
+          <button class="ribbon-btn" data-cmd="flipH" title="Flip horizontal">⇋</button>
+          <button class="ribbon-btn" data-cmd="flipV" title="Flip vertical">⇅</button>
+          <button class="ribbon-btn" data-cmd="pickFormat" title="Format painter — click to copy format, then click target shapes">🖌</button>
+        </div>
         <div class="group-label">Arrange</div>
+      </div>
+
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn" data-cmd="alignSelLeft"   title="Align left">⫷</button>
+          <button class="ribbon-btn" data-cmd="alignSelCenter" title="Align center horizontally">⫶</button>
+          <button class="ribbon-btn" data-cmd="alignSelRight"  title="Align right">⫸</button>
+          <button class="ribbon-btn" data-cmd="alignSelTop"    title="Align top">⫯</button>
+          <button class="ribbon-btn" data-cmd="alignSelMiddle" title="Align middle vertically">⫰</button>
+          <button class="ribbon-btn" data-cmd="alignSelBottom" title="Align bottom">⫱</button>
+        </div>
+        <div class="group-row">
+          <button class="ribbon-btn" data-cmd="distributeH" title="Distribute horizontally">⇔</button>
+          <button class="ribbon-btn" data-cmd="distributeV" title="Distribute vertically">⇕</button>
+          <button class="ribbon-btn" data-cmd="spaceEvenly" title="Space evenly (both axes)">⫾</button>
+        </div>
+        <div class="group-label">Align</div>
       </div>
 
       <div class="group">
@@ -203,6 +225,7 @@
           <button class="ribbon-btn" data-cmd="duplicateSelection" title="Duplicate (Ctrl+D)">Duplicate</button>
           <button class="ribbon-btn" data-cmd="deleteSelection" title="Delete (Del)">Delete</button>
           <button class="ribbon-btn" data-cmd="selectAll" title="Select all (Ctrl+A)">All</button>
+          <button class="ribbon-btn" data-cmd="showFind" title="Find &amp; Replace (Ctrl+F)">🔍</button>
         </div>
         <div class="group-label">Editing</div>
       </div>
@@ -210,6 +233,43 @@
 
     <!-- Insert -->
     <div class="ribbon-panel" data-panel="insert">
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn" data-cmd="setConnectorRoute" data-route="orthogonal" title="Orthogonal connector route">▥</button>
+          <button class="ribbon-btn" data-cmd="setConnectorRoute" data-route="straight"   title="Straight connector route">／</button>
+          <button class="ribbon-btn" data-cmd="setConnectorRoute" data-route="curved"     title="Curved connector route">⌒</button>
+          <button class="ribbon-btn" data-cmd="setConnectorRoute" data-route="tree"       title="Tree connector route">┐</button>
+        </div>
+        <div class="group-row">
+          <button class="ribbon-btn" data-cmd="setConnectorLine" data-line="solid"  title="Solid line">─</button>
+          <button class="ribbon-btn" data-cmd="setConnectorLine" data-line="dashed" title="Dashed line">╌</button>
+          <button class="ribbon-btn" data-cmd="setConnectorLine" data-line="dotted" title="Dotted line">⋯</button>
+          <button class="ribbon-btn" data-cmd="setConnectorLine" data-line="double" title="Double line">═</button>
+        </div>
+        <div class="group-row">
+          <button class="ribbon-btn" data-cmd="setConnectorWeight" data-weight="0.5" title="Weight 0.5">·</button>
+          <button class="ribbon-btn" data-cmd="setConnectorWeight" data-weight="1"   title="Weight 1">1</button>
+          <button class="ribbon-btn" data-cmd="setConnectorWeight" data-weight="2"   title="Weight 2">2</button>
+          <button class="ribbon-btn" data-cmd="setConnectorWeight" data-weight="3"   title="Weight 3">3</button>
+          <button class="ribbon-btn" data-cmd="setConnectorWeight" data-weight="5"   title="Weight 5">5</button>
+        </div>
+        <div class="group-row">
+          <button class="ribbon-btn" data-cmd="editConnectorLabel" title="Edit connector label">Label…</button>
+        </div>
+        <div class="group-label">Connector</div>
+      </div>
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn wide" data-cmd="autoLayoutHierarchy" title="Hierarchical auto-layout">⇣ Hierarchy</button>
+        </div>
+        <div class="group-row">
+          <button class="ribbon-btn wide" data-cmd="autoLayoutForce" title="Force-directed auto-layout">⚛ Force</button>
+        </div>
+        <div class="group-row">
+          <button class="ribbon-btn" data-cmd="addCustomPort" title="Add custom connection point to selected shape">+ Port</button>
+        </div>
+        <div class="group-label">Layout</div>
+      </div>
       <div class="group">
         <div class="group-row">
           <button class="ribbon-btn wide" data-cmd="addPage">+ Page</button>
@@ -235,12 +295,37 @@
         </div>
         <div class="group-label">Quick shapes</div>
       </div>
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn wide" data-cmd="showReplaceShape" title="Replace selected shape's stencil">Replace shape…</button>
+        </div>
+        <div class="group-label">Shape</div>
+      </div>
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn" data-cmd="addShapeDataField" title="Add a data field to the selected shape">+ Data</button>
+          <button class="ribbon-btn" data-cmd="addHyperlink" title="Attach a hyperlink to the selected shape">+ Link</button>
+          <button class="ribbon-btn" data-cmd="addComment" title="Add a comment to the selected shape">+ Comment</button>
+        </div>
+        <div class="group-row">
+          <button class="ribbon-btn wide" data-cmd="configureDataGraphics" title="Drive shape colors/icons/bars from a data field">Data graphics…</button>
+          <button class="ribbon-btn" data-cmd="clearDataGraphics" title="Disable data graphics">Clear</button>
+        </div>
+        <div class="group-row">
+          <button class="ribbon-btn" data-cmd="runValidation" title="Run validation rules">Validate</button>
+          <button class="ribbon-btn" data-cmd="exportReport" title="Export shape data as CSV">Report</button>
+        </div>
+        <div class="group-label">Data</div>
+      </div>
     </div>
 
     <!-- Design -->
     <div class="ribbon-panel" data-panel="design">
       <div class="group">
         <div class="group-row" id="themeStrip"><!-- populated by app.js --></div>
+        <div class="group-row">
+          <button class="ribbon-btn" data-cmd="showThemeBuilder" title="Build a custom theme">+ Theme…</button>
+        </div>
         <div class="group-label">Themes</div>
       </div>
       <div class="group">
@@ -263,6 +348,10 @@
           </select>
           <input class="color-input" type="color" id="pageBgColor" title="Page background" value="#ffffff" />
         </div>
+        <div class="group-row">
+          <button class="ribbon-btn" data-cmd="setBackgroundPage" title="Apply another page as background of this one">Background…</button>
+          <button class="ribbon-btn" data-cmd="setDrawingScale" title="Set drawing scale (e.g. 1in=1ft)">Scale…</button>
+        </div>
         <div class="group-label">Canvas</div>
       </div>
     </div>
@@ -283,6 +372,12 @@
         <div class="group-row">
           <button class="ribbon-btn wide" data-cmd="toggleStencils">Stencils panel</button>
           <button class="ribbon-btn wide" data-cmd="toggleSidePane">Properties / Layers</button>
+        </div>
+        <div class="group-row">
+          <label class="select sm" style="display:inline-flex;align-items:center;gap:3px;border:1px solid var(--ribbon-border);padding:2px 6px;background:#fff;">
+            <input type="checkbox" id="rulersToggle" /> Rulers
+          </label>
+          <button class="ribbon-btn" data-cmd="toggleMiniMap" title="Mini-map (pan thumbnail)">⊞ Mini-map</button>
         </div>
         <div class="group-label">Panels</div>
       </div>
@@ -321,6 +416,7 @@
     <aside class="side-pane" id="sidePane" aria-label="Properties and Layers">
       <div class="side-pane-tabs">
         <button class="side-pane-tab active" data-side-tab="properties">Properties</button>
+        <button class="side-pane-tab" data-side-tab="data">Data</button>
         <button class="side-pane-tab" data-side-tab="layers">Layers</button>
       </div>
       <div class="side-pane-body" id="sidePaneProps" data-side-body="properties">
@@ -343,6 +439,9 @@
           <label for="propText">Label</label><input id="propText" type="text" />
           <label for="propLayer">Layer</label><select id="propLayer"></select>
         </div>
+      </div>
+      <div class="side-pane-body" id="sidePaneData" data-side-body="data" hidden>
+        <!-- populated by renderDataPanel() -->
       </div>
       <div class="side-pane-body" id="sidePaneLayers" data-side-body="layers" hidden>
         <div class="layers-toolbar">
@@ -380,7 +479,16 @@
             <option value="svg">SVG — Scalable Vector Graphics (.svg)</option>
             <option value="png">PNG — bitmap @ 2× DPI (.png)</option>
             <option value="pdf">PDF — multi-page document (.pdf)</option>
+            <option value="docx">DOCX — Word doc with embedded pages</option>
+            <option value="pptx">PPTX — PowerPoint, one slide per page</option>
+            <option value="html">HTML — single-file interactive</option>
+            <option value="md">Markdown — embedded base64 PNG</option>
+            <option value="dxf">DXF — AutoCAD wireframe</option>
           </select>
+        </label>
+        <label style="display:flex;flex-direction:row;align-items:center;gap:6px;">
+          <input id="saveTiledChk" type="checkbox" />
+          Tile large pages across PDF page size (PDF only)
         </label>
       </div>
       <footer>
@@ -391,6 +499,86 @@
   </dialog>
 
   <input type="file" id="openFileInput" accept=".vsdx,.vsdm,.svg" hidden />
+
+  <div id="miniMap" hidden></div>
+
+  <dialog class="save-dialog" id="themeBuilderDialog">
+    <form method="dialog">
+      <header>
+        <h3>Build a custom theme</h3>
+        <button type="button" aria-label="Close" onclick="this.closest('dialog').close()">&times;</button>
+      </header>
+      <div class="body">
+        <label>Name <input id="themeBuilderName" type="text" value="My Theme" /></label>
+        <label>Fill <input id="themeBuilderFill" type="color" /></label>
+        <label>Stroke <input id="themeBuilderStroke" type="color" /></label>
+        <label>Text color <input id="themeBuilderText" type="color" /></label>
+        <label>Page background <input id="themeBuilderBg" type="color" /></label>
+        <label>Font family <input id="themeBuilderFont" type="text" /></label>
+      </div>
+      <footer>
+        <button type="button" onclick="this.closest('dialog').close()">Cancel</button>
+        <button type="submit" class="primary" data-cmd="saveCustomTheme">Save theme</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <dialog class="save-dialog" id="csvImportDialog">
+    <form method="dialog">
+      <header>
+        <h3>Import data from CSV</h3>
+        <button type="button" aria-label="Close" onclick="this.closest('dialog').close()">&times;</button>
+      </header>
+      <div class="body">
+        <p style="margin:0;font-size:12px;color:var(--muted);">Paste CSV. Header row becomes field names. Each subsequent row maps to a shape (by row order) and writes shape data fields.</p>
+        <textarea id="csvImportInput" rows="10" style="font:inherit;font-family:Consolas,monospace;font-size:12px;width:100%;box-sizing:border-box;border:1px solid var(--ribbon-border);padding:6px;"></textarea>
+      </div>
+      <footer>
+        <button type="button" id="csvImportCancelBtn">Cancel</button>
+        <button type="submit" id="csvImportApplyBtn" class="primary">Apply</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <dialog class="save-dialog replace-shape-dialog" id="replaceShapeDialog">
+    <form method="dialog">
+      <header>
+        <h3>Replace shape</h3>
+        <button type="button" id="replaceShapeCloseBtn" aria-label="Close" onclick="this.closest('dialog').close()">&times;</button>
+      </header>
+      <div class="body" style="max-height:60vh;overflow-y:auto;">
+        <div id="replaceShapeList"></div>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog class="save-dialog find-dialog" id="findDialog">
+    <form method="dialog">
+      <header>
+        <h3>Find &amp; Replace</h3>
+        <button type="button" id="findCloseBtn" aria-label="Close">&times;</button>
+      </header>
+      <div class="body">
+        <label>
+          Find
+          <input id="findInput" type="text" autocomplete="off" />
+        </label>
+        <label>
+          Replace with
+          <input id="findReplaceInput" type="text" autocomplete="off" />
+        </label>
+        <label style="display:flex;flex-direction:row;align-items:center;gap:6px;">
+          <input id="findCaseChk" type="checkbox" /> Case sensitive
+        </label>
+        <div id="findStatus" style="font-size:12px;color:var(--muted);min-height:1.2em;"></div>
+        <div id="findResults" class="find-results"></div>
+      </div>
+      <footer>
+        <button type="button" id="findReplaceBtn">Replace all</button>
+        <button type="submit" class="primary">Close</button>
+      </footer>
+    </form>
+  </dialog>
 
   <div class="help-modal" id="helpInfoModal" hidden role="dialog" aria-modal="true" aria-labelledby="helpInfoTitle">
     <div class="help-modal-card">
@@ -410,6 +598,8 @@
     // the classic-script app.js below can use it without becoming a
     // module itself. Mirrors the slides/word/image pattern.
     import * as diagrams from '../lib/diagrams/index.js';
+    import * as docs from '../lib/docs/index.js';
+    import * as slides from '../lib/slides/index.js';
     import * as claude from '../lib/claude/index.js';
     window.RodmanDiagramsIO = {
       saveVsdx: diagrams.saveVsdx,
@@ -417,7 +607,13 @@
       exportSvg: diagrams.exportSvg,
       exportPng: diagrams.exportPng,
       exportPdf: diagrams.exportPdf,
+      exportHtml: diagrams.exportHtml,
+      exportMarkdown: diagrams.exportMarkdown,
+      exportDxf: diagrams.exportDxf,
+      exportDocx: (d) => diagrams.exportDocx(d, docs),
+      exportPptx: (d) => diagrams.exportPptx(d, slides),
     };
+    window.RodmanDocs = { savePdf: docs.savePdf, saveDocx: docs.saveDocx };
     window.RodmanStencils = {
       STENCILS: diagrams.STENCILS,
       CATEGORIES: diagrams.CATEGORIES,

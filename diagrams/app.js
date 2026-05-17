@@ -39,11 +39,51 @@
     zoom: 1,
     showGrid: true,
     snapToGrid: true,
+    showRulers: false,
     sideTab: 'properties',  // 'properties' | 'layers'
     panOpen: { stencils: true, side: true },
     clipboard: null,
     isEditingText: false,
+    paintMode: null,        // { fill, stroke, strokeWidth, opacity, textStyle } | null
+    smartGuides: [],        // active guide lines during drag: { x1, y1, x2, y2 }
   };
+
+  // ---------- Undo / Redo history ----------
+  // We snapshot the entire diagram before each mutation. Cheap because
+  // diagrams are small and JSON.stringify is fast for our model.
+  const HISTORY_MAX = 50;
+  const history = { stack: [], index: -1 };
+
+  function snapshotDiagram() {
+    return JSON.stringify(diagram);
+  }
+
+  function restoreSnapshot(snap) {
+    try {
+      const obj = JSON.parse(snap);
+      sanitizeDiagram(obj);
+      diagram = obj;
+      // Keep activePageId pointing at a real page.
+      if (!D.findPage(diagram, state.activePageId)) {
+        state.activePageId = diagram.pages[0].id;
+      }
+      state.selectedShapeIds.clear();
+      state.selectedConnectorIds.clear();
+      $('#diagramTitle').value = diagram.title;
+      renderAll();
+    } catch (_) { /* ignore */ }
+  }
+
+  function pushHistory() {
+    const snap = snapshotDiagram();
+    // Drop any redo tail.
+    if (history.index < history.stack.length - 1) {
+      history.stack = history.stack.slice(0, history.index + 1);
+    }
+    history.stack.push(snap);
+    if (history.stack.length > HISTORY_MAX) history.stack.shift();
+    history.index = history.stack.length - 1;
+  }
 
   // ---------- Helpers ----------
   function $(sel, root) { return (root || document).querySelector(sel); }
@@ -78,10 +118,18 @@
 
   // ---------- Autosave ----------
   let saveTimer = null;
+  let historyPushPending = false;
   function scheduleSave() {
     setSaveIndicator('saving');
+    // Coalesce history pushes per "mutation batch" so drag-moves don't
+    // record dozens of intermediate states. We push once per save flush.
+    historyPushPending = true;
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
+      if (historyPushPending) {
+        pushHistory();
+        historyPushPending = false;
+      }
       const ok = D.save(diagram);
       setSaveIndicator(ok ? 'saved' : 'error');
     }, 400);
@@ -118,16 +166,75 @@
   }
 
   // ---------- Stencil drawer ----------
+  const FAVORITES_KEY = 'vision.favorites.v1';
+  function loadFavorites() {
+    try {
+      const raw = localStorage.getItem(FAVORITES_KEY);
+      const arr = raw ? JSON.parse(raw) : [];
+      return Array.isArray(arr) ? arr.filter((id) => STENCILS.STENCILS[id]) : [];
+    } catch (_) { return []; }
+  }
+  function saveFavorites(arr) {
+    try { localStorage.setItem(FAVORITES_KEY, JSON.stringify(arr)); } catch (_) {}
+  }
+
+  // Fuzzy match: subsequence of query chars in name (case-insensitive).
+  // Returns rank score (lower = better, 0 = exact substring) or -1 if no
+  // match. Exact substring beats fuzzy; acronym match (initials of words)
+  // beats arbitrary subsequence.
+  function fuzzyScore(haystack, needle) {
+    const h = haystack.toLowerCase();
+    const n = needle.toLowerCase();
+    if (!n) return 0;
+    const sub = h.indexOf(n);
+    if (sub !== -1) return sub;
+    // Acronym match: first letter of each word.
+    const acronym = h.split(/[\s\-_]+/).map((w) => w[0] || '').join('');
+    if (acronym.startsWith(n)) return 100;
+    // Subsequence match.
+    let i = 0, j = 0, gaps = 0;
+    while (i < h.length && j < n.length) {
+      if (h[i] === n[j]) { j++; if (i > 0 && h[i - 1] !== n[j - 2]) gaps++; }
+      i++;
+    }
+    return j === n.length ? 1000 + gaps : -1;
+  }
+
   function renderStencilDrawer() {
     const list = $('#stencilList');
     list.innerHTML = '';
     const groups = STENCILS.stencilsByCategory();
-    const filter = ($('#stencilSearch').value || '').trim().toLowerCase();
+    const filter = ($('#stencilSearch').value || '').trim();
+    const favorites = loadFavorites();
+
+    // Favorites pseudo-category (only when populated)
+    if (favorites.length && !filter) {
+      const wrap = document.createElement('div');
+      wrap.className = 'stencil-category';
+      const header = document.createElement('div');
+      header.className = 'stencil-category-header';
+      header.textContent = '★ Favorites';
+      header.addEventListener('click', () => wrap.classList.toggle('collapsed'));
+      wrap.appendChild(header);
+      const grid = document.createElement('div');
+      grid.className = 'stencil-grid';
+      for (const id of favorites) {
+        const stencil = STENCILS.getStencil(id);
+        if (stencil) grid.appendChild(makeStencilTile(stencil, true));
+      }
+      wrap.appendChild(grid);
+      list.appendChild(wrap);
+    }
 
     for (const cat of STENCILS.CATEGORIES) {
-      const items = groups[cat].filter((s) =>
-        !filter || s.name.toLowerCase().includes(filter) || s.id.toLowerCase().includes(filter)
-      );
+      let items = groups[cat] || [];
+      if (filter) {
+        items = items
+          .map((s) => ({ s, score: Math.max(fuzzyScore(s.name, filter), fuzzyScore(s.id, filter)) }))
+          .filter((x) => x.score >= 0)
+          .sort((a, b) => a.score - b.score)
+          .map((x) => x.s);
+      }
       if (!items.length) continue;
       const wrap = document.createElement('div');
       wrap.className = 'stencil-category';
@@ -138,31 +245,41 @@
       wrap.appendChild(header);
       const grid = document.createElement('div');
       grid.className = 'stencil-grid';
-      for (const stencil of items) {
-        const tile = document.createElement('div');
-        tile.className = 'stencil-tile';
-        tile.draggable = true;
-        tile.dataset.stencil = stencil.id;
-        tile.title = stencil.name;
-        const thumb = R.renderStencilThumb(stencil, 36);
-        tile.appendChild(thumb);
-        const name = document.createElement('div');
-        name.className = 'stencil-tile-name';
-        name.textContent = stencil.name;
-        tile.appendChild(name);
-        tile.addEventListener('dragstart', (e) => {
-          e.dataTransfer.setData('application/x-rodman-stencil', stencil.id);
-          e.dataTransfer.effectAllowed = 'copy';
-        });
-        tile.addEventListener('click', () => {
-          // click-to-drop at canvas center
-          dropStencilAt(stencil.id, activePage().w / 2, activePage().h / 2);
-        });
-        grid.appendChild(tile);
-      }
+      for (const stencil of items) grid.appendChild(makeStencilTile(stencil));
       wrap.appendChild(grid);
       list.appendChild(wrap);
     }
+  }
+
+  function makeStencilTile(stencil, isFavorite) {
+    const tile = document.createElement('div');
+    tile.className = 'stencil-tile';
+    tile.draggable = true;
+    tile.dataset.stencil = stencil.id;
+    tile.title = `${stencil.name} (right-click to ${isFavorite ? 'unpin' : 'pin'})`;
+    const thumb = R.renderStencilThumb(stencil, 36);
+    tile.appendChild(thumb);
+    const name = document.createElement('div');
+    name.className = 'stencil-tile-name';
+    name.textContent = stencil.name;
+    tile.appendChild(name);
+    tile.addEventListener('dragstart', (e) => {
+      e.dataTransfer.setData('application/x-rodman-stencil', stencil.id);
+      e.dataTransfer.effectAllowed = 'copy';
+    });
+    tile.addEventListener('click', () => {
+      dropStencilAt(stencil.id, activePage().w / 2, activePage().h / 2);
+    });
+    tile.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      const favs = loadFavorites();
+      const idx = favs.indexOf(stencil.id);
+      if (idx === -1) favs.push(stencil.id);
+      else favs.splice(idx, 1);
+      saveFavorites(favs);
+      renderStencilDrawer();
+    });
+    return tile;
   }
 
   function bindStencilSearch() {
@@ -175,6 +292,20 @@
     const shadow = $('#canvasShadow');
     shadow.innerHTML = '';
     const page = activePage();
+    // Background page composition: render the referenced page first
+    // at 40% opacity so the user can see what overlays which.
+    if (page.bgPageId) {
+      const bg = D.findPage(diagram, page.bgPageId);
+      if (bg) {
+        const bgSvg = R.renderPage(bg, diagram.layers, { showGrid: false });
+        bgSvg.setAttribute('opacity', '0.4');
+        bgSvg.style.position = 'absolute';
+        bgSvg.style.left = '0';
+        bgSvg.style.top = '0';
+        bgSvg.style.pointerEvents = 'none';
+        shadow.appendChild(bgSvg);
+      }
+    }
     const svg = R.renderPage(page, diagram.layers, { showGrid: state.showGrid });
     shadow.appendChild(svg);
     shadow.style.width = page.w + 'px';
@@ -184,8 +315,137 @@
     bindCanvasInteractions(svg, shadow);
     renderSelectionOverlays(shadow);
     renderHoverPorts(shadow);
+    renderSmartGuides(shadow);
+    renderAutoConnectArrows(shadow);
+    renderConnectorHandles(shadow);
+    renderRulers();
     renderPageStrip();
     updateStatusBar();
+    renderMiniMap();
+  }
+
+  // ---------- Rulers ----------
+  function renderRulers() {
+    const wrap = $('#canvasArea');
+    if (!wrap) return;
+    let topRuler = wrap.querySelector('.ruler-top');
+    let leftRuler = wrap.querySelector('.ruler-left');
+    if (!state.showRulers) {
+      if (topRuler) topRuler.remove();
+      if (leftRuler) leftRuler.remove();
+      wrap.classList.remove('with-rulers');
+      return;
+    }
+    wrap.classList.add('with-rulers');
+    if (!topRuler) {
+      topRuler = document.createElement('canvas');
+      topRuler.className = 'ruler ruler-top';
+      wrap.appendChild(topRuler);
+    }
+    if (!leftRuler) {
+      leftRuler = document.createElement('canvas');
+      leftRuler.className = 'ruler ruler-left';
+      wrap.appendChild(leftRuler);
+    }
+    const scroll = $('#canvasScroll');
+    const sw = scroll.clientWidth;
+    const sh = scroll.clientHeight;
+    const dpr = window.devicePixelRatio || 1;
+    drawRuler(topRuler, sw - 22, 22, 'horizontal', dpr);
+    drawRuler(leftRuler, 22, sh - 22, 'vertical', dpr);
+  }
+
+  function drawRuler(canvas, w, h, orientation, dpr) {
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+    canvas.style.width = w + 'px';
+    canvas.style.height = h + 'px';
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = '#f8fafc';
+    ctx.fillRect(0, 0, w, h);
+    ctx.strokeStyle = '#94a3b8';
+    ctx.fillStyle = '#475569';
+    ctx.font = '10px Segoe UI, sans-serif';
+    const minor = 10 * state.zoom;
+    const major = 100 * state.zoom;
+    const scroll = $('#canvasScroll');
+    const shadow = $('#canvasShadow');
+    const sRect = shadow.getBoundingClientRect();
+    const cRect = scroll.getBoundingClientRect();
+    if (orientation === 'horizontal') {
+      const originPx = sRect.left - cRect.left;
+      for (let x = 0; x < w; x++) {
+        const pageX = (x - originPx) / state.zoom;
+        if (pageX < 0) continue;
+        const onMajor = Math.abs(((x - originPx) % major)) < 1;
+        const onMinor = Math.abs(((x - originPx) % minor)) < 1;
+        if (onMajor) {
+          ctx.beginPath();
+          ctx.moveTo(x + 0.5, h * 0.4);
+          ctx.lineTo(x + 0.5, h);
+          ctx.stroke();
+          ctx.fillText(String(Math.round(pageX)), x + 2, h * 0.4);
+        } else if (onMinor) {
+          ctx.beginPath();
+          ctx.moveTo(x + 0.5, h * 0.7);
+          ctx.lineTo(x + 0.5, h);
+          ctx.stroke();
+        }
+      }
+    } else {
+      const originPx = sRect.top - cRect.top;
+      for (let y = 0; y < h; y++) {
+        const pageY = (y - originPx) / state.zoom;
+        if (pageY < 0) continue;
+        const onMajor = Math.abs(((y - originPx) % major)) < 1;
+        const onMinor = Math.abs(((y - originPx) % minor)) < 1;
+        if (onMajor) {
+          ctx.beginPath();
+          ctx.moveTo(w * 0.4, y + 0.5);
+          ctx.lineTo(w, y + 0.5);
+          ctx.stroke();
+          ctx.save();
+          ctx.translate(w * 0.4 - 2, y + 2);
+          ctx.rotate(-Math.PI / 2);
+          ctx.fillText(String(Math.round(pageY)), 0, 0);
+          ctx.restore();
+        } else if (onMinor) {
+          ctx.beginPath();
+          ctx.moveTo(w * 0.7, y + 0.5);
+          ctx.lineTo(w, y + 0.5);
+          ctx.stroke();
+        }
+      }
+    }
+  }
+
+  // ---------- Smart guides (alignment lines during drag) ----------
+  function renderSmartGuides(shadow) {
+    shadow.querySelectorAll('.smart-guide').forEach((el) => el.remove());
+    if (!state.smartGuides || !state.smartGuides.length) return;
+    const ns = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('class', 'smart-guide');
+    const page = activePage();
+    svg.setAttribute('width', page.w);
+    svg.setAttribute('height', page.h);
+    svg.style.position = 'absolute';
+    svg.style.left = '0';
+    svg.style.top = '0';
+    svg.style.pointerEvents = 'none';
+    for (const ln of state.smartGuides) {
+      const line = document.createElementNS(ns, 'line');
+      line.setAttribute('x1', ln.x1);
+      line.setAttribute('y1', ln.y1);
+      line.setAttribute('x2', ln.x2);
+      line.setAttribute('y2', ln.y2);
+      line.setAttribute('stroke', '#ec4899');
+      line.setAttribute('stroke-width', '1');
+      line.setAttribute('stroke-dasharray', '4 3');
+      svg.appendChild(line);
+    }
+    shadow.appendChild(svg);
   }
 
   // Mouse coords → page-local coords (accounting for zoom + scroll).
@@ -215,6 +475,38 @@
 
       if (target.classList.contains('shape')) {
         const id = target.getAttribute('data-shape-id');
+        const page = activePage();
+
+        // Cmd/Ctrl-click on a shape with hyperlinks follows the first.
+        if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey) {
+          const sh = D.findShape(page, id);
+          if (sh && Array.isArray(sh.hyperlinks) && sh.hyperlinks.length) {
+            followHyperlink(sh.hyperlinks[0]);
+            return;
+          }
+        }
+
+        // Format painter: clicking a shape paints, doesn't select.
+        if (state.paintMode) {
+          const sh = D.findShape(page, id);
+          if (sh) {
+            sh.fill = state.paintMode.fill;
+            sh.stroke = state.paintMode.stroke;
+            sh.strokeWidth = state.paintMode.strokeWidth;
+            sh.opacity = state.paintMode.opacity;
+            sh.textStyle = JSON.parse(JSON.stringify(state.paintMode.textStyle));
+            sh._themed = false;
+            scheduleSave();
+            renderCanvas();
+          }
+          // Hold Alt to keep painting; otherwise exit after first paint.
+          if (!e.altKey) {
+            state.paintMode = null;
+            document.body.classList.remove('format-painter-active');
+          }
+          return;
+        }
+
         if (e.shiftKey) {
           if (state.selectedShapeIds.has(id)) state.selectedShapeIds.delete(id);
           else state.selectedShapeIds.add(id);
@@ -223,8 +515,11 @@
           state.selectedConnectorIds.clear();
           state.selectedShapeIds.add(id);
         }
+        // Group-aware selection: if any selected shape is in a group,
+        // pull every group member into the selection.
+        state.selectedShapeIds = D.expandSelectionToGroups(page, state.selectedShapeIds);
+
         // Start a move drag carrying every selected shape.
-        const page = activePage();
         const initial = new Map();
         for (const sid of state.selectedShapeIds) {
           const sh = D.findShape(page, sid);
@@ -280,9 +575,24 @@
     const shadow = $('#canvasShadow');
     const pt = eventToPagePoint(e, shadow);
     if (drag.mode === 'move') {
-      const dx = pt.x - drag.startX;
-      const dy = pt.y - drag.startY;
+      let dx = pt.x - drag.startX;
+      let dy = pt.y - drag.startY;
       const page = activePage();
+      // Smart guides: snap the *primary* dragged shape's edges/center to
+      // matching edges/centers of any non-selected shape. The other
+      // selected shapes follow the same dx/dy so multi-selection drag
+      // stays coherent.
+      const primaryId = [...drag.initial.keys()][0];
+      const primaryInit = drag.initial.get(primaryId);
+      const primary = D.findShape(page, primaryId);
+      if (primary && primaryInit) {
+        const guides = computeSmartGuides(page, primary, primaryInit, dx, dy);
+        if (guides.snapX != null) dx = guides.snapX - primaryInit.x;
+        if (guides.snapY != null) dy = guides.snapY - primaryInit.y;
+        state.smartGuides = guides.lines;
+      } else {
+        state.smartGuides = [];
+      }
       for (const [sid, init] of drag.initial.entries()) {
         const sh = D.findShape(page, sid);
         if (!sh) continue;
@@ -331,10 +641,74 @@
       scheduleSave();
     }
     drag = null;
+    state.smartGuides = [];
     renderCanvas();
   });
 
-  function dropStencilAt(stencilId, cx, cy) {
+  // Compute smart-guide snap suggestions for a moving shape.
+  // Returns { snapX, snapY, lines } where snapX/snapY are absolute
+  // top-left coordinates the shape should snap to (or null) and lines
+  // is the list of pink alignment lines to draw in page space.
+  const SMART_GUIDE_THRESHOLD = 5;
+  function computeSmartGuides(page, primary, primaryInit, dx, dy) {
+    const targetX = primaryInit.x + dx;
+    const targetY = primaryInit.y + dy;
+    const candidateX = [
+      { v: targetX, kind: 'left' },
+      { v: targetX + primary.w / 2, kind: 'cx' },
+      { v: targetX + primary.w, kind: 'right' },
+    ];
+    const candidateY = [
+      { v: targetY, kind: 'top' },
+      { v: targetY + primary.h / 2, kind: 'cy' },
+      { v: targetY + primary.h, kind: 'bottom' },
+    ];
+    let bestX = null, bestY = null;
+    const lines = [];
+    for (const other of page.shapes) {
+      if (state.selectedShapeIds.has(other.id)) continue;
+      const otherEdges = [
+        { v: other.x, line: other.x },
+        { v: other.x + other.w / 2, line: other.x + other.w / 2 },
+        { v: other.x + other.w, line: other.x + other.w },
+      ];
+      for (const cx of candidateX) {
+        for (const ox of otherEdges) {
+          if (Math.abs(cx.v - ox.v) < SMART_GUIDE_THRESHOLD) {
+            const candidate = ox.v - (cx.kind === 'left' ? 0 : cx.kind === 'cx' ? primary.w / 2 : primary.w);
+            if (bestX == null || Math.abs(candidate - targetX) < Math.abs(bestX - targetX)) {
+              bestX = candidate;
+            }
+            const top = Math.min(other.y, targetY) - 12;
+            const bot = Math.max(other.y + other.h, targetY + primary.h) + 12;
+            lines.push({ x1: ox.line, y1: top, x2: ox.line, y2: bot });
+          }
+        }
+      }
+      const otherEdgesY = [
+        { v: other.y, line: other.y },
+        { v: other.y + other.h / 2, line: other.y + other.h / 2 },
+        { v: other.y + other.h, line: other.y + other.h },
+      ];
+      for (const cy of candidateY) {
+        for (const oy of otherEdgesY) {
+          if (Math.abs(cy.v - oy.v) < SMART_GUIDE_THRESHOLD) {
+            const candidate = oy.v - (cy.kind === 'top' ? 0 : cy.kind === 'cy' ? primary.h / 2 : primary.h);
+            if (bestY == null || Math.abs(candidate - targetY) < Math.abs(bestY - targetY)) {
+              bestY = candidate;
+            }
+            const left = Math.min(other.x, targetX) - 12;
+            const right = Math.max(other.x + other.w, targetX + primary.w) + 12;
+            lines.push({ x1: left, y1: oy.line, x2: right, y2: oy.line });
+          }
+        }
+      }
+    }
+    return { snapX: bestX, snapY: bestY, lines };
+  }
+
+  function dropStencilAt(stencilId, cx, cy, opts) {
+    opts = opts || {};
     const stencil = STENCILS.getStencil(stencilId);
     const w = 140, h = 80;
     const theme = THEMES_MOD.getTheme(diagram.theme);
@@ -353,12 +727,16 @@
       text: stencil.name,
     });
     activePage().shapes.push(shape);
-    state.selectedShapeIds.clear();
-    state.selectedConnectorIds.clear();
-    state.selectedShapeIds.add(shape.id);
+    lastDroppedStencil = stencilId;
+    if (!opts.suppressSelect) {
+      state.selectedShapeIds.clear();
+      state.selectedConnectorIds.clear();
+      state.selectedShapeIds.add(shape.id);
+    }
     scheduleSave();
     renderCanvas();
     renderPropertiesPanel();
+    return shape;
   }
 
   // ---------- Selection overlays + handles ----------
@@ -628,6 +1006,7 @@
   }
 
   function renderPropertiesPanel() {
+    renderDataPanel(); // Keep Data tab in sync with selection.
     const empty = $('#propsEmpty');
     const grid = $('#propsGrid');
     if (state.selectedShapeIds.size !== 1) {
@@ -969,8 +1348,67 @@
       [...state.selectedShapeIds].forEach((id) => D.sendBackward(page, id));
       scheduleSave(); renderCanvas();
     },
-    group() { /* Placeholder: visual grouping; current model treats them as a multi-select. */ },
-    ungroup() { /* Mirror of group(). */ },
+    group() {
+      const page = activePage();
+      const ids = [...state.selectedShapeIds];
+      if (ids.length < 2) return;
+      D.groupShapes(page, ids);
+      scheduleSave();
+      renderCanvas();
+    },
+    ungroup() {
+      const page = activePage();
+      const ids = [...state.selectedShapeIds];
+      if (!ids.length) return;
+      if (D.ungroupShapes(page, ids)) {
+        scheduleSave();
+        renderCanvas();
+      }
+    },
+
+    // Align (selection ≥ 2 shapes)
+    alignSelLeft()   { alignSelection('left'); },
+    alignSelCenter() { alignSelection('center'); },
+    alignSelRight()  { alignSelection('right'); },
+    alignSelTop()    { alignSelection('top'); },
+    alignSelMiddle() { alignSelection('middle'); },
+    alignSelBottom() { alignSelection('bottom'); },
+
+    // Distribute (selection ≥ 3 shapes)
+    distributeH()    { distributeSelection('horizontal'); },
+    distributeV()    { distributeSelection('vertical'); },
+    spaceEvenly()    { distributeSelection('evenly'); },
+
+    // Flip
+    flipH() { flipSelection('h'); },
+    flipV() { flipSelection('v'); },
+
+    // Format painter
+    pickFormat() {
+      if (state.selectedShapeIds.size !== 1) {
+        alert('Select one shape to copy its format, then click Format Painter again on the targets.');
+        return;
+      }
+      const page = activePage();
+      const sh = D.findShape(page, [...state.selectedShapeIds][0]);
+      if (!sh) return;
+      state.paintMode = {
+        fill: sh.fill,
+        stroke: sh.stroke,
+        strokeWidth: sh.strokeWidth,
+        opacity: sh.opacity,
+        textStyle: JSON.parse(JSON.stringify(sh.textStyle || {})),
+      };
+      document.body.classList.add('format-painter-active');
+    },
+
+    // Find / Replace
+    showFind() {
+      const dlg = $('#findDialog');
+      if (typeof dlg.showModal === 'function') dlg.showModal();
+      else dlg.setAttribute('open', '');
+      $('#findInput').focus();
+    },
 
     // Insert
     addPage() {
@@ -1049,10 +1487,964 @@
       else ($('#askClaudeKey')?.value.trim() ? $('#askClaudeInput') : $('#askClaudeKey'))?.focus();
     },
 
-    // Stubs for forward compatibility
-    undo() { /* roadmap */ },
-    redo() { /* roadmap */ },
+    // Undo / Redo (real)
+    undo() {
+      if (history.index <= 0) return;
+      history.index--;
+      restoreSnapshot(history.stack[history.index]);
+      setSaveIndicator('saved');
+    },
+    redo() {
+      if (history.index >= history.stack.length - 1) return;
+      history.index++;
+      restoreSnapshot(history.stack[history.index]);
+      setSaveIndicator('saved');
+    },
+
+    // View toggles
+    toggleRulers() {
+      state.showRulers = !state.showRulers;
+      $('#rulersToggle').checked = state.showRulers;
+      renderCanvas();
+    },
+
+    // ---------- Phase 5: export + integrations ----------
+    showThemeBuilder() {
+      const dlg = $('#themeBuilderDialog');
+      // Seed with current theme defaults.
+      const theme = THEMES_MOD.getTheme(diagram.theme);
+      $('#themeBuilderName').value = 'My Theme';
+      $('#themeBuilderFill').value = ensureHex(theme.fill);
+      $('#themeBuilderStroke').value = ensureHex(theme.stroke);
+      $('#themeBuilderText').value = ensureHex(theme.textColor);
+      $('#themeBuilderBg').value = ensureHex(theme.pageBg);
+      $('#themeBuilderFont').value = theme.fontFamily || 'Segoe UI, sans-serif';
+      if (typeof dlg.showModal === 'function') dlg.showModal();
+      else dlg.setAttribute('open', '');
+    },
+    saveCustomTheme(e) {
+      if (e) e.preventDefault();
+      const name = $('#themeBuilderName').value.trim() || 'My Theme';
+      const theme = {
+        id: 'custom-' + Date.now().toString(36),
+        name,
+        palette: [
+          $('#themeBuilderFill').value, $('#themeBuilderStroke').value,
+          $('#themeBuilderText').value, $('#themeBuilderBg').value,
+          '#9ca3af', '#e5e7eb',
+        ],
+        fill: $('#themeBuilderFill').value,
+        stroke: $('#themeBuilderStroke').value,
+        textColor: $('#themeBuilderText').value,
+        pageBg: $('#themeBuilderBg').value,
+        fontFamily: $('#themeBuilderFont').value || 'Segoe UI, sans-serif',
+      };
+      // Persist + inject.
+      const custom = loadCustomThemes();
+      custom.push(theme);
+      saveCustomThemes(custom);
+      THEMES_MOD.THEMES.push(theme);
+      diagram.theme = theme.id;
+      THEMES_MOD.applyThemeToDiagram(diagram);
+      scheduleSave();
+      renderThemeStrip();
+      renderCanvas();
+      $('#themeBuilderDialog').close();
+    },
+    setBackgroundPage() {
+      const page = activePage();
+      const opts = diagram.pages.filter((p) => p.id !== page.id).map((p, i) => `${i + 1}: ${p.name}`).join('\n');
+      const pick = prompt('Use which page as background?\n0: none\n' + opts, '0');
+      const n = parseInt(pick, 10);
+      if (n === 0) { delete page.bgPageId; }
+      else {
+        const others = diagram.pages.filter((p) => p.id !== page.id);
+        const target = others[n - 1];
+        if (target) page.bgPageId = target.id;
+      }
+      scheduleSave();
+      renderCanvas();
+    },
+    setDrawingScale() {
+      const page = activePage();
+      const scaleStr = prompt('Drawing scale (e.g. "1in=1ft", "1cm=1m"). Empty to clear.', page.scale ? `${page.scale.value}${page.scale.unitFrom}=${page.scale.value}${page.scale.unitTo}` : '');
+      if (scaleStr === null) return;
+      if (!scaleStr.trim()) {
+        delete page.scale;
+      } else {
+        const m = scaleStr.match(/^\s*(\d*\.?\d+)\s*(\w+)\s*=\s*(\d*\.?\d+)\s*(\w+)\s*$/);
+        if (!m) { alert('Could not parse. Try "1in=1ft".'); return; }
+        page.scale = {
+          value: parseFloat(m[1]),
+          unitFrom: m[2],
+          ratio: parseFloat(m[3]) / parseFloat(m[1]),
+          unitTo: m[4],
+        };
+      }
+      scheduleSave();
+      renderCanvas();
+    },
+    toggleMiniMap() {
+      const mm = $('#miniMap');
+      if (!mm) return;
+      mm.hidden = !mm.hidden;
+      if (!mm.hidden) renderMiniMap();
+    },
+
+    // ---------- Phase 4: data, validation, comments ----------
+    addShapeDataField() {
+      if (state.selectedShapeIds.size !== 1) return;
+      const name = prompt('Field name'); if (!name) return;
+      const value = prompt('Value', '') || '';
+      const page = activePage();
+      const sh = D.findShape(page, [...state.selectedShapeIds][0]);
+      if (!sh) return;
+      sh.data = sh.data || {};
+      sh.data[name] = { value, type: inferType(value) };
+      scheduleSave();
+      renderDataPanel();
+      renderCanvas();
+    },
+    removeShapeDataField(btn) {
+      if (state.selectedShapeIds.size !== 1) return;
+      const page = activePage();
+      const sh = D.findShape(page, [...state.selectedShapeIds][0]);
+      if (!sh || !sh.data) return;
+      delete sh.data[btn.dataset.field];
+      scheduleSave();
+      renderDataPanel();
+      renderCanvas();
+    },
+    addHyperlink() {
+      if (state.selectedShapeIds.size !== 1) return;
+      const page = activePage();
+      const sh = D.findShape(page, [...state.selectedShapeIds][0]);
+      if (!sh) return;
+      const kindStr = prompt('Hyperlink kind: url, page, or mailto', 'url');
+      if (!kindStr) return;
+      const kind = kindStr.trim().toLowerCase();
+      let target;
+      if (kind === 'page') {
+        const pageNames = diagram.pages.map((p, i) => `${i + 1}: ${p.name}`).join('\n');
+        target = prompt('Target page (1-based index):\n' + pageNames, '1');
+      } else {
+        target = prompt(kind === 'mailto' ? 'Email address' : 'URL', '');
+      }
+      if (!target) return;
+      const label = prompt('Label (optional)', target) || target;
+      sh.hyperlinks = sh.hyperlinks || [];
+      sh.hyperlinks.push({ kind, target, label });
+      scheduleSave();
+      renderDataPanel();
+      renderCanvas();
+    },
+    removeHyperlink(btn) {
+      if (state.selectedShapeIds.size !== 1) return;
+      const page = activePage();
+      const sh = D.findShape(page, [...state.selectedShapeIds][0]);
+      if (!sh || !sh.hyperlinks) return;
+      const idx = parseInt(btn.dataset.idx, 10);
+      sh.hyperlinks.splice(idx, 1);
+      scheduleSave();
+      renderDataPanel();
+      renderCanvas();
+    },
+    addComment() {
+      if (state.selectedShapeIds.size !== 1) return;
+      const text = prompt('Comment'); if (!text) return;
+      const author = prompt('Author', 'You') || 'You';
+      const page = activePage();
+      const sh = D.findShape(page, [...state.selectedShapeIds][0]);
+      if (!sh) return;
+      sh.comments = sh.comments || [];
+      sh.comments.push({ author, ts: Date.now(), text });
+      scheduleSave();
+      renderDataPanel();
+      renderCanvas();
+    },
+    removeComment(btn) {
+      if (state.selectedShapeIds.size !== 1) return;
+      const page = activePage();
+      const sh = D.findShape(page, [...state.selectedShapeIds][0]);
+      if (!sh || !sh.comments) return;
+      const idx = parseInt(btn.dataset.idx, 10);
+      sh.comments.splice(idx, 1);
+      scheduleSave();
+      renderDataPanel();
+      renderCanvas();
+    },
+    importDataCsv() {
+      const dlg = $('#csvImportDialog');
+      $('#csvImportInput').value = '';
+      if (typeof dlg.showModal === 'function') dlg.showModal();
+      else dlg.setAttribute('open', '');
+    },
+    runValidation() {
+      const issues = validateDiagram();
+      const body = issues.length
+        ? '<ul>' + issues.map((i) => `<li><b>${escHtml(i.severity)}</b>: ${escHtml(i.message)} <button data-shape="${i.shapeId}" data-page="${i.pageIndex}" class="ribbon-btn">Locate</button></li>`).join('') + '</ul>'
+        : '<p>No validation issues found. 🎉</p>';
+      showHelpModal('Validation results', body);
+      // Wire locate buttons
+      $('#helpInfoBody').querySelectorAll('button[data-shape]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const pi = parseInt(btn.dataset.page, 10);
+          const sid = btn.dataset.shape;
+          state.activePageId = diagram.pages[pi].id;
+          state.selectedShapeIds = new Set([sid]);
+          state.selectedConnectorIds.clear();
+          renderCanvas();
+          renderPropertiesPanel();
+          $('#helpInfoModal').hidden = true;
+        });
+      });
+    },
+    exportReport() {
+      const rows = [];
+      const fields = new Set();
+      for (const page of diagram.pages) {
+        for (const s of page.shapes) {
+          if (s.data) Object.keys(s.data).forEach((k) => fields.add(k));
+        }
+      }
+      const cols = ['page', 'shape', 'stencil', 'text', ...fields];
+      rows.push(cols.join(','));
+      for (let pi = 0; pi < diagram.pages.length; pi++) {
+        const page = diagram.pages[pi];
+        for (const s of page.shapes) {
+          const row = [csvCell(page.name), csvCell(s.id), csvCell(s.stencil), csvCell(s.text || '')];
+          for (const f of fields) {
+            const entry = s.data && s.data[f];
+            row.push(csvCell(entry ? (entry.value != null ? entry.value : entry) : ''));
+          }
+          rows.push(row.join(','));
+        }
+      }
+      const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
+      downloadBlob(blob, (diagram.title || 'diagram').replace(/[^\w\-]+/g, '_') + '_report.csv');
+    },
+    configureDataGraphics() {
+      const fields = collectDataFields();
+      if (!fields.size) { alert('Add shape data fields first.'); return; }
+      const field = prompt('Field to visualize:\n' + [...fields].join('\n'), [...fields][0]);
+      if (!field) return;
+      const mode = prompt('Mode: color, icon, bar', 'color');
+      if (!mode) return;
+      if (mode === 'bar') {
+        const max = parseFloat(prompt('Max value for bar scale', '100'));
+        diagram.dataGraphics = { field, mode: 'bar', min: 0, max: isFinite(max) ? max : 100, barColor: '#0ea5e9' };
+      } else if (mode === 'icon') {
+        diagram.dataGraphics = { field, mode: 'icon', iconMap: { true: '✓', false: '✗', warning: '⚠', high: '⚠', low: '✓' } };
+      } else {
+        diagram.dataGraphics = { field, mode: 'color', palette: {} };
+      }
+      window.RodmanRender.dataGraphicsCfg = diagram.dataGraphics;
+      scheduleSave();
+      renderCanvas();
+    },
+    clearDataGraphics() {
+      diagram.dataGraphics = null;
+      window.RodmanRender.dataGraphicsCfg = null;
+      scheduleSave();
+      renderCanvas();
+    },
+
+    // ---------- Phase 3: connectors + layout ----------
+    setConnectorRoute(btn) { setConnectorProp('routeStyle', btn?.dataset.route || 'orthogonal'); },
+    setConnectorLine(btn)  { setConnectorProp('lineStyle',  btn?.dataset.line  || 'solid'); },
+    setConnectorWeight(btn){ setConnectorProp('strokeWidth', parseFloat(btn?.dataset.weight) || 1.5); },
+    editConnectorLabel() {
+      const page = activePage();
+      if (state.selectedConnectorIds.size !== 1) return;
+      const c = D.findConnector(page, [...state.selectedConnectorIds][0]);
+      if (!c) return;
+      const next = prompt('Connector label', c.label || '');
+      if (next != null) { c.label = next; scheduleSave(); renderCanvas(); }
+    },
+    autoLayoutHierarchy() {
+      const page = activePage();
+      autoLayoutHierarchical(page);
+      scheduleSave();
+      renderCanvas();
+    },
+    autoLayoutForce() {
+      const page = activePage();
+      autoLayoutForceDirected(page, 120);
+      scheduleSave();
+      renderCanvas();
+    },
+    addCustomPort() {
+      if (state.selectedShapeIds.size !== 1) return;
+      const page = activePage();
+      const sh = D.findShape(page, [...state.selectedShapeIds][0]);
+      if (!sh) return;
+      const fx = parseFloat(prompt('Port X (0..1 across width)', '0.5'));
+      const fy = parseFloat(prompt('Port Y (0..1 down height)', '0.5'));
+      if (!isFinite(fx) || !isFinite(fy)) return;
+      sh.customPorts = sh.customPorts || [];
+      sh.customPorts.push({ fx: Math.max(0, Math.min(1, fx)), fy: Math.max(0, Math.min(1, fy)) });
+      scheduleSave();
+      renderCanvas();
+    },
+
+    // Replace selected shape's stencil (preserves geometry / text /
+    // connectors / data). Opens the Replace dialog with a stencil list.
+    showReplaceShape() {
+      if (state.selectedShapeIds.size === 0) return;
+      const dlg = $('#replaceShapeDialog');
+      const list = $('#replaceShapeList');
+      list.innerHTML = '';
+      const groups = STENCILS.stencilsByCategory();
+      for (const cat of STENCILS.CATEGORIES) {
+        const items = groups[cat] || [];
+        if (!items.length) continue;
+        const header = document.createElement('div');
+        header.className = 'stencil-category-header';
+        header.textContent = cat;
+        list.appendChild(header);
+        const grid = document.createElement('div');
+        grid.className = 'stencil-grid';
+        for (const stencil of items) {
+          const tile = document.createElement('div');
+          tile.className = 'stencil-tile';
+          tile.title = stencil.name;
+          tile.appendChild(R.renderStencilThumb(stencil, 32));
+          const name = document.createElement('div');
+          name.className = 'stencil-tile-name';
+          name.textContent = stencil.name;
+          tile.appendChild(name);
+          tile.addEventListener('click', () => {
+            const page = activePage();
+            for (const id of state.selectedShapeIds) {
+              const sh = D.findShape(page, id);
+              if (sh) sh.stencil = stencil.id;
+            }
+            scheduleSave();
+            renderCanvas();
+            dlg.close();
+          });
+          grid.appendChild(tile);
+        }
+        list.appendChild(grid);
+      }
+      if (typeof dlg.showModal === 'function') dlg.showModal();
+      else dlg.setAttribute('open', '');
+    },
   };
+
+  // ---------- Align / Distribute / Flip implementations ----------
+  function alignSelection(mode) {
+    const page = activePage();
+    const shapes = [...state.selectedShapeIds]
+      .map((id) => D.findShape(page, id))
+      .filter(Boolean);
+    if (shapes.length < 2) return;
+    const bounds = D.boundsOfShapes(shapes);
+    for (const s of shapes) {
+      switch (mode) {
+        case 'left':   s.x = bounds.x; break;
+        case 'center': s.x = bounds.x + (bounds.w - s.w) / 2; break;
+        case 'right':  s.x = bounds.x + bounds.w - s.w; break;
+        case 'top':    s.y = bounds.y; break;
+        case 'middle': s.y = bounds.y + (bounds.h - s.h) / 2; break;
+        case 'bottom': s.y = bounds.y + bounds.h - s.h; break;
+      }
+      s.x = Math.round(s.x);
+      s.y = Math.round(s.y);
+    }
+    scheduleSave();
+    renderCanvas();
+  }
+
+  function distributeSelection(mode) {
+    const page = activePage();
+    const shapes = [...state.selectedShapeIds]
+      .map((id) => D.findShape(page, id))
+      .filter(Boolean);
+    if (shapes.length < 3) return;
+    if (mode === 'horizontal' || mode === 'evenly') {
+      shapes.sort((a, b) => (a.x + a.w / 2) - (b.x + b.w / 2));
+      const first = shapes[0];
+      const last = shapes[shapes.length - 1];
+      const firstCx = first.x + first.w / 2;
+      const lastCx = last.x + last.w / 2;
+      const step = (lastCx - firstCx) / (shapes.length - 1);
+      shapes.forEach((s, i) => {
+        if (i === 0 || i === shapes.length - 1) return;
+        const cx = firstCx + i * step;
+        s.x = Math.round(cx - s.w / 2);
+      });
+    }
+    if (mode === 'vertical' || mode === 'evenly') {
+      shapes.sort((a, b) => (a.y + a.h / 2) - (b.y + b.h / 2));
+      const first = shapes[0];
+      const last = shapes[shapes.length - 1];
+      const firstCy = first.y + first.h / 2;
+      const lastCy = last.y + last.h / 2;
+      const step = (lastCy - firstCy) / (shapes.length - 1);
+      shapes.forEach((s, i) => {
+        if (i === 0 || i === shapes.length - 1) return;
+        const cy = firstCy + i * step;
+        s.y = Math.round(cy - s.h / 2);
+      });
+    }
+    scheduleSave();
+    renderCanvas();
+  }
+
+  function flipSelection(axis) {
+    const page = activePage();
+    let changed = false;
+    for (const id of state.selectedShapeIds) {
+      const sh = D.findShape(page, id);
+      if (!sh) continue;
+      if (axis === 'h') sh.flipH = !sh.flipH;
+      else if (axis === 'v') sh.flipV = !sh.flipV;
+      changed = true;
+    }
+    if (changed) { scheduleSave(); renderCanvas(); }
+  }
+
+  // ---------- Find / Replace ----------
+  function findMatches(query, caseSensitive) {
+    const results = [];
+    if (!query) return results;
+    const normalized = caseSensitive ? query : query.toLowerCase();
+    for (let pi = 0; pi < diagram.pages.length; pi++) {
+      const page = diagram.pages[pi];
+      for (const s of page.shapes) {
+        const txt = (s.text || '');
+        const probe = caseSensitive ? txt : txt.toLowerCase();
+        if (probe.includes(normalized)) {
+          results.push({ pageIndex: pi, shapeId: s.id, text: txt });
+        }
+      }
+    }
+    return results;
+  }
+
+  function replaceInDiagram(query, replacement, caseSensitive) {
+    const re = new RegExp(
+      query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
+      caseSensitive ? 'g' : 'gi'
+    );
+    let count = 0;
+    for (const page of diagram.pages) {
+      for (const s of page.shapes) {
+        if (s.text && re.test(s.text)) {
+          s.text = s.text.replace(re, replacement);
+          count++;
+          re.lastIndex = 0;
+        }
+      }
+    }
+    if (count) { scheduleSave(); renderCanvas(); }
+    return count;
+  }
+
+  // ---------- Phase 5 helpers ----------
+  const CUSTOM_THEMES_KEY = 'vision.themes.custom.v1';
+  function loadCustomThemes() {
+    try {
+      const raw = localStorage.getItem(CUSTOM_THEMES_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch (_) { return []; }
+  }
+  function saveCustomThemes(arr) {
+    try { localStorage.setItem(CUSTOM_THEMES_KEY, JSON.stringify(arr)); } catch (_) {}
+  }
+  // Inject any user themes from a previous session at module init.
+  (function injectCustomThemesOnBoot() {
+    const themes = loadCustomThemes();
+    for (const t of themes) {
+      if (!THEMES_MOD.THEMES.find((x) => x.id === t.id)) THEMES_MOD.THEMES.push(t);
+    }
+  })();
+
+  function renderMiniMap() {
+    const mm = $('#miniMap');
+    if (!mm || mm.hidden) return;
+    const page = activePage();
+    const targetW = 160, targetH = 100;
+    const scale = Math.min(targetW / page.w, targetH / page.h);
+    const w = page.w * scale, h = page.h * scale;
+    mm.innerHTML = '';
+    mm.style.width = w + 'px';
+    mm.style.height = h + 'px';
+    const ns = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('viewBox', `0 0 ${page.w} ${page.h}`);
+    svg.setAttribute('width', w);
+    svg.setAttribute('height', h);
+    svg.innerHTML = `<rect x="0" y="0" width="${page.w}" height="${page.h}" fill="${page.bg || '#fff'}" />` +
+      page.shapes.map((s) =>
+        `<rect x="${s.x}" y="${s.y}" width="${s.w}" height="${s.h}" fill="${s.fill || '#888'}" stroke="${s.stroke || '#444'}" stroke-width="2" />`
+      ).join('');
+    mm.appendChild(svg);
+    // Viewport rect.
+    const scroll = $('#canvasScroll');
+    const vpRect = document.createElement('div');
+    vpRect.className = 'minimap-viewport';
+    const vx = (scroll.scrollLeft / state.zoom) * scale;
+    const vy = (scroll.scrollTop / state.zoom) * scale;
+    const vw = (scroll.clientWidth / state.zoom) * scale;
+    const vh = (scroll.clientHeight / state.zoom) * scale;
+    vpRect.style.left = vx + 'px';
+    vpRect.style.top = vy + 'px';
+    vpRect.style.width = vw + 'px';
+    vpRect.style.height = vh + 'px';
+    mm.appendChild(vpRect);
+    // Click to recenter the viewport on the click point.
+    mm.onclick = (e) => {
+      const rect = mm.getBoundingClientRect();
+      const cx = (e.clientX - rect.left) / scale;
+      const cy = (e.clientY - rect.top) / scale;
+      scroll.scrollLeft = (cx * state.zoom) - scroll.clientWidth / 2;
+      scroll.scrollTop = (cy * state.zoom) - scroll.clientHeight / 2;
+      renderMiniMap();
+    };
+  }
+
+  // ---------- Phase 4 helpers ----------
+  // (escHtml is defined in the misc-utilities section near end of file.)
+  function inferType(v) {
+    if (v === '' || v == null) return 'string';
+    if (!isNaN(parseFloat(v)) && isFinite(v)) return 'number';
+    if (v === 'true' || v === 'false') return 'boolean';
+    return 'string';
+  }
+  function csvCell(v) {
+    const s = String(v == null ? '' : v);
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  }
+  function collectDataFields() {
+    const fields = new Set();
+    for (const page of diagram.pages) {
+      for (const s of page.shapes) {
+        if (s.data) Object.keys(s.data).forEach((f) => fields.add(f));
+      }
+    }
+    return fields;
+  }
+
+  // Built-in validation rules. Each returns array of
+  // { severity: 'warn'|'error', message, pageIndex, shapeId }.
+  const VALIDATION_RULES = [
+    {
+      name: 'orphan-shape',
+      check(diagram) {
+        const issues = [];
+        for (let pi = 0; pi < diagram.pages.length; pi++) {
+          const p = diagram.pages[pi];
+          for (const s of p.shapes) {
+            const used = p.connectors.some((c) => c.fromShapeId === s.id || c.toShapeId === s.id);
+            if (!used && p.shapes.length > 1) {
+              issues.push({ severity: 'warn', message: `Orphan shape "${s.text || s.stencil}"`, pageIndex: pi, shapeId: s.id });
+            }
+          }
+        }
+        return issues;
+      },
+    },
+    {
+      name: 'decision-outputs',
+      check(diagram) {
+        const issues = [];
+        for (let pi = 0; pi < diagram.pages.length; pi++) {
+          const p = diagram.pages[pi];
+          for (const s of p.shapes) {
+            if (!/decision|bpmnExclusive|bpmnInclusive|bpmnParallel/i.test(s.stencil)) continue;
+            const outDeg = p.connectors.filter((c) => c.fromShapeId === s.id).length;
+            if (outDeg < 2) {
+              issues.push({ severity: 'warn', message: `Decision "${s.text || s.stencil}" should have ≥2 outgoing connectors (has ${outDeg})`, pageIndex: pi, shapeId: s.id });
+            }
+          }
+        }
+        return issues;
+      },
+    },
+    {
+      name: 'start-event-inputs',
+      check(diagram) {
+        const issues = [];
+        for (let pi = 0; pi < diagram.pages.length; pi++) {
+          const p = diagram.pages[pi];
+          for (const s of p.shapes) {
+            if (!/bpmnStartEvent/i.test(s.stencil)) continue;
+            const inDeg = p.connectors.filter((c) => c.toShapeId === s.id).length;
+            if (inDeg > 0) {
+              issues.push({ severity: 'error', message: `Start Event "${s.text || s.stencil}" should have 0 incoming connectors (has ${inDeg})`, pageIndex: pi, shapeId: s.id });
+            }
+          }
+        }
+        return issues;
+      },
+    },
+    {
+      name: 'end-event-outputs',
+      check(diagram) {
+        const issues = [];
+        for (let pi = 0; pi < diagram.pages.length; pi++) {
+          const p = diagram.pages[pi];
+          for (const s of p.shapes) {
+            if (!/bpmnEndEvent/i.test(s.stencil)) continue;
+            const outDeg = p.connectors.filter((c) => c.fromShapeId === s.id).length;
+            if (outDeg > 0) {
+              issues.push({ severity: 'error', message: `End Event "${s.text || s.stencil}" should have 0 outgoing connectors (has ${outDeg})`, pageIndex: pi, shapeId: s.id });
+            }
+          }
+        }
+        return issues;
+      },
+    },
+  ];
+
+  function validateDiagram() {
+    const all = [];
+    for (const rule of VALIDATION_RULES) all.push(...rule.check(diagram));
+    return all;
+  }
+
+  function followHyperlink(link) {
+    if (!link) return;
+    if (link.kind === 'page') {
+      const idx = parseInt(link.target, 10) - 1;
+      if (idx >= 0 && idx < diagram.pages.length) {
+        state.activePageId = diagram.pages[idx].id;
+        clearSelection();
+        renderCanvas();
+      }
+    } else if (link.kind === 'mailto') {
+      window.open('mailto:' + link.target, '_self');
+    } else {
+      window.open(link.target, '_blank', 'noopener');
+    }
+  }
+
+  // Render the new Data side-pane tab.
+  function renderDataPanel() {
+    const body = $('#sidePaneData');
+    if (!body) return;
+    if (state.selectedShapeIds.size !== 1) {
+      body.innerHTML = '<div class="props-empty">Select a single shape to edit its data, hyperlinks, and comments.</div>';
+      return;
+    }
+    const page = activePage();
+    const sh = D.findShape(page, [...state.selectedShapeIds][0]);
+    if (!sh) return;
+    let html = '';
+    // Shape Data
+    html += '<div class="props-section-title">Shape Data</div>';
+    if (!sh.data || !Object.keys(sh.data).length) {
+      html += '<div class="props-empty" style="padding:6px;">No fields.</div>';
+    } else {
+      html += '<div class="data-field-list">';
+      for (const [k, v] of Object.entries(sh.data)) {
+        const value = v && v.value != null ? v.value : v;
+        html += `<div class="data-field-row">` +
+          `<input type="text" class="data-field-val" data-field="${escHtml(k)}" value="${escHtml(value)}" data-kind="value" />` +
+          `<span class="data-field-name">${escHtml(k)}</span>` +
+          `<button class="ribbon-btn sm" data-cmd="removeShapeDataField" data-field="${escHtml(k)}" title="Remove">×</button>` +
+          `</div>`;
+      }
+      html += '</div>';
+    }
+    html += '<div><button class="ribbon-btn" data-cmd="addShapeDataField">+ Field</button> ';
+    html += '<button class="ribbon-btn" data-cmd="importDataCsv" title="Paste CSV to import data fields">Import CSV…</button></div>';
+    // Hyperlinks
+    html += '<div class="props-section-title">Hyperlinks</div>';
+    if (!sh.hyperlinks || !sh.hyperlinks.length) {
+      html += '<div class="props-empty" style="padding:6px;">None.</div>';
+    } else {
+      html += '<div class="data-field-list">';
+      sh.hyperlinks.forEach((h, i) => {
+        html += `<div class="data-field-row hyperlink-row" data-idx="${i}">` +
+          `<span class="hyperlink-kind">${escHtml(h.kind)}</span>` +
+          `<span class="hyperlink-label" title="${escHtml(h.target)}">${escHtml(h.label || h.target)}</span>` +
+          `<button class="ribbon-btn sm" data-cmd="removeHyperlink" data-idx="${i}">×</button>` +
+          `</div>`;
+      });
+      html += '</div>';
+    }
+    html += '<div><button class="ribbon-btn" data-cmd="addHyperlink">+ Hyperlink</button></div>';
+    // Comments
+    html += '<div class="props-section-title">Comments</div>';
+    if (!sh.comments || !sh.comments.length) {
+      html += '<div class="props-empty" style="padding:6px;">No comments.</div>';
+    } else {
+      html += '<div class="comment-list">';
+      sh.comments.forEach((c, i) => {
+        const dt = new Date(c.ts || Date.now()).toLocaleString();
+        html += `<div class="comment-row">` +
+          `<div class="comment-meta"><b>${escHtml(c.author || 'Anon')}</b> · ${escHtml(dt)}</div>` +
+          `<div class="comment-text">${escHtml(c.text)}</div>` +
+          `<button class="ribbon-btn sm" data-cmd="removeComment" data-idx="${i}">×</button>` +
+          `</div>`;
+      });
+      html += '</div>';
+    }
+    html += '<div><button class="ribbon-btn" data-cmd="addComment">+ Comment</button></div>';
+    body.innerHTML = html;
+    // Wire all data-cmd buttons inside the panel.
+    body.querySelectorAll('[data-cmd]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const cmd = btn.dataset.cmd;
+        if (commands[cmd]) commands[cmd](btn);
+      });
+    });
+    body.querySelectorAll('.data-field-val').forEach((inp) => {
+      inp.addEventListener('change', () => {
+        const f = inp.dataset.field;
+        const value = inp.value;
+        sh.data[f] = { value, type: inferType(value) };
+        scheduleSave();
+        renderCanvas();
+      });
+    });
+  }
+
+  function jumpToMatch(match) {
+    state.activePageId = diagram.pages[match.pageIndex].id;
+    state.selectedShapeIds = new Set([match.shapeId]);
+    state.selectedConnectorIds.clear();
+    renderCanvas();
+    renderPropertiesPanel();
+  }
+
+  // ---------- Phase 3 helpers ----------
+  function setConnectorProp(field, value) {
+    const page = activePage();
+    let changed = false;
+    for (const id of state.selectedConnectorIds) {
+      const c = D.findConnector(page, id);
+      if (c) { c[field] = value; changed = true; }
+    }
+    if (changed) { scheduleSave(); renderCanvas(); renderPropertiesPanel(); }
+  }
+
+  // Hierarchical (Sugiyama-lite) auto-layout: assign layers by BFS
+  // depth from roots (shapes with no incoming connectors), then
+  // arrange each layer left-to-right with even spacing.
+  function autoLayoutHierarchical(page) {
+    if (!page.shapes.length) return;
+    const inDeg = new Map(page.shapes.map((s) => [s.id, 0]));
+    const adj = new Map(page.shapes.map((s) => [s.id, []]));
+    for (const c of page.connectors) {
+      if (inDeg.has(c.toShapeId)) inDeg.set(c.toShapeId, inDeg.get(c.toShapeId) + 1);
+      if (adj.has(c.fromShapeId)) adj.get(c.fromShapeId).push(c.toShapeId);
+    }
+    const layer = new Map();
+    const queue = page.shapes.filter((s) => inDeg.get(s.id) === 0).map((s) => s.id);
+    if (!queue.length && page.shapes.length) queue.push(page.shapes[0].id);
+    for (const id of queue) layer.set(id, 0);
+    let head = 0;
+    while (head < queue.length) {
+      const id = queue[head++];
+      const l = layer.get(id);
+      for (const next of adj.get(id) || []) {
+        const nextLayer = l + 1;
+        if (!layer.has(next) || layer.get(next) < nextLayer) {
+          layer.set(next, nextLayer);
+          queue.push(next);
+        }
+      }
+    }
+    // Default un-layered shapes to layer 0 (disconnected nodes).
+    for (const s of page.shapes) if (!layer.has(s.id)) layer.set(s.id, 0);
+
+    // Bucket by layer.
+    const buckets = new Map();
+    for (const s of page.shapes) {
+      const l = layer.get(s.id);
+      if (!buckets.has(l)) buckets.set(l, []);
+      buckets.get(l).push(s);
+    }
+    const layers = [...buckets.keys()].sort((a, b) => a - b);
+    const ySpacing = 140;
+    const xSpacing = 200;
+    const startX = 100;
+    const startY = 100;
+    for (let li = 0; li < layers.length; li++) {
+      const l = layers[li];
+      const shapes = buckets.get(l);
+      const rowY = startY + li * ySpacing;
+      shapes.forEach((s, i) => {
+        s.x = startX + i * xSpacing;
+        s.y = rowY;
+      });
+    }
+  }
+
+  // Force-directed (spring-electric) auto-layout. Light-weight,
+  // suitable for ~50 shapes; not a Fruchterman-Reingold textbook
+  // implementation but produces readable layouts.
+  function autoLayoutForceDirected(page, iterations) {
+    const shapes = page.shapes;
+    if (shapes.length < 2) return;
+    const k = 120;          // ideal edge length
+    const repulsion = 8000; // node-node repulsion strength
+    const damp = 0.85;
+    const adj = new Map(shapes.map((s) => [s.id, new Set()]));
+    for (const c of page.connectors) {
+      if (adj.has(c.fromShapeId)) adj.get(c.fromShapeId).add(c.toShapeId);
+      if (adj.has(c.toShapeId))   adj.get(c.toShapeId).add(c.fromShapeId);
+    }
+    // Velocity state.
+    const vel = new Map(shapes.map((s) => [s.id, { vx: 0, vy: 0 }]));
+    for (let iter = 0; iter < iterations; iter++) {
+      for (const a of shapes) {
+        let fx = 0, fy = 0;
+        const acx = a.x + a.w / 2, acy = a.y + a.h / 2;
+        // Repulsion from every other shape.
+        for (const b of shapes) {
+          if (a === b) continue;
+          const bcx = b.x + b.w / 2, bcy = b.y + b.h / 2;
+          const dx = acx - bcx, dy = acy - bcy;
+          const distSq = Math.max(dx * dx + dy * dy, 100);
+          const f = repulsion / distSq;
+          fx += (dx / Math.sqrt(distSq)) * f;
+          fy += (dy / Math.sqrt(distSq)) * f;
+        }
+        // Spring attraction along edges.
+        for (const otherId of adj.get(a.id)) {
+          const b = shapes.find((s) => s.id === otherId);
+          if (!b) continue;
+          const bcx = b.x + b.w / 2, bcy = b.y + b.h / 2;
+          const dx = bcx - acx, dy = bcy - acy;
+          const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+          const f = (dist - k) * 0.05;
+          fx += (dx / dist) * f;
+          fy += (dy / dist) * f;
+        }
+        const v = vel.get(a.id);
+        v.vx = (v.vx + fx) * damp;
+        v.vy = (v.vy + fy) * damp;
+      }
+      for (const s of shapes) {
+        const v = vel.get(s.id);
+        s.x = Math.max(20, Math.min(page.w - s.w - 20, s.x + v.vx));
+        s.y = Math.max(20, Math.min(page.h - s.h - 20, s.y + v.vy));
+      }
+    }
+    for (const s of shapes) { s.x = Math.round(s.x); s.y = Math.round(s.y); }
+  }
+
+  // AutoConnect: when a single shape is selected and the cursor is
+  // near (but outside) its edge, show 4 small blue arrows that drop a
+  // pre-connected copy of the most-recently-used stencil on click.
+  // The state is tracked in canvas-level event listeners below.
+  let lastDroppedStencil = 'rectangle';
+  function renderAutoConnectArrows(shadow) {
+    shadow.querySelectorAll('.autoconnect-arrow').forEach((el) => el.remove());
+    if (state.selectedShapeIds.size !== 1) return;
+    const page = activePage();
+    const sh = D.findShape(page, [...state.selectedShapeIds][0]);
+    if (!sh) return;
+    const arrows = [
+      { dir: 'top',    x: sh.x + sh.w / 2 - 8, y: sh.y - 22, glyph: '▲', port: 'top',    place: { dx: 0,           dy: -120 } },
+      { dir: 'right',  x: sh.x + sh.w + 8,     y: sh.y + sh.h / 2 - 8, glyph: '▶', port: 'right',  place: { dx: 160,         dy: 0 } },
+      { dir: 'bottom', x: sh.x + sh.w / 2 - 8, y: sh.y + sh.h + 8, glyph: '▼', port: 'bottom', place: { dx: 0,           dy: 120 } },
+      { dir: 'left',   x: sh.x - 22,           y: sh.y + sh.h / 2 - 8, glyph: '◀', port: 'left',   place: { dx: -160,        dy: 0 } },
+    ];
+    for (const a of arrows) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'autoconnect-arrow';
+      btn.textContent = a.glyph;
+      btn.style.left = a.x + 'px';
+      btn.style.top = a.y + 'px';
+      btn.title = `AutoConnect ${a.dir}`;
+      btn.addEventListener('mousedown', (e) => e.stopPropagation());
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const cx = sh.x + sh.w / 2 + a.place.dx;
+        const cy = sh.y + sh.h / 2 + a.place.dy;
+        const newShape = dropStencilAt(lastDroppedStencil, cx, cy, { suppressSelect: true });
+        if (!newShape) return;
+        const opposite = { top: 'bottom', bottom: 'top', left: 'right', right: 'left' }[a.port];
+        const theme = THEMES_MOD.getTheme(diagram.theme);
+        page.connectors.push(D.newConnector({
+          fromShapeId: sh.id, toShapeId: newShape.id,
+          fromPort: a.port, toPort: opposite,
+          stroke: theme.stroke, layerId: activeLayer().id,
+        }));
+        scheduleSave();
+        renderCanvas();
+      });
+      shadow.appendChild(btn);
+    }
+  }
+
+  // Connector bend handles: midpoints of each segment become drag
+  // handles that insert a new waypoint. Existing waypoints become
+  // draggable round handles.
+  function renderConnectorHandles(shadow) {
+    shadow.querySelectorAll('.connector-handle').forEach((el) => el.remove());
+    if (state.selectedConnectorIds.size !== 1) return;
+    const page = activePage();
+    const c = D.findConnector(page, [...state.selectedConnectorIds][0]);
+    if (!c) return;
+    const fromShape = page.shapes.find((s) => s.id === c.fromShapeId);
+    const toShape   = page.shapes.find((s) => s.id === c.toShapeId);
+    if (!fromShape || !toShape) return;
+    const a = R.portPoint(fromShape, c.fromPort);
+    const b = R.portPoint(toShape, c.toPort);
+    const points = [a, ...(c.waypoints || []), b];
+    // Existing waypoints
+    (c.waypoints || []).forEach((wp, idx) => {
+      const h = document.createElement('div');
+      h.className = 'connector-handle waypoint';
+      h.style.left = (wp.x - 5) + 'px';
+      h.style.top = (wp.y - 5) + 'px';
+      h.addEventListener('mousedown', (e) => startWaypointDrag(e, c, idx));
+      shadow.appendChild(h);
+    });
+    // Midpoint "add" handles between consecutive points
+    for (let i = 0; i < points.length - 1; i++) {
+      const p1 = points[i], p2 = points[i + 1];
+      const mid = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
+      const h = document.createElement('div');
+      h.className = 'connector-handle midpoint';
+      h.style.left = (mid.x - 4) + 'px';
+      h.style.top = (mid.y - 4) + 'px';
+      h.addEventListener('mousedown', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        c.waypoints = c.waypoints || [];
+        c.waypoints.splice(i, 0, mid);
+        startWaypointDrag(e, c, i);
+      });
+      shadow.appendChild(h);
+    }
+  }
+
+  function startWaypointDrag(e, conn, idx) {
+    e.stopPropagation();
+    e.preventDefault();
+    const shadow = $('#canvasShadow');
+    drag = {
+      mode: 'waypoint',
+      connId: conn.id,
+      waypointIdx: idx,
+      hasMoved: false,
+    };
+    // Reuse the document-level mousemove via a custom branch below.
+    function move(ev) {
+      const pt = eventToPagePoint(ev, shadow);
+      conn.waypoints[idx] = { x: Math.round(pt.x), y: Math.round(pt.y) };
+      drag.hasMoved = true;
+      renderCanvas();
+    }
+    function up() {
+      document.removeEventListener('mousemove', move);
+      document.removeEventListener('mouseup', up);
+      if (drag && drag.hasMoved) scheduleSave();
+      drag = null;
+      renderCanvas();
+    }
+    document.addEventListener('mousemove', move);
+    document.addEventListener('mouseup', up);
+  }
 
   function applyTextStyle(opts) {
     const page = activePage();
@@ -1146,6 +2538,7 @@
     // Design controls
     $('#snapToggle').addEventListener('change', (e) => { state.snapToGrid = e.target.checked; });
     $('#gridToggle').addEventListener('change', (e) => { state.showGrid = e.target.checked; renderCanvas(); });
+    $('#rulersToggle').addEventListener('change', (e) => { state.showRulers = e.target.checked; renderCanvas(); });
     $('#pageSizeSelect').addEventListener('change', (e) => {
       const [w, h] = e.target.value.split(',').map(Number);
       const page = activePage();
@@ -1206,13 +2599,60 @@
         case 'vsdx': blob = IO.saveVsdx(diagram); ext = 'vsdx'; break;
         case 'svg':  blob = new Blob([IO.exportSvg(diagram)], { type: 'image/svg+xml' }); ext = 'svg'; break;
         case 'png':  blob = await IO.exportPng(diagram, { scale: 2 }); ext = 'png'; break;
-        case 'pdf':  blob = await IO.exportPdf(diagram); ext = 'pdf'; break;
+        case 'pdf':
+          blob = $('#saveTiledChk')?.checked
+            ? await exportPdfTiled(diagram)
+            : await IO.exportPdf(diagram);
+          ext = 'pdf';
+          break;
+        case 'docx': blob = await IO.exportDocx(diagram); ext = 'docx'; break;
+        case 'pptx': blob = await IO.exportPptx(diagram); ext = 'pptx'; break;
+        case 'html': blob = IO.exportHtml(diagram); ext = 'html'; break;
+        case 'md':   blob = await IO.exportMarkdown(diagram); ext = 'md'; break;
+        case 'dxf':  blob = IO.exportDxf(diagram); ext = 'dxf'; break;
         default: throw new Error('Unknown format: ' + format);
       }
       downloadBlob(blob, `${name}.${ext}`);
     } catch (err) {
       alert(`Save as .${format} failed: ${err.message || err}`);
     }
+  }
+
+  // Tiled PDF print: chop a page into Letter-sized tiles, render each
+  // as PNG, and embed them as a multi-page PDF where each PDF page is
+  // one tile. Useful when a diagram is larger than a single sheet.
+  async function exportPdfTiled(diagram) {
+    const tilePxW = 11 * 96;   // landscape Letter at 96 DPI
+    const tilePxH = 8.5 * 96;
+    // Build a transient diagram of just the tile crops by cloning
+    // the original and shifting shapes per tile.
+    const PT_PER_IN = 72;
+    const pageWpt = 11 * PT_PER_IN;
+    const pageHpt = 8.5 * PT_PER_IN;
+    const html = [];
+    for (let pi = 0; pi < diagram.pages.length; pi++) {
+      const page = diagram.pages[pi];
+      const cols = Math.max(1, Math.ceil(page.w / tilePxW));
+      const rows = Math.max(1, Math.ceil(page.h / tilePxH));
+      for (let ry = 0; ry < rows; ry++) {
+        for (let cx = 0; cx < cols; cx++) {
+          const blob = await IO.exportPng(diagram, { pageIndex: pi, scale: 2 });
+          const url = await new Promise((res, rej) => {
+            const r = new FileReader();
+            r.onload = () => res(r.result);
+            r.onerror = rej;
+            r.readAsDataURL(blob);
+          });
+          html.push(`<div style="page-break-after: always; width: 11in; height: 8.5in; overflow: hidden;">`
+            + `<img src="${url}" style="margin-left:${-cx * 11}in;margin-top:${-ry * 8.5}in;width:${cols * 11}in;height:${rows * 8.5}in;display:block;" />`
+            + `</div>`);
+        }
+      }
+    }
+    return window.RodmanDocs.savePdf(html.join(''), {
+      title: diagram.title || 'Diagram',
+      pageW: pageWpt, pageH: pageHpt, margin: 0,
+    });
   }
 
   function downloadBlob(blob, filename) {
@@ -1351,6 +2791,31 @@
         commands.showSaveDialog();
         return;
       }
+      // Find: Ctrl/Cmd+F
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
+        e.preventDefault();
+        commands.showFind();
+        return;
+      }
+      // Undo / Redo: Ctrl/Cmd+Z (shift = redo) and Ctrl/Cmd+Y
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) commands.redo();
+        else commands.undo();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+        e.preventDefault();
+        commands.redo();
+        return;
+      }
+      // Group / Ungroup: Ctrl/Cmd+G, Ctrl/Cmd+Shift+G
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'g') {
+        e.preventDefault();
+        if (e.shiftKey) commands.ungroup();
+        else commands.group();
+        return;
+      }
       if (inField && target.id === 'diagramTitle') return;
       if (inField) return;
 
@@ -1403,11 +2868,15 @@
 
   // ---------- Bootstrap ----------
   function renderAll() {
+    // Sync the live data-graphics ref so the renderer picks up any
+    // change after a load/restore.
+    if (window.RodmanRender) window.RodmanRender.dataGraphicsCfg = diagram.dataGraphics || null;
     renderStencilDrawer();
     renderThemeStrip();
     renderLayersPanel();
     renderCanvas();
     renderPropertiesPanel();
+    renderDataPanel();
   }
 
   function bootstrap() {
@@ -1421,12 +2890,126 @@
     bindOpenFile();
     bindAskClaude();
     bindHelpModal();
+    bindFindDialog();
+    bindCsvImportDialog();
     bindPropertyInputs();
     bindKeyboard();
     renderAll();
     setSaveIndicator('saved');
+    // Seed the history stack with the initial diagram so the first
+    // undo never empties out below an unsaved state.
+    pushHistory();
+    // Keep rulers redraw in sync with viewport changes.
+    window.addEventListener('resize', () => { if (state.showRulers) renderRulers(); });
+    $('#canvasScroll')?.addEventListener('scroll', () => { if (state.showRulers) renderRulers(); });
     // Resize fit-to-window on first paint
     setTimeout(() => commands.zoomFit(), 0);
+  }
+
+  function bindCsvImportDialog() {
+    const dlg = $('#csvImportDialog');
+    if (!dlg) return;
+    $('#csvImportCancelBtn').addEventListener('click', (e) => { e.preventDefault(); dlg.close(); });
+    $('#csvImportApplyBtn').addEventListener('click', (e) => {
+      e.preventDefault();
+      const text = $('#csvImportInput').value;
+      if (!text.trim()) { dlg.close(); return; }
+      const rows = parseCsv(text);
+      if (!rows.length) { dlg.close(); return; }
+      const headers = rows[0];
+      const data = rows.slice(1);
+      const page = activePage();
+      let count = 0;
+      data.forEach((row, i) => {
+        const sh = page.shapes[i];
+        if (!sh) return;
+        sh.data = sh.data || {};
+        headers.forEach((h, j) => {
+          if (!h) return;
+          const v = row[j] == null ? '' : row[j];
+          sh.data[h] = { value: v, type: inferType(v) };
+        });
+        count++;
+      });
+      alert(`Imported ${count} row(s) into shape data.`);
+      scheduleSave();
+      renderCanvas();
+      renderDataPanel();
+      dlg.close();
+    });
+  }
+
+  // Tiny CSV parser: handles quoted fields with embedded quotes/commas.
+  function parseCsv(text) {
+    const out = [];
+    let row = [], field = '', inQuote = false;
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i];
+      if (inQuote) {
+        if (c === '"' && text[i + 1] === '"') { field += '"'; i++; }
+        else if (c === '"') inQuote = false;
+        else field += c;
+      } else {
+        if (c === '"') inQuote = true;
+        else if (c === ',') { row.push(field); field = ''; }
+        else if (c === '\n' || c === '\r') {
+          if (field || row.length) { row.push(field); out.push(row); row = []; field = ''; }
+          if (c === '\r' && text[i + 1] === '\n') i++;
+        } else field += c;
+      }
+    }
+    if (field || row.length) { row.push(field); out.push(row); }
+    return out.filter((r) => r.some((v) => v && v.trim()));
+  }
+
+  function bindFindDialog() {
+    const dlg = $('#findDialog');
+    if (!dlg) return;
+    const input = $('#findInput');
+    const replInput = $('#findReplaceInput');
+    const caseChk = $('#findCaseChk');
+    const resultsEl = $('#findResults');
+    const status = $('#findStatus');
+
+    function renderResults() {
+      const q = input.value;
+      const cs = caseChk.checked;
+      resultsEl.innerHTML = '';
+      if (!q) {
+        status.textContent = '';
+        return;
+      }
+      const matches = findMatches(q, cs);
+      status.textContent = matches.length === 0
+        ? 'No matches.'
+        : `${matches.length} match${matches.length === 1 ? '' : 'es'}`;
+      matches.forEach((m, i) => {
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'find-result';
+        const page = diagram.pages[m.pageIndex];
+        item.textContent = `${page.name}: ${m.text.slice(0, 60)}`;
+        item.addEventListener('click', () => {
+          jumpToMatch(m);
+        });
+        resultsEl.appendChild(item);
+      });
+    }
+
+    input.addEventListener('input', renderResults);
+    caseChk.addEventListener('change', renderResults);
+    $('#findCloseBtn').addEventListener('click', () => dlg.close());
+    $('#findReplaceBtn').addEventListener('click', (e) => {
+      e.preventDefault();
+      const q = input.value;
+      if (!q) return;
+      const cs = caseChk.checked;
+      const count = replaceInDiagram(q, replInput.value, cs);
+      status.textContent = count === 0
+        ? 'No replacements made.'
+        : `Replaced ${count} occurrence${count === 1 ? '' : 's'}.`;
+      renderResults();
+    });
   }
 
   // ---------- Misc utilities ----------
