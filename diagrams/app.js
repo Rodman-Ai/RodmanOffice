@@ -156,12 +156,34 @@
         });
       });
     });
-    // Double-click on a tab collapses the ribbon (Office-classic gesture).
-    const tabs = $('.tabs');
-    let ribbonCollapsed = false;
-    tabs.addEventListener('dblclick', () => {
-      ribbonCollapsed = !ribbonCollapsed;
-      $('#ribbon').style.display = ribbonCollapsed ? 'none' : '';
+    // Custom dbltap detector for the Office-classic gesture
+    // "double-tap a tab to collapse the ribbon". iOS Safari's
+    // synthesized `dblclick` is unreliable on elements with
+    // `touch-action: pan-x` (which .tabs has from PR #60), so we
+    // measure tap timing on the universal `click` event instead.
+    const tabsEl = $('.tabs');
+    const ribbonEl = $('#ribbon');
+    let lastTabTap = 0;
+    let lastTabId = null;
+    tabsEl?.addEventListener('click', (e) => {
+      const tab = e.target.closest('.tab');
+      if (!tab) return;
+      const now = Date.now();
+      const id = tab.dataset.tab;
+      if (now - lastTabTap < 350 && lastTabId === id) {
+        ribbonEl.classList.toggle('collapsed');
+        lastTabTap = 0; // reset so triple-tap doesn't re-toggle
+      } else {
+        lastTabTap = now;
+        lastTabId = id;
+      }
+    });
+    // Explicit caret button for users who don't know the dbltap
+    // gesture (and as a single-tap fallback on devices where the
+    // tap-timing detector misfires).
+    $('#ribbonCollapseBtn')?.addEventListener('click', () => {
+      ribbonEl.classList.toggle('collapsed');
+      $('#ribbonCollapseBtn').textContent = ribbonEl.classList.contains('collapsed') ? '▴' : '▾';
     });
   }
 
@@ -1466,6 +1488,12 @@
       const ah = scroll.clientHeight - 48;
       state.zoom = Math.max(0.2, Math.min(4, Math.min(aw / page.w, ah / page.h)));
       renderCanvas();
+      // Re-center the canvas inside the viewport-padded scroll
+      // container (the 50vh / 50vw padding leaves the default
+      // scrollLeft / scrollTop in the top-left gutter, not on the
+      // canvas itself).
+      scroll.scrollLeft = (scroll.scrollWidth - scroll.clientWidth) / 2;
+      scroll.scrollTop = (scroll.scrollHeight - scroll.clientHeight) / 2;
     },
 
     // Help
