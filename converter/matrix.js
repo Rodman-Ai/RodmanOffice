@@ -98,6 +98,13 @@ export const ready = isAvifEncodeSupported().then((ok) => {
   }
 });
 
+const DIAGRAM_OUTPUTS = [
+  { ext: 'vsdx', mime: 'application/vnd.ms-visio.drawing', label: 'Visio (.vsdx)' },
+  { ext: 'svg',  mime: 'image/svg+xml', label: 'SVG (.svg)' },
+  { ext: 'png',  mime: 'image/png', label: 'PNG (.png)' },
+  { ext: 'pdf',  mime: 'application/pdf', label: 'PDF (.pdf)' },
+];
+
 const SLIDES_OUTPUTS = [
   { ext: 'pptx', mime: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', label: 'PowerPoint (.pptx)' },
   { ext: 'odp',  mime: 'application/vnd.oasis.opendocument.presentation', label: 'OpenDocument presentation (.odp)' },
@@ -224,6 +231,7 @@ export const MATRIX = {
   spreadsheet: SHEET_OUTPUTS,
   image: IMAGE_OUTPUTS,
   slides: SLIDES_OUTPUTS,
+  diagram: DIAGRAM_OUTPUTS,
   video: VIDEO_OUTPUTS,
   audio: AUDIO_OUTPUTS,
   subtitle: SUBTITLE_OUTPUTS,

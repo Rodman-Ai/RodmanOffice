@@ -1,0 +1,19 @@
+{
+  "name": "RodmanVision",
+  "short_name": "RodmanVision",
+  "description": "Browser-based Visio clone — VSDX read/write, runs offline, no backend.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#1a8e9a",
+  "theme_color": "#1a8e9a",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

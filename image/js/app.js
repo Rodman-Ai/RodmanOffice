@@ -1954,6 +1954,157 @@
     }
   }
 
+  // ---- Save As… (format + quality + resolution + colors) ----
+  const SAVE_AS_FORMATS = [
+    { ext: 'png',  label: 'PNG',          lossy: false, palette: true  },
+    { ext: 'jpg',  label: 'JPEG',         lossy: true,  palette: false },
+    { ext: 'webp', label: 'WebP',         lossy: true,  palette: false },
+    { ext: 'avif', label: 'AVIF',         lossy: true,  palette: false, gated: true },
+    { ext: 'bmp',  label: 'BMP',          lossy: false, palette: true  },
+    { ext: 'ico',  label: 'Icon (.ico)',  lossy: false, palette: true  },
+    { ext: 'icns', label: 'Apple Icon',   lossy: false, palette: false },
+    { ext: 'cur',  label: 'Windows Cursor', lossy: false, palette: true },
+    { ext: 'tif',  label: 'TIFF',         lossy: false, palette: false },
+    { ext: 'tif-multi', label: 'TIFF (multi-page wrapper)', lossy: false, palette: false },
+    { ext: 'psd',  label: 'Photoshop',    lossy: false, palette: false },
+    { ext: 'pdf',  label: 'PDF (Photoshop)', lossy: true, palette: false },
+    // Part 10 niche image formats — same encoders as the converter.
+    { ext: 'ppm',  label: 'Netpbm PPM',   lossy: false, palette: false },
+    { ext: 'pgm',  label: 'Netpbm PGM (grayscale)', lossy: false, palette: false },
+    { ext: 'pbm',  label: 'Netpbm PBM (1-bit)', lossy: false, palette: false },
+    { ext: 'pam',  label: 'Netpbm PAM (RGBA)', lossy: false, palette: false },
+    { ext: 'tga',  label: 'Targa (.tga)', lossy: false, palette: false },
+    { ext: 'pcx',  label: 'PCX',          lossy: false, palette: false },
+    { ext: 'hdr',  label: 'Radiance HDR', lossy: false, palette: false },
+    { ext: 'xbm',  label: 'X11 Bitmap (.xbm)', lossy: false, palette: false },
+    { ext: 'xpm',  label: 'X11 PixMap (.xpm)', lossy: false, palette: false },
+    { ext: 'wbmp', label: 'WAP Bitmap',   lossy: false, palette: false },
+    { ext: 'sgi',  label: 'SGI Image',    lossy: false, palette: false },
+    { ext: 'ras',  label: 'Sun Raster',   lossy: false, palette: false },
+    { ext: 'ff',   label: 'Farbfeld',     lossy: false, palette: false },
+    { ext: 'cbz',  label: 'Comic Book ZIP', lossy: false, palette: false },
+  ];
+
+  const btnSaveAs = $('btn-save-as');
+  if (btnSaveAs) btnSaveAs.addEventListener('click', async () => {
+    let avifSupported = false;
+    try { avifSupported = await IO.isAvifEncodeSupported(); } catch { /* probe failed; treat as no */ }
+    const formats = SAVE_AS_FORMATS.filter((f) => !f.gated || avifSupported);
+
+    const fmtOptions = formats.map((f, i) =>
+      `<option value="${f.ext}"${i === 0 ? ' selected' : ''}>${f.label}</option>`
+    ).join('');
+    const html = `
+      <div class="save-as-form" style="display:flex;flex-direction:column;gap:10px;font-size:13px">
+        <label style="display:flex;justify-content:space-between;gap:10px;align-items:center">
+          <span>Format</span>
+          <select id="sa-format">${fmtOptions}</select>
+        </label>
+        <label id="sa-quality-row" style="display:flex;justify-content:space-between;gap:10px;align-items:center">
+          <span>Quality</span>
+          <span style="display:inline-flex;align-items:center;gap:6px">
+            <input id="sa-quality" type="range" min="0.1" max="1" step="0.05" value="0.85" style="width:140px">
+            <span id="sa-quality-value" style="min-width:40px;text-align:right">85%</span>
+          </span>
+        </label>
+        <label style="display:flex;justify-content:space-between;gap:10px;align-items:center">
+          <span>Resolution</span>
+          <select id="sa-scale">
+            <option value="1" selected>100% (original)</option>
+            <option value="0.75">75%</option>
+            <option value="0.5">50%</option>
+            <option value="0.25">25%</option>
+            <option value="2">200% (upscale)</option>
+            <option value="4">400% (upscale)</option>
+          </select>
+        </label>
+        <label id="sa-colors-row" style="display:flex;justify-content:space-between;gap:10px;align-items:center">
+          <span>Colors</span>
+          <select id="sa-colors">
+            <option value="" selected>Full colour</option>
+            <option value="256">256</option>
+            <option value="128">128</option>
+            <option value="64">64</option>
+            <option value="16">16</option>
+          </select>
+        </label>
+      </div>
+    `;
+    // Use the showModal helper but populate the body, then attach
+    // live form listeners that update the readouts. The OK button
+    // resolves the promise; we read the form values after.
+    const sel = () => $('sa-format');
+    const refreshFieldVisibility = () => {
+      const fmt = formats.find((f) => f.ext === sel().value);
+      $('sa-quality-row').style.display = fmt && fmt.lossy ? '' : 'none';
+      $('sa-colors-row').style.display = fmt && fmt.palette ? '' : 'none';
+    };
+    const wireForm = () => {
+      sel().addEventListener('change', refreshFieldVisibility);
+      const q = $('sa-quality');
+      const qv = $('sa-quality-value');
+      q.addEventListener('input', () => { qv.textContent = `${Math.round(parseFloat(q.value) * 100)}%`; });
+      refreshFieldVisibility();
+    };
+    // showModal sets the body, then we wire on the next tick.
+    const okPromise = showModal('Save As…', html, { okText: 'Save' });
+    setTimeout(wireForm, 0);
+    const ok = await okPromise;
+    if (!ok) return;
+
+    const ext = $('sa-format').value;
+    const quality = parseFloat($('sa-quality').value);
+    const scale = parseFloat($('sa-scale').value);
+    const colorsRaw = $('sa-colors').value;
+    const colors = colorsRaw ? parseInt(colorsRaw, 10) : null;
+
+    let work = canvas;
+    if (scale && scale !== 1) work = IO.resize(work, scale, { smoothing: scale < 1 });
+    if (colors) work = IO.quantizeCanvas(work, colors);
+
+    const stamp = `retropaint-${Date.now()}`;
+    // XBM / XPM emit C source where the symbol name has to be a
+    // valid identifier (no dashes). Derive a stem from the stamp.
+    const stem = stamp.replace(/[^A-Za-z0-9_]/g, '_') || 'image';
+    try {
+      let blob, filename;
+      switch (ext) {
+        case 'png':  blob = await IO.encodePNG(work);  filename = IO.suggestFilename(stamp, 'png'); break;
+        case 'jpg':  blob = await IO.encodeJPEG(work, quality); filename = IO.suggestFilename(stamp, 'jpg'); break;
+        case 'webp': blob = await IO.encodeWebP(work, quality); filename = IO.suggestFilename(stamp, 'webp'); break;
+        case 'avif': blob = await IO.encodeAVIF(work, quality); filename = IO.suggestFilename(stamp, 'avif'); break;
+        case 'bmp':  blob = IO.encodeBMP(work); filename = IO.suggestFilename(stamp, 'bmp'); break;
+        case 'ico':  blob = await IO.encodeICO(work); filename = IO.suggestFilename(stamp, 'ico'); break;
+        case 'icns': blob = await IO.encodeICNS(work); filename = IO.suggestFilename(stamp, 'icns'); break;
+        case 'cur':  blob = await IO.encodeCUR(work); filename = IO.suggestFilename(stamp, 'cur'); break;
+        case 'tif':  blob = IO.encodeTIFF(work); filename = IO.suggestFilename(stamp, 'tif'); break;
+        case 'tif-multi': blob = IO.encodeMultiTIFF([work]); filename = IO.suggestFilename(stamp, 'tif'); break;
+        case 'psd':  blob = IO.encodePsd(work); filename = IO.suggestFilename(stamp, 'psd'); break;
+        case 'pdf':  blob = await IO.encodePdfFromCanvas(work, { format: 'jpeg', quality }); filename = IO.suggestFilename(stamp, 'pdf'); break;
+        // Part 10 niche image formats.
+        case 'ppm':  blob = IO.encodePPM(work);  filename = IO.suggestFilename(stamp, 'ppm'); break;
+        case 'pgm':  blob = IO.encodePGM(work);  filename = IO.suggestFilename(stamp, 'pgm'); break;
+        case 'pbm':  blob = IO.encodePBM(work);  filename = IO.suggestFilename(stamp, 'pbm'); break;
+        case 'pam':  blob = IO.encodePAM(work);  filename = IO.suggestFilename(stamp, 'pam'); break;
+        case 'tga':  blob = IO.encodeTGA(work);  filename = IO.suggestFilename(stamp, 'tga'); break;
+        case 'pcx':  blob = IO.encodePCX(work);  filename = IO.suggestFilename(stamp, 'pcx'); break;
+        case 'hdr':  blob = IO.encodeHDR(work);  filename = IO.suggestFilename(stamp, 'hdr'); break;
+        case 'xbm':  blob = IO.encodeXBM(work, stem); filename = IO.suggestFilename(stamp, 'xbm'); break;
+        case 'xpm':  blob = IO.encodeXPM(work, stem); filename = IO.suggestFilename(stamp, 'xpm'); break;
+        case 'wbmp': blob = IO.encodeWBMP(work); filename = IO.suggestFilename(stamp, 'wbmp'); break;
+        case 'sgi':  blob = IO.encodeSGI(work);  filename = IO.suggestFilename(stamp, 'sgi'); break;
+        case 'ras':  blob = IO.encodeRAS(work);  filename = IO.suggestFilename(stamp, 'ras'); break;
+        case 'ff':   blob = IO.encodeFarbfeld(work); filename = IO.suggestFilename(stamp, 'ff'); break;
+        case 'cbz':  blob = await IO.encodeCbzFromCanvas(work); filename = IO.suggestFilename(stamp, 'cbz'); break;
+        default: throw new Error('Unknown format: ' + ext);
+      }
+      IO.triggerDownload(blob, filename);
+    } catch (e) {
+      console.error(e);
+      alert('Could not save .' + ext + ': ' + (e && e.message ? e.message : e));
+    }
+  });
+
   // ---- Autosave + restore ----
   let saveTimer = null;
   let autosaveWarned = false;

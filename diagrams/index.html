@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#1a8e9a" />
+  <title>RodmanVision</title>
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="stylesheet" href="styles.css" />
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(() => {});
+      });
+    }
+  </script>
+</head>
+<body>
+  <header class="title-bar">
+    <a class="rodmanoffice-back" href="../" title="Back to RodmanOffice apps" aria-label="Back to RodmanOffice apps">
+      <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M14 7l-5 5 5 5V7z"/></svg>
+      <span>Apps</span>
+    </a>
+    <div class="app-brand">
+      <div class="app-logo" aria-hidden="true">V</div>
+      <div class="app-title">
+        <input id="diagramTitle" class="doc-title" type="text" value="Untitled Diagram" aria-label="Diagram title" spellcheck="false" />
+        <span class="app-subtitle">RodmanVision</span>
+      </div>
+    </div>
+    <div class="title-actions">
+      <button
+        id="askClaudeBtn"
+        class="ask-claude"
+        type="button"
+        title="Ask Claude"
+        aria-label="Ask Claude"
+        aria-controls="askClaudePanel"
+        aria-expanded="false"
+      >&#129302; Ask Claude</button>
+      <span id="saveIndicator" class="save-indicator">Saved</span>
+      <button class="icon-btn" id="stencilToggleBtn" title="Toggle stencils" aria-label="Stencils">▦</button>
+      <button class="icon-btn" id="sideToggleBtn" title="Toggle properties" aria-label="Properties">⚙</button>
+      <button class="icon-btn" id="helpBtn" title="Help" aria-label="Help">?</button>
+    </div>
+  </header>
+
+  <aside id="askClaudePanel" class="claude-panel" aria-label="Ask Claude" hidden>
+    <header class="claude-panel-header">
+      <span>Ask Claude</span>
+      <button id="askClaudeCloseBtn" type="button" aria-label="Close Ask Claude panel">&times;</button>
+    </header>
+    <div class="claude-panel-body">
+      <div class="claude-panel-notice">
+        <label class="claude-api-key-row" for="askClaudeKey">
+          <span>Click here to enter a Claude API key to enable AI features</span>
+          <input id="askClaudeKey" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-..." />
+        </label>
+      </div>
+      <div class="claude-panel-intro">
+        <h3>Skip the menus - just ask.</h3>
+        <p>
+          Sketch diagrams in plain English. Claude can suggest layouts,
+          BPMN choices, and stencil ideas for your flow.
+        </p>
+        <p class="claude-panel-label">Try one of these:</p>
+        <div class="claude-panel-chips">
+          <button type="button" data-claude-prompt="What BPMN shape should I use for a parallel split?">What BPMN shape for a parallel split?</button>
+          <button type="button" data-claude-prompt="Suggest a clean flowchart for an order-fulfilment process.">Sketch an order-fulfilment flowchart.</button>
+          <button type="button" data-claude-prompt="Which network topology fits a small office with two switches?">Network topology for a small office?</button>
+          <button type="button" data-claude-prompt="Recommend a colour scheme that prints well in black and white.">B&amp;W-safe colour scheme.</button>
+        </div>
+      </div>
+    </div>
+    <div id="askClaudeOutput" class="claude-panel-output" aria-live="polite" hidden></div>
+    <form class="claude-panel-input">
+      <textarea id="askClaudeInput" rows="2" placeholder="Choose an example or type a prompt..."></textarea>
+      <button id="askClaudeSendBtn" type="submit" disabled>Send</button>
+    </form>
+  </aside>
+
+  <nav class="tabs" role="tablist" aria-label="Ribbon tabs">
+    <button class="tab" role="tab" data-tab="file">File</button>
+    <button class="tab active" role="tab" aria-selected="true" data-tab="home">Home</button>
+    <button class="tab" role="tab" data-tab="insert">Insert</button>
+    <button class="tab" role="tab" data-tab="design">Design</button>
+    <button class="tab" role="tab" data-tab="view">View</button>
+    <button class="tab" role="tab" data-tab="help">Help</button>
+  </nav>
+
+  <section class="ribbon" id="ribbon">
+    <!-- File -->
+    <div class="ribbon-panel" data-panel="file">
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn wide" data-cmd="newDiagram">New</button>
+          <button class="ribbon-btn wide" data-cmd="openDiagram">📂 Open…</button>
+        </div>
+        <div class="group-label">Diagram</div>
+      </div>
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn wide" data-cmd="showSaveDialog">💾 Save…</button>
+        </div>
+        <div class="group-row">
+          <button class="ribbon-btn" data-cmd="saveAsVsdx" title="Quick-save as VSDX">.vsdx</button>
+          <button class="ribbon-btn" data-cmd="saveAsSvg" title="Quick-save as SVG">.svg</button>
+          <button class="ribbon-btn" data-cmd="saveAsPng" title="Quick-save as PNG">.png</button>
+          <button class="ribbon-btn" data-cmd="saveAsPdf" title="Quick-save as PDF">.pdf</button>
+        </div>
+        <div class="group-label">Save / Export</div>
+      </div>
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn wide" data-cmd="resetDiagram" title="Wipe local storage and start fresh">Reset</button>
+        </div>
+        <div class="group-label">Danger</div>
+      </div>
+    </div>
+
+    <!-- Home -->
+    <div class="ribbon-panel active" data-panel="home">
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn" data-cmd="cut" title="Cut (Ctrl+X)">Cut</button>
+          <button class="ribbon-btn" data-cmd="copy" title="Copy (Ctrl+C)">Copy</button>
+          <button class="ribbon-btn" data-cmd="paste" title="Paste (Ctrl+V)">Paste</button>
+        </div>
+        <div class="group-label">Clipboard</div>
+      </div>
+
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn" data-cmd="undo" title="Undo (Ctrl+Z)">↶</button>
+          <button class="ribbon-btn" data-cmd="redo" title="Redo (Ctrl+Y)">↷</button>
+        </div>
+        <div class="group-label">History</div>
+      </div>
+
+      <div class="group">
+        <div class="group-row">
+          <select class="select" id="fontFamily" title="Font family">
+            <option value="">Theme font</option>
+            <option value="Calibri, Arial, sans-serif">Calibri</option>
+            <option value="'Segoe UI', sans-serif">Segoe UI</option>
+            <option value="Arial, sans-serif">Arial</option>
+            <option value="Georgia, serif">Georgia</option>
+            <option value="'Times New Roman', Times, serif">Times New Roman</option>
+            <option value="'Courier New', monospace">Courier New</option>
+          </select>
+          <select class="select sm" id="fontSize" title="Font size">
+            <option>9</option><option>10</option><option>11</option><option>12</option>
+            <option selected>14</option><option>16</option><option>18</option>
+            <option>20</option><option>24</option><option>28</option><option>32</option>
+          </select>
+        </div>
+        <div class="group-row">
+          <button class="ribbon-btn" data-cmd="bold" title="Bold (Ctrl+B)"><b>B</b></button>
+          <button class="ribbon-btn" data-cmd="italic" title="Italic (Ctrl+I)"><i>I</i></button>
+          <input class="color-input" type="color" id="textColor" title="Text color" value="#1F2937" />
+        </div>
+        <div class="group-label">Font</div>
+      </div>
+
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn" data-cmd="alignLeft" title="Align text left">⬅</button>
+          <button class="ribbon-btn" data-cmd="alignCenter" title="Align text center">⬌</button>
+          <button class="ribbon-btn" data-cmd="alignRight" title="Align text right">➡</button>
+        </div>
+        <div class="group-label">Paragraph</div>
+      </div>
+
+      <div class="group">
+        <div class="group-row">
+          <input class="color-input" type="color" id="shapeFill" title="Shape fill" value="#DAE3F3" />
+          <input class="color-input" type="color" id="shapeStroke" title="Shape stroke" value="#2E5597" />
+          <label class="select sm" style="display:inline-flex;align-items:center;gap:3px;border:1px solid var(--ribbon-border);padding:0 6px;background:#fff;">
+            Stroke <input type="number" id="shapeStrokeWidth" min="0" max="20" step="0.5" value="1.5" style="width:50px;border:0;font:inherit;background:transparent;" />
+          </label>
+        </div>
+        <div class="group-row">
+          <label class="select sm" style="display:inline-flex;align-items:center;gap:3px;border:1px solid var(--ribbon-border);padding:0 6px;background:#fff;">
+            Opacity <input type="range" id="shapeOpacity" min="0" max="100" value="100" style="width:80px;" />
+          </label>
+        </div>
+        <div class="group-label">Shape</div>
+      </div>
+
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn" data-cmd="bringForward" title="Bring forward">⤴</button>
+          <button class="ribbon-btn" data-cmd="sendBackward" title="Send backward">⤵</button>
+          <button class="ribbon-btn" data-cmd="group" title="Group (Ctrl+G)">Group</button>
+          <button class="ribbon-btn" data-cmd="ungroup" title="Ungroup (Ctrl+Shift+G)">Ungroup</button>
+        </div>
+        <div class="group-label">Arrange</div>
+      </div>
+
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn" data-cmd="duplicateSelection" title="Duplicate (Ctrl+D)">Duplicate</button>
+          <button class="ribbon-btn" data-cmd="deleteSelection" title="Delete (Del)">Delete</button>
+          <button class="ribbon-btn" data-cmd="selectAll" title="Select all (Ctrl+A)">All</button>
+        </div>
+        <div class="group-label">Editing</div>
+      </div>
+    </div>
+
+    <!-- Insert -->
+    <div class="ribbon-panel" data-panel="insert">
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn wide" data-cmd="addPage">+ Page</button>
+          <button class="ribbon-btn" data-cmd="duplicatePage" title="Duplicate page">⎘</button>
+          <button class="ribbon-btn" data-cmd="deletePage" title="Delete page">🗑</button>
+        </div>
+        <div class="group-label">Pages</div>
+      </div>
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn wide" data-cmd="toggleStencils">Stencil drawer</button>
+        </div>
+        <div class="group-label">Stencils</div>
+      </div>
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn" data-cmd="dropStencil" data-stencil="rectangle">Rect</button>
+          <button class="ribbon-btn" data-cmd="dropStencil" data-stencil="ellipse">Oval</button>
+          <button class="ribbon-btn" data-cmd="dropStencil" data-stencil="diamond">Diam</button>
+          <button class="ribbon-btn" data-cmd="dropStencil" data-stencil="flowProcess">Proc</button>
+          <button class="ribbon-btn" data-cmd="dropStencil" data-stencil="flowDecision">Dec</button>
+          <button class="ribbon-btn" data-cmd="dropStencil" data-stencil="bpmnStartEvent">Start</button>
+        </div>
+        <div class="group-label">Quick shapes</div>
+      </div>
+    </div>
+
+    <!-- Design -->
+    <div class="ribbon-panel" data-panel="design">
+      <div class="group">
+        <div class="group-row" id="themeStrip"><!-- populated by app.js --></div>
+        <div class="group-label">Themes</div>
+      </div>
+      <div class="group">
+        <div class="group-row">
+          <label class="select sm" style="display:inline-flex;align-items:center;gap:3px;border:1px solid var(--ribbon-border);padding:2px 6px;background:#fff;">
+            <input type="checkbox" id="snapToggle" checked /> Snap to grid
+          </label>
+          <label class="select sm" style="display:inline-flex;align-items:center;gap:3px;border:1px solid var(--ribbon-border);padding:2px 6px;background:#fff;">
+            <input type="checkbox" id="gridToggle" checked /> Show grid
+          </label>
+        </div>
+        <div class="group-row">
+          <select class="select" id="pageSizeSelect" title="Page size">
+            <option value="1100,850">Letter landscape (1100×850)</option>
+            <option value="850,1100">Letter portrait (850×1100)</option>
+            <option value="1280,720">16:9 widescreen (1280×720)</option>
+            <option value="1400,990">A4 landscape (1400×990)</option>
+            <option value="990,1400">A4 portrait (990×1400)</option>
+            <option value="2000,1500">Large (2000×1500)</option>
+          </select>
+          <input class="color-input" type="color" id="pageBgColor" title="Page background" value="#ffffff" />
+        </div>
+        <div class="group-label">Canvas</div>
+      </div>
+    </div>
+
+    <!-- View -->
+    <div class="ribbon-panel" data-panel="view">
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn" data-cmd="zoomOut" title="Zoom out">−</button>
+          <span id="zoomDisplay" class="zoom-display">100%</span>
+          <button class="ribbon-btn" data-cmd="zoomIn" title="Zoom in">+</button>
+          <button class="ribbon-btn" data-cmd="zoomFit" title="Fit to window">⤢</button>
+          <button class="ribbon-btn" data-cmd="zoom100" title="100% zoom">1:1</button>
+        </div>
+        <div class="group-label">Zoom</div>
+      </div>
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn wide" data-cmd="toggleStencils">Stencils panel</button>
+          <button class="ribbon-btn wide" data-cmd="toggleSidePane">Properties / Layers</button>
+        </div>
+        <div class="group-label">Panels</div>
+      </div>
+    </div>
+
+    <!-- Help -->
+    <div class="ribbon-panel" data-panel="help">
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn wide" data-cmd="showHelp">Keyboard shortcuts</button>
+          <button class="ribbon-btn wide" data-cmd="showAbout">About</button>
+          <button class="ribbon-btn wide" data-cmd="askClaude">Ask Claude</button>
+        </div>
+        <div class="group-label">Help</div>
+      </div>
+    </div>
+  </section>
+
+  <main class="workspace" id="workspace">
+    <aside class="stencil-pane" id="stencilPane" aria-label="Stencils">
+      <div class="stencil-search">
+        <input type="search" id="stencilSearch" placeholder="Search stencils…" aria-label="Search stencils" />
+      </div>
+      <div class="stencil-list" id="stencilList"><!-- populated by app.js --></div>
+    </aside>
+
+    <section class="canvas-area" id="canvasArea">
+      <div class="canvas-scroll" id="canvasScroll">
+        <div class="canvas-shadow" id="canvasShadow">
+          <!-- SVG canvas + selection overlays inserted by app.js -->
+        </div>
+      </div>
+      <div class="page-strip" id="pageStrip"><!-- page tabs populated by app.js --></div>
+    </section>
+
+    <aside class="side-pane" id="sidePane" aria-label="Properties and Layers">
+      <div class="side-pane-tabs">
+        <button class="side-pane-tab active" data-side-tab="properties">Properties</button>
+        <button class="side-pane-tab" data-side-tab="layers">Layers</button>
+      </div>
+      <div class="side-pane-body" id="sidePaneProps" data-side-body="properties">
+        <div class="props-empty" id="propsEmpty">Select a shape or connector to edit its properties.</div>
+        <div class="props-grid" id="propsGrid" hidden>
+          <div class="props-section-title">Geometry</div>
+          <label for="propX">X</label><input id="propX" type="number" step="1" />
+          <label for="propY">Y</label><input id="propY" type="number" step="1" />
+          <label for="propW">Width</label><input id="propW" type="number" step="1" min="10" />
+          <label for="propH">Height</label><input id="propH" type="number" step="1" min="10" />
+          <label for="propRot">Rotation</label><input id="propRot" type="number" step="1" min="0" max="360" />
+
+          <div class="props-section-title">Appearance</div>
+          <label for="propFill">Fill</label><input id="propFill" type="color" />
+          <label for="propStroke">Stroke</label><input id="propStroke" type="color" />
+          <label for="propStrokeWidth">Stroke px</label><input id="propStrokeWidth" type="number" step="0.5" min="0" max="20" />
+          <label for="propOpacity">Opacity</label><input id="propOpacity" type="range" min="0" max="100" />
+
+          <div class="props-section-title">Text</div>
+          <label for="propText">Label</label><input id="propText" type="text" />
+          <label for="propLayer">Layer</label><select id="propLayer"></select>
+        </div>
+      </div>
+      <div class="side-pane-body" id="sidePaneLayers" data-side-body="layers" hidden>
+        <div class="layers-toolbar">
+          <button id="addLayerBtn" type="button">+ Layer</button>
+          <button id="deleteLayerBtn" type="button">Delete</button>
+        </div>
+        <div id="layerList"></div>
+      </div>
+    </aside>
+  </main>
+
+  <footer class="status-bar">
+    <span id="statusPageCounter">Page 1 of 1</span>
+    <span id="statusSelection">No selection</span>
+    <span id="statusTheme">Office</span>
+    <span class="status-spacer"></span>
+    <span id="statusZoom">100%</span>
+  </footer>
+
+  <dialog class="save-dialog" id="saveDialog">
+    <form method="dialog">
+      <header>
+        <h3>Save diagram</h3>
+        <button type="button" id="saveDialogCloseBtn" aria-label="Close">&times;</button>
+      </header>
+      <div class="body">
+        <label>
+          Filename
+          <input id="saveDialogName" type="text" value="diagram" autocomplete="off" />
+        </label>
+        <label>
+          Format
+          <select id="saveDialogFormat">
+            <option value="vsdx" selected>VSDX — Visio drawing (.vsdx)</option>
+            <option value="svg">SVG — Scalable Vector Graphics (.svg)</option>
+            <option value="png">PNG — bitmap @ 2× DPI (.png)</option>
+            <option value="pdf">PDF — multi-page document (.pdf)</option>
+          </select>
+        </label>
+      </div>
+      <footer>
+        <button type="button" id="saveDialogCancelBtn">Cancel</button>
+        <button type="submit" class="primary" id="saveDialogSaveBtn">Save</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <input type="file" id="openFileInput" accept=".vsdx,.vsdm,.svg" hidden />
+
+  <div class="help-modal" id="helpInfoModal" hidden role="dialog" aria-modal="true" aria-labelledby="helpInfoTitle">
+    <div class="help-modal-card">
+      <header>
+        <h3 id="helpInfoTitle">RodmanVision help</h3>
+        <button class="icon-btn" id="helpInfoCloseBtn" type="button" aria-label="Close help">×</button>
+      </header>
+      <div class="help-modal-body" id="helpInfoBody"></div>
+      <footer>
+        <button class="ribbon-btn wide" id="helpInfoDoneBtn" type="button">Close</button>
+      </footer>
+    </div>
+  </div>
+
+  <script type="module">
+    // Bridge the shared /lib/diagrams/ engine onto window globals so
+    // the classic-script app.js below can use it without becoming a
+    // module itself. Mirrors the slides/word/image pattern.
+    import * as diagrams from '../lib/diagrams/index.js';
+    import * as claude from '../lib/claude/index.js';
+    window.RodmanDiagramsIO = {
+      saveVsdx: diagrams.saveVsdx,
+      loadVsdx: diagrams.loadVsdx,
+      exportSvg: diagrams.exportSvg,
+      exportPng: diagrams.exportPng,
+      exportPdf: diagrams.exportPdf,
+    };
+    window.RodmanStencils = {
+      STENCILS: diagrams.STENCILS,
+      CATEGORIES: diagrams.CATEGORIES,
+      getStencil: diagrams.getStencil,
+      stencilsByCategory: diagrams.stencilsByCategory,
+    };
+    window.RodmanDiagramThemes = {
+      THEMES: diagrams.THEMES,
+      getTheme: diagrams.getTheme,
+      applyThemeToDiagram: diagrams.applyThemeToDiagram,
+    };
+    window.RodmanClaude = claude;
+  </script>
+  <script src="diagram.js" defer></script>
+  <script src="render.js" defer></script>
+  <script src="app.js" defer></script>
+</body>
+</html>

@@ -33,6 +33,13 @@ const EXT_TABLE = {
   pptx: { family: 'slides', mime: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', ext: 'pptx' },
   ppt:  { family: 'slides', mime: 'application/vnd.ms-powerpoint', ext: 'ppt' },
 
+  // Diagrams (Visio)
+  vsdx: { family: 'diagram', mime: 'application/vnd.ms-visio.drawing',  ext: 'vsdx' },
+  vsdm: { family: 'diagram', mime: 'application/vnd.ms-visio.drawing.macroEnabled', ext: 'vsdm' },
+  vssx: { family: 'diagram', mime: 'application/vnd.ms-visio.stencil',  ext: 'vssx' },
+  vstx: { family: 'diagram', mime: 'application/vnd.ms-visio.template', ext: 'vstx' },
+  vsd:  { family: 'diagram', mime: 'application/vnd.visio',             ext: 'vsd' },
+
   // Video
   mp4:  { family: 'video', mime: 'video/mp4',         ext: 'mp4' },
   m4v:  { family: 'video', mime: 'video/mp4',         ext: 'mp4' },
