@@ -323,6 +323,21 @@
     setSaveIndicator('saved');
     bindImageAdjustSliders();
     bindAnimationControls();
+    // Two-finger pan + pinch-zoom on the editor scroll area. The
+    // helper only claims 2+ touches; single-finger element drags
+    // continue to fire through the existing pointerdown handlers.
+    if (window.RodmanGestures) {
+      const scroll = $('#editorScroll');
+      if (scroll) {
+        window.RodmanGestures.attachPanZoom(scroll, {
+          onPinch: (ratio) => {
+            state.autoFit = false;
+            state.zoom = Math.max(0.1, Math.min(4, state.zoom * ratio));
+            layoutEditor();
+          },
+        });
+      }
+    }
   }
 
   // ---------- Deck title ----------

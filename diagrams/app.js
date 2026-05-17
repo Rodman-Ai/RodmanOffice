@@ -2901,7 +2901,32 @@
     pushHistory();
     // Keep rulers redraw in sync with viewport changes.
     window.addEventListener('resize', () => { if (state.showRulers) renderRulers(); });
-    $('#canvasScroll')?.addEventListener('scroll', () => { if (state.showRulers) renderRulers(); });
+    $('#canvasScroll')?.addEventListener('scroll', () => {
+      if (state.showRulers) renderRulers();
+      if (!$('#miniMap')?.hidden) renderMiniMap();
+    });
+    // Two-finger pan + pinch-zoom on the canvas scroll container.
+    // The helper handles 2+ touches (pans scrollLeft/scrollTop) and
+    // wheel+ctrlKey (trackpad pinch). Single-finger touches and plain
+    // wheel events fall through to the existing handlers.
+    if (window.RodmanGestures) {
+      const scrollEl = $('#canvasScroll');
+      window.RodmanGestures.attachPanZoom(scrollEl, {
+        onPinch: (ratio, center) => {
+          const nextZoom = Math.max(0.2, Math.min(4, state.zoom * ratio));
+          if (nextZoom === state.zoom) return;
+          // Keep the pinch center stable in page coords across the
+          // zoom change so it feels anchored to the user's fingers.
+          const before = state.zoom;
+          const pageX = (scrollEl.scrollLeft + center.x) / before;
+          const pageY = (scrollEl.scrollTop + center.y) / before;
+          state.zoom = nextZoom;
+          renderCanvas();
+          scrollEl.scrollLeft = pageX * nextZoom - center.x;
+          scrollEl.scrollTop = pageY * nextZoom - center.y;
+        },
+      });
+    }
     // Resize fit-to-window on first paint
     setTimeout(() => commands.zoomFit(), 0);
   }
