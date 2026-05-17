@@ -923,6 +923,28 @@ body.format-painter-active .canvas-svg { cursor: crosshair; }
   font-size: 11px;
 }
 
+/* Mini-map ---------------------------------------------------------------- */
+#miniMap {
+  position: fixed;
+  right: 16px;
+  bottom: 36px;
+  background: #fff;
+  border: 1px solid var(--pane-border);
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 600;
+  cursor: pointer;
+  overflow: hidden;
+}
+#miniMap[hidden] { display: none; }
+#miniMap svg { display: block; pointer-events: none; }
+.minimap-viewport {
+  position: absolute;
+  border: 1.5px solid var(--primary);
+  background: rgba(26, 142, 154, 0.1);
+  pointer-events: none;
+}
+
 /* Mobile / small screens --------------------------------------------------- */
 @media (max-width: 720px) {
   body { font-size: 14px; }

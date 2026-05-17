@@ -292,6 +292,20 @@
     const shadow = $('#canvasShadow');
     shadow.innerHTML = '';
     const page = activePage();
+    // Background page composition: render the referenced page first
+    // at 40% opacity so the user can see what overlays which.
+    if (page.bgPageId) {
+      const bg = D.findPage(diagram, page.bgPageId);
+      if (bg) {
+        const bgSvg = R.renderPage(bg, diagram.layers, { showGrid: false });
+        bgSvg.setAttribute('opacity', '0.4');
+        bgSvg.style.position = 'absolute';
+        bgSvg.style.left = '0';
+        bgSvg.style.top = '0';
+        bgSvg.style.pointerEvents = 'none';
+        shadow.appendChild(bgSvg);
+      }
+    }
     const svg = R.renderPage(page, diagram.layers, { showGrid: state.showGrid });
     shadow.appendChild(svg);
     shadow.style.width = page.w + 'px';
@@ -307,6 +321,7 @@
     renderRulers();
     renderPageStrip();
     updateStatusBar();
+    renderMiniMap();
   }
 
   // ---------- Rulers ----------
@@ -1493,6 +1508,89 @@
       renderCanvas();
     },
 
+    // ---------- Phase 5: export + integrations ----------
+    showThemeBuilder() {
+      const dlg = $('#themeBuilderDialog');
+      // Seed with current theme defaults.
+      const theme = THEMES_MOD.getTheme(diagram.theme);
+      $('#themeBuilderName').value = 'My Theme';
+      $('#themeBuilderFill').value = ensureHex(theme.fill);
+      $('#themeBuilderStroke').value = ensureHex(theme.stroke);
+      $('#themeBuilderText').value = ensureHex(theme.textColor);
+      $('#themeBuilderBg').value = ensureHex(theme.pageBg);
+      $('#themeBuilderFont').value = theme.fontFamily || 'Segoe UI, sans-serif';
+      if (typeof dlg.showModal === 'function') dlg.showModal();
+      else dlg.setAttribute('open', '');
+    },
+    saveCustomTheme(e) {
+      if (e) e.preventDefault();
+      const name = $('#themeBuilderName').value.trim() || 'My Theme';
+      const theme = {
+        id: 'custom-' + Date.now().toString(36),
+        name,
+        palette: [
+          $('#themeBuilderFill').value, $('#themeBuilderStroke').value,
+          $('#themeBuilderText').value, $('#themeBuilderBg').value,
+          '#9ca3af', '#e5e7eb',
+        ],
+        fill: $('#themeBuilderFill').value,
+        stroke: $('#themeBuilderStroke').value,
+        textColor: $('#themeBuilderText').value,
+        pageBg: $('#themeBuilderBg').value,
+        fontFamily: $('#themeBuilderFont').value || 'Segoe UI, sans-serif',
+      };
+      // Persist + inject.
+      const custom = loadCustomThemes();
+      custom.push(theme);
+      saveCustomThemes(custom);
+      THEMES_MOD.THEMES.push(theme);
+      diagram.theme = theme.id;
+      THEMES_MOD.applyThemeToDiagram(diagram);
+      scheduleSave();
+      renderThemeStrip();
+      renderCanvas();
+      $('#themeBuilderDialog').close();
+    },
+    setBackgroundPage() {
+      const page = activePage();
+      const opts = diagram.pages.filter((p) => p.id !== page.id).map((p, i) => `${i + 1}: ${p.name}`).join('\n');
+      const pick = prompt('Use which page as background?\n0: none\n' + opts, '0');
+      const n = parseInt(pick, 10);
+      if (n === 0) { delete page.bgPageId; }
+      else {
+        const others = diagram.pages.filter((p) => p.id !== page.id);
+        const target = others[n - 1];
+        if (target) page.bgPageId = target.id;
+      }
+      scheduleSave();
+      renderCanvas();
+    },
+    setDrawingScale() {
+      const page = activePage();
+      const scaleStr = prompt('Drawing scale (e.g. "1in=1ft", "1cm=1m"). Empty to clear.', page.scale ? `${page.scale.value}${page.scale.unitFrom}=${page.scale.value}${page.scale.unitTo}` : '');
+      if (scaleStr === null) return;
+      if (!scaleStr.trim()) {
+        delete page.scale;
+      } else {
+        const m = scaleStr.match(/^\s*(\d*\.?\d+)\s*(\w+)\s*=\s*(\d*\.?\d+)\s*(\w+)\s*$/);
+        if (!m) { alert('Could not parse. Try "1in=1ft".'); return; }
+        page.scale = {
+          value: parseFloat(m[1]),
+          unitFrom: m[2],
+          ratio: parseFloat(m[3]) / parseFloat(m[1]),
+          unitTo: m[4],
+        };
+      }
+      scheduleSave();
+      renderCanvas();
+    },
+    toggleMiniMap() {
+      const mm = $('#miniMap');
+      if (!mm) return;
+      mm.hidden = !mm.hidden;
+      if (!mm.hidden) renderMiniMap();
+    },
+
     // ---------- Phase 4: data, validation, comments ----------
     addShapeDataField() {
       if (state.selectedShapeIds.size !== 1) return;
@@ -1842,6 +1940,69 @@
     }
     if (count) { scheduleSave(); renderCanvas(); }
     return count;
+  }
+
+  // ---------- Phase 5 helpers ----------
+  const CUSTOM_THEMES_KEY = 'vision.themes.custom.v1';
+  function loadCustomThemes() {
+    try {
+      const raw = localStorage.getItem(CUSTOM_THEMES_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch (_) { return []; }
+  }
+  function saveCustomThemes(arr) {
+    try { localStorage.setItem(CUSTOM_THEMES_KEY, JSON.stringify(arr)); } catch (_) {}
+  }
+  // Inject any user themes from a previous session at module init.
+  (function injectCustomThemesOnBoot() {
+    const themes = loadCustomThemes();
+    for (const t of themes) {
+      if (!THEMES_MOD.THEMES.find((x) => x.id === t.id)) THEMES_MOD.THEMES.push(t);
+    }
+  })();
+
+  function renderMiniMap() {
+    const mm = $('#miniMap');
+    if (!mm || mm.hidden) return;
+    const page = activePage();
+    const targetW = 160, targetH = 100;
+    const scale = Math.min(targetW / page.w, targetH / page.h);
+    const w = page.w * scale, h = page.h * scale;
+    mm.innerHTML = '';
+    mm.style.width = w + 'px';
+    mm.style.height = h + 'px';
+    const ns = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('viewBox', `0 0 ${page.w} ${page.h}`);
+    svg.setAttribute('width', w);
+    svg.setAttribute('height', h);
+    svg.innerHTML = `<rect x="0" y="0" width="${page.w}" height="${page.h}" fill="${page.bg || '#fff'}" />` +
+      page.shapes.map((s) =>
+        `<rect x="${s.x}" y="${s.y}" width="${s.w}" height="${s.h}" fill="${s.fill || '#888'}" stroke="${s.stroke || '#444'}" stroke-width="2" />`
+      ).join('');
+    mm.appendChild(svg);
+    // Viewport rect.
+    const scroll = $('#canvasScroll');
+    const vpRect = document.createElement('div');
+    vpRect.className = 'minimap-viewport';
+    const vx = (scroll.scrollLeft / state.zoom) * scale;
+    const vy = (scroll.scrollTop / state.zoom) * scale;
+    const vw = (scroll.clientWidth / state.zoom) * scale;
+    const vh = (scroll.clientHeight / state.zoom) * scale;
+    vpRect.style.left = vx + 'px';
+    vpRect.style.top = vy + 'px';
+    vpRect.style.width = vw + 'px';
+    vpRect.style.height = vh + 'px';
+    mm.appendChild(vpRect);
+    // Click to recenter the viewport on the click point.
+    mm.onclick = (e) => {
+      const rect = mm.getBoundingClientRect();
+      const cx = (e.clientX - rect.left) / scale;
+      const cy = (e.clientY - rect.top) / scale;
+      scroll.scrollLeft = (cx * state.zoom) - scroll.clientWidth / 2;
+      scroll.scrollTop = (cy * state.zoom) - scroll.clientHeight / 2;
+      renderMiniMap();
+    };
   }
 
   // ---------- Phase 4 helpers ----------
@@ -2438,13 +2599,60 @@
         case 'vsdx': blob = IO.saveVsdx(diagram); ext = 'vsdx'; break;
         case 'svg':  blob = new Blob([IO.exportSvg(diagram)], { type: 'image/svg+xml' }); ext = 'svg'; break;
         case 'png':  blob = await IO.exportPng(diagram, { scale: 2 }); ext = 'png'; break;
-        case 'pdf':  blob = await IO.exportPdf(diagram); ext = 'pdf'; break;
+        case 'pdf':
+          blob = $('#saveTiledChk')?.checked
+            ? await exportPdfTiled(diagram)
+            : await IO.exportPdf(diagram);
+          ext = 'pdf';
+          break;
+        case 'docx': blob = await IO.exportDocx(diagram); ext = 'docx'; break;
+        case 'pptx': blob = await IO.exportPptx(diagram); ext = 'pptx'; break;
+        case 'html': blob = IO.exportHtml(diagram); ext = 'html'; break;
+        case 'md':   blob = await IO.exportMarkdown(diagram); ext = 'md'; break;
+        case 'dxf':  blob = IO.exportDxf(diagram); ext = 'dxf'; break;
         default: throw new Error('Unknown format: ' + format);
       }
       downloadBlob(blob, `${name}.${ext}`);
     } catch (err) {
       alert(`Save as .${format} failed: ${err.message || err}`);
     }
+  }
+
+  // Tiled PDF print: chop a page into Letter-sized tiles, render each
+  // as PNG, and embed them as a multi-page PDF where each PDF page is
+  // one tile. Useful when a diagram is larger than a single sheet.
+  async function exportPdfTiled(diagram) {
+    const tilePxW = 11 * 96;   // landscape Letter at 96 DPI
+    const tilePxH = 8.5 * 96;
+    // Build a transient diagram of just the tile crops by cloning
+    // the original and shifting shapes per tile.
+    const PT_PER_IN = 72;
+    const pageWpt = 11 * PT_PER_IN;
+    const pageHpt = 8.5 * PT_PER_IN;
+    const html = [];
+    for (let pi = 0; pi < diagram.pages.length; pi++) {
+      const page = diagram.pages[pi];
+      const cols = Math.max(1, Math.ceil(page.w / tilePxW));
+      const rows = Math.max(1, Math.ceil(page.h / tilePxH));
+      for (let ry = 0; ry < rows; ry++) {
+        for (let cx = 0; cx < cols; cx++) {
+          const blob = await IO.exportPng(diagram, { pageIndex: pi, scale: 2 });
+          const url = await new Promise((res, rej) => {
+            const r = new FileReader();
+            r.onload = () => res(r.result);
+            r.onerror = rej;
+            r.readAsDataURL(blob);
+          });
+          html.push(`<div style="page-break-after: always; width: 11in; height: 8.5in; overflow: hidden;">`
+            + `<img src="${url}" style="margin-left:${-cx * 11}in;margin-top:${-ry * 8.5}in;width:${cols * 11}in;height:${rows * 8.5}in;display:block;" />`
+            + `</div>`);
+        }
+      }
+    }
+    return window.RodmanDocs.savePdf(html.join(''), {
+      title: diagram.title || 'Diagram',
+      pageW: pageWpt, pageH: pageHpt, margin: 0,
+    });
   }
 
   function downloadBlob(blob, filename) {

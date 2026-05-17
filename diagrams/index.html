@@ -323,6 +323,9 @@
     <div class="ribbon-panel" data-panel="design">
       <div class="group">
         <div class="group-row" id="themeStrip"><!-- populated by app.js --></div>
+        <div class="group-row">
+          <button class="ribbon-btn" data-cmd="showThemeBuilder" title="Build a custom theme">+ Theme…</button>
+        </div>
         <div class="group-label">Themes</div>
       </div>
       <div class="group">
@@ -344,6 +347,10 @@
             <option value="2000,1500">Large (2000×1500)</option>
           </select>
           <input class="color-input" type="color" id="pageBgColor" title="Page background" value="#ffffff" />
+        </div>
+        <div class="group-row">
+          <button class="ribbon-btn" data-cmd="setBackgroundPage" title="Apply another page as background of this one">Background…</button>
+          <button class="ribbon-btn" data-cmd="setDrawingScale" title="Set drawing scale (e.g. 1in=1ft)">Scale…</button>
         </div>
         <div class="group-label">Canvas</div>
       </div>
@@ -370,6 +377,7 @@
           <label class="select sm" style="display:inline-flex;align-items:center;gap:3px;border:1px solid var(--ribbon-border);padding:2px 6px;background:#fff;">
             <input type="checkbox" id="rulersToggle" /> Rulers
           </label>
+          <button class="ribbon-btn" data-cmd="toggleMiniMap" title="Mini-map (pan thumbnail)">⊞ Mini-map</button>
         </div>
         <div class="group-label">Panels</div>
       </div>
@@ -471,7 +479,16 @@
             <option value="svg">SVG — Scalable Vector Graphics (.svg)</option>
             <option value="png">PNG — bitmap @ 2× DPI (.png)</option>
             <option value="pdf">PDF — multi-page document (.pdf)</option>
+            <option value="docx">DOCX — Word doc with embedded pages</option>
+            <option value="pptx">PPTX — PowerPoint, one slide per page</option>
+            <option value="html">HTML — single-file interactive</option>
+            <option value="md">Markdown — embedded base64 PNG</option>
+            <option value="dxf">DXF — AutoCAD wireframe</option>
           </select>
+        </label>
+        <label style="display:flex;flex-direction:row;align-items:center;gap:6px;">
+          <input id="saveTiledChk" type="checkbox" />
+          Tile large pages across PDF page size (PDF only)
         </label>
       </div>
       <footer>
@@ -482,6 +499,29 @@
   </dialog>
 
   <input type="file" id="openFileInput" accept=".vsdx,.vsdm,.svg" hidden />
+
+  <div id="miniMap" hidden></div>
+
+  <dialog class="save-dialog" id="themeBuilderDialog">
+    <form method="dialog">
+      <header>
+        <h3>Build a custom theme</h3>
+        <button type="button" aria-label="Close" onclick="this.closest('dialog').close()">&times;</button>
+      </header>
+      <div class="body">
+        <label>Name <input id="themeBuilderName" type="text" value="My Theme" /></label>
+        <label>Fill <input id="themeBuilderFill" type="color" /></label>
+        <label>Stroke <input id="themeBuilderStroke" type="color" /></label>
+        <label>Text color <input id="themeBuilderText" type="color" /></label>
+        <label>Page background <input id="themeBuilderBg" type="color" /></label>
+        <label>Font family <input id="themeBuilderFont" type="text" /></label>
+      </div>
+      <footer>
+        <button type="button" onclick="this.closest('dialog').close()">Cancel</button>
+        <button type="submit" class="primary" data-cmd="saveCustomTheme">Save theme</button>
+      </footer>
+    </form>
+  </dialog>
 
   <dialog class="save-dialog" id="csvImportDialog">
     <form method="dialog">
@@ -558,6 +598,8 @@
     // the classic-script app.js below can use it without becoming a
     // module itself. Mirrors the slides/word/image pattern.
     import * as diagrams from '../lib/diagrams/index.js';
+    import * as docs from '../lib/docs/index.js';
+    import * as slides from '../lib/slides/index.js';
     import * as claude from '../lib/claude/index.js';
     window.RodmanDiagramsIO = {
       saveVsdx: diagrams.saveVsdx,
@@ -565,7 +607,13 @@
       exportSvg: diagrams.exportSvg,
       exportPng: diagrams.exportPng,
       exportPdf: diagrams.exportPdf,
+      exportHtml: diagrams.exportHtml,
+      exportMarkdown: diagrams.exportMarkdown,
+      exportDxf: diagrams.exportDxf,
+      exportDocx: (d) => diagrams.exportDocx(d, docs),
+      exportPptx: (d) => diagrams.exportPptx(d, slides),
     };
+    window.RodmanDocs = { savePdf: docs.savePdf, saveDocx: docs.saveDocx };
     window.RodmanStencils = {
       STENCILS: diagrams.STENCILS,
       CATEGORIES: diagrams.CATEGORIES,
