@@ -601,6 +601,7 @@
     import * as docs from '../lib/docs/index.js';
     import * as slides from '../lib/slides/index.js';
     import * as claude from '../lib/claude/index.js';
+    import * as gestures from '../lib/ui/gestures.js';
     window.RodmanDiagramsIO = {
       saveVsdx: diagrams.saveVsdx,
       loadVsdx: diagrams.loadVsdx,
@@ -614,6 +615,7 @@
       exportPptx: (d) => diagrams.exportPptx(d, slides),
     };
     window.RodmanDocs = { savePdf: docs.savePdf, saveDocx: docs.saveDocx };
+    window.RodmanGestures = gestures;
     window.RodmanStencils = {
       STENCILS: diagrams.STENCILS,
       CATEGORIES: diagrams.CATEGORIES,

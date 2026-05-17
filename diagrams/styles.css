@@ -419,6 +419,9 @@ body {
   border-radius: 2px;
   position: relative;
   transform-origin: top left;
+  /* Two-finger gestures are handled by lib/ui/gestures.js, which
+     pans the parent .canvas-scroll and pinches state.zoom. */
+  touch-action: none;
 }
 .canvas-svg { display: block; }
 

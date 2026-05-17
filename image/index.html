@@ -276,6 +276,8 @@
     // order — so this shim runs before menus.js / app.js below.
     import * as imageio from '../lib/images/index.js';
     import * as claude from '../lib/claude/index.js';
+    import * as gestures from '../lib/ui/gestures.js';
+    window.RodmanGestures = gestures;
     window.IO = {
       decodeFile: imageio.decodeFile,
       decodeBlob: imageio.decodeBlob,
