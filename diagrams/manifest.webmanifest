@@ -1,6 +1,6 @@
 {
-  "name": "RodmanDiagrams",
-  "short_name": "RodmanDiagrams",
+  "name": "RodmanVision",
+  "short_name": "RodmanVision",
   "description": "Browser-based Visio clone — VSDX read/write, runs offline, no backend.",
   "start_url": "./",
   "scope": "./",

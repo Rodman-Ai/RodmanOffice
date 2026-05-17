@@ -1,18 +1,18 @@
 # RodmanOffice — orientation for Claude
 
-A static, browser-first office suite (Word + Sheets + Slides + Image
-editor + Diagrams + Converter + Accounting + CRM) that runs from
-GitHub Pages with no app-specific build step for most surfaces. Every
-file format the suite speaks is implemented from scratch under
-`/lib/`.
+A static, browser-first office suite (Word + Sheets + Slides +
+Diagrams (RodmanVision) + Image editor + Converter + Accounting +
+CRM) that runs from GitHub Pages with no app-specific build step
+for most surfaces. Every file format the suite speaks is
+implemented from scratch under `/lib/`.
 
 ## Layout
 
 ```
 /word/        Vanilla HTML + ESM word processor
 /slides/      Vanilla HTML + ESM presentation editor
+/diagrams/    Vanilla HTML + ESM Visio-clone (VSDX read/write) — RodmanVision
 /image/       Vanilla HTML + ESM image editor (RetroPaint inside)
-/diagrams/    Vanilla HTML + ESM Visio-clone (VSDX read/write)
 /converter/   Vanilla HTML + ESM batch file converter
 /accounting/  Vanilla HTML + ESM bookkeeping app
 /crm/         Vanilla HTML + ESM contacts / deals app

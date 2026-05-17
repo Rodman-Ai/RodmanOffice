@@ -1,4 +1,4 @@
-/* RodmanDiagrams — main app.
+/* RodmanVision — main app.
  *
  * Three-tier state:
  *   1. window.RodmanDiagram — pure data model + storage helpers
@@ -762,7 +762,7 @@
     });
     $('#deleteLayerBtn').addEventListener('click', () => {
       if (diagram.layers.length <= 1) {
-        alert('Diagrams need at least one layer.');
+        alert('A diagram needs at least one layer.');
         return;
       }
       const id = diagram.activeLayerId;
@@ -1039,8 +1039,8 @@
         '</ul>');
     },
     showAbout() {
-      showHelpModal('About RodmanDiagrams',
-        '<p>RodmanDiagrams is a browser-first Visio clone. Native format is VSDX (Visio OOXML/ZIP) — files round-trip cleanly with Microsoft Visio and LibreOffice Draw. Also exports to SVG, PNG and multi-page PDF.</p>' +
+      showHelpModal('About RodmanVision',
+        '<p>RodmanVision is a browser-first Visio clone. Native format is VSDX (Visio OOXML/ZIP) — files round-trip cleanly with Microsoft Visio and LibreOffice Draw. Also exports to SVG, PNG and multi-page PDF.</p>' +
         `<p><a href="${HELP_REPO_URL}" target="_blank" rel="noopener">Source on GitHub</a></p>`);
     },
     askClaude() {
@@ -1320,7 +1320,7 @@
       try {
         const result = await window.RodmanClaude.sendClaudeMessage({
           apiKey,
-          system: 'You are Claude inside RodmanDiagrams. Help the user design clear diagrams — flowcharts, BPMN, network topologies, and Visio-style drawings. Propose shape choices, layout improvements, and labels the user can apply manually. Be concise.',
+          system: 'You are Claude inside RodmanVision. Help the user design clear diagrams — flowcharts, BPMN, network topologies, and Visio-style drawings. Propose shape choices, layout improvements, and labels the user can apply manually. Be concise.',
           messages: [{ role: 'user', content: prompt }],
         });
         setOutput(result.text || 'Claude returned an empty response.');

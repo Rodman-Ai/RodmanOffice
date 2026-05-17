@@ -1,4 +1,4 @@
-// RodmanDiagrams — DOM renderer for the editor canvas.
+// RodmanVision — DOM renderer for the editor canvas.
 //
 // We don't render via the engine's exportSvg() here because the
 // editor needs interactive overlays (selection handles, port dots,

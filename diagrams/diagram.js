@@ -1,5 +1,6 @@
-// RodmanDiagrams — diagram data model + localStorage persistence.
-// Single global: window.RodmanDiagram.
+// RodmanVision — diagram data model + localStorage persistence.
+// Single global: window.RodmanDiagram (kept brand-neutral to match
+// engine naming under /lib/diagrams/).
 (function () {
   'use strict';
 
@@ -90,14 +91,14 @@
   }
 
   // ---------- localStorage persistence ----------
-  const STORAGE_KEY = 'diagrams.diagram.v1';
+  const STORAGE_KEY = 'vision.diagram.v1';
 
   function save(diagram) {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(diagram));
       return true;
     } catch (e) {
-      console.warn('RodmanDiagrams: autosave failed', e);
+      console.warn('RodmanVision:autosave failed', e);
       return false;
     }
   }
@@ -110,7 +111,7 @@
       if (!obj || obj.schema !== SCHEMA) return null;
       return obj;
     } catch (e) {
-      console.warn('RodmanDiagrams: load failed', e);
+      console.warn('RodmanVision:load failed', e);
       return null;
     }
   }

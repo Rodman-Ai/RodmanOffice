@@ -1,6 +1,6 @@
 # lib/diagrams — VSDX read/write + stencil library
 
-Shared engine powering `/diagrams/`. Pure JS with JSDoc types; no
+Shared engine powering `/diagrams/` (RodmanVision). Pure JS with JSDoc types; no
 vendor blobs, no npm packages — only `lib/docs/docx.js` is reused
 for its hand-rolled `buildZip` / `readZip` (the same primitives the
 PPTX engine builds on).
@@ -45,7 +45,7 @@ cleanly in Microsoft Visio 2013+ and LibreOffice Draw 7+:
 - `Shape` elements with `PinX`/`PinY`/`Width`/`Height`/`Angle` cells
 - A generic rectangular `Geometry` section per shape (Visio renders
   the bounding rect; the original stencil id is preserved in an XML
-  comment so RodmanDiagrams can re-render the exact stencil on
+  comment so RodmanVision can re-render the exact stencil on
   re-import).
 - `Connect` table linking dynamic connectors to their endpoint
   shapes.
