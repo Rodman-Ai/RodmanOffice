@@ -15,6 +15,7 @@ import * as docs from '../lib/docs/index.js';
 import * as images from '../lib/images/index.js';
 import * as sheets from '../lib/sheets/index.js';
 import * as slides from '../lib/slides/index.js';
+import * as diagrams from '../lib/diagrams/index.js';
 // lib/video pulls in the FFmpeg.wasm vendor blob (~25 MB) the
 // first time any of its functions are called. We deliberately
 // import it lazily inside runVideo() so the converter shell
@@ -483,6 +484,44 @@ async function runSlides(source, target) {
 }
 
 // deckToHtml is imported from lib/slides/html-bridge.js (see above).
+
+// ---------- Diagram family (VSDX read; SVG / PNG / PDF export) ----------
+//
+// VSDX is a ZIP package like DOCX/PPTX, so magic-sniff alone can't
+// tell them apart from extension. We rely on `detect.js` extension
+// tables for routing, then dispatch here based on the chosen target.
+// VSDX → VSDX is a pass-through. The other targets re-use the
+// engine's SVG / PNG / PDF exporters.
+async function runDiagram(source, target) {
+  const sourceExt = (source.name.split('.').pop() || '').toLowerCase();
+  if (target.ext === 'vsdx' && (sourceExt === 'vsdx' || sourceExt === 'vsdm')) {
+    return { bytes: source.bytes, mime: target.mime };
+  }
+  const diagram = await diagrams.loadVsdx(source.bytes);
+  switch (target.ext) {
+    case 'vsdx': {
+      const blob = diagrams.saveVsdx(diagram);
+      const bytes = await blobToBytes(blob);
+      return { bytes: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), mime: target.mime };
+    }
+    case 'svg': {
+      const svg = diagrams.exportSvg(diagram);
+      const bytes = TXT_ENC.encode(svg);
+      return { bytes: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), mime: target.mime };
+    }
+    case 'png': {
+      const blob = await diagrams.exportPng(diagram, { scale: 2 });
+      const bytes = await blobToBytes(blob);
+      return { bytes: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), mime: target.mime };
+    }
+    case 'pdf': {
+      const blob = await diagrams.exportPdf(diagram);
+      const bytes = await blobToBytes(blob);
+      return { bytes: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), mime: target.mime };
+    }
+    default: throw new Error(`Unsupported diagram output: .${target.ext}`);
+  }
+}
 
 // ---------- Video family (FFmpeg.wasm; lazy-loaded) ----------
 //
@@ -1266,6 +1305,7 @@ async function convertAll() {
           case 'spreadsheet': output = await runSheet(source, item.target); break;
           case 'image':       output = await runImage(source, item.target, item.options); break;
           case 'slides':      output = await runSlides(source, item.target); break;
+          case 'diagram':     output = await runDiagram(source, item.target); break;
           case 'video': {
             // Surface the wasm download status the very first time
             // any video job runs; the engine memoizes the load so

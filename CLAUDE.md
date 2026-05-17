@@ -1,9 +1,10 @@
 # RodmanOffice — orientation for Claude
 
 A static, browser-first office suite (Word + Sheets + Slides + Image
-editor + Converter + Accounting + CRM) that runs from GitHub Pages
-with no app-specific build step for most surfaces. Every file format
-the suite speaks is implemented from scratch under `/lib/`.
+editor + Diagrams + Converter + Accounting + CRM) that runs from
+GitHub Pages with no app-specific build step for most surfaces. Every
+file format the suite speaks is implemented from scratch under
+`/lib/`.
 
 ## Layout
 
@@ -11,6 +12,7 @@ the suite speaks is implemented from scratch under `/lib/`.
 /word/        Vanilla HTML + ESM word processor
 /slides/      Vanilla HTML + ESM presentation editor
 /image/       Vanilla HTML + ESM image editor (RetroPaint inside)
+/diagrams/    Vanilla HTML + ESM Visio-clone (VSDX read/write)
 /converter/   Vanilla HTML + ESM batch file converter
 /accounting/  Vanilla HTML + ESM bookkeeping app
 /crm/         Vanilla HTML + ESM contacts / deals app
@@ -20,6 +22,7 @@ the suite speaks is implemented from scratch under `/lib/`.
   /lib/docs/      DOCX, PDF, RTF, ODT, EPUB, MD, HTML, …
   /lib/sheets/    CSV, TSV, XLSX, JSON, NDJSON, YAML, vCard, iCal …
   /lib/slides/    PPTX read/write + the deckToHtml ↔ htmlToDeck bridge
+  /lib/diagrams/  VSDX read/write + 52-shape stencil library + SVG/PNG/PDF export
   /lib/images/    Canvas encoders for ~25 image formats + PDF + PSD
   /lib/video/     FFmpeg.wasm wrapper for video / audio transcoding
   /lib/claude/    Anthropic API client used by every "Ask Claude" panel
@@ -35,8 +38,8 @@ the suite support":
 
 - **`converter/matrix.js`** — every write target, grouped by family.
   `DOC_OUTPUTS`, `SHEET_OUTPUTS`, `IMAGE_OUTPUTS`, `SLIDES_OUTPUTS`,
-  `VIDEO_OUTPUTS`, `AUDIO_OUTPUTS`, `SUBTITLE_OUTPUTS`. Each entry is
-  `{ ext, mime, label, [outputExt] }`.
+  `DIAGRAM_OUTPUTS`, `VIDEO_OUTPUTS`, `AUDIO_OUTPUTS`,
+  `SUBTITLE_OUTPUTS`. Each entry is `{ ext, mime, label, [outputExt] }`.
 - **`converter/detect.js`** — every input format we can identify by
   extension, plus a `magicSniff()` for byte-prefix tiebreaking.
 
