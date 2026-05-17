@@ -166,16 +166,75 @@
   }
 
   // ---------- Stencil drawer ----------
+  const FAVORITES_KEY = 'vision.favorites.v1';
+  function loadFavorites() {
+    try {
+      const raw = localStorage.getItem(FAVORITES_KEY);
+      const arr = raw ? JSON.parse(raw) : [];
+      return Array.isArray(arr) ? arr.filter((id) => STENCILS.STENCILS[id]) : [];
+    } catch (_) { return []; }
+  }
+  function saveFavorites(arr) {
+    try { localStorage.setItem(FAVORITES_KEY, JSON.stringify(arr)); } catch (_) {}
+  }
+
+  // Fuzzy match: subsequence of query chars in name (case-insensitive).
+  // Returns rank score (lower = better, 0 = exact substring) or -1 if no
+  // match. Exact substring beats fuzzy; acronym match (initials of words)
+  // beats arbitrary subsequence.
+  function fuzzyScore(haystack, needle) {
+    const h = haystack.toLowerCase();
+    const n = needle.toLowerCase();
+    if (!n) return 0;
+    const sub = h.indexOf(n);
+    if (sub !== -1) return sub;
+    // Acronym match: first letter of each word.
+    const acronym = h.split(/[\s\-_]+/).map((w) => w[0] || '').join('');
+    if (acronym.startsWith(n)) return 100;
+    // Subsequence match.
+    let i = 0, j = 0, gaps = 0;
+    while (i < h.length && j < n.length) {
+      if (h[i] === n[j]) { j++; if (i > 0 && h[i - 1] !== n[j - 2]) gaps++; }
+      i++;
+    }
+    return j === n.length ? 1000 + gaps : -1;
+  }
+
   function renderStencilDrawer() {
     const list = $('#stencilList');
     list.innerHTML = '';
     const groups = STENCILS.stencilsByCategory();
-    const filter = ($('#stencilSearch').value || '').trim().toLowerCase();
+    const filter = ($('#stencilSearch').value || '').trim();
+    const favorites = loadFavorites();
+
+    // Favorites pseudo-category (only when populated)
+    if (favorites.length && !filter) {
+      const wrap = document.createElement('div');
+      wrap.className = 'stencil-category';
+      const header = document.createElement('div');
+      header.className = 'stencil-category-header';
+      header.textContent = '★ Favorites';
+      header.addEventListener('click', () => wrap.classList.toggle('collapsed'));
+      wrap.appendChild(header);
+      const grid = document.createElement('div');
+      grid.className = 'stencil-grid';
+      for (const id of favorites) {
+        const stencil = STENCILS.getStencil(id);
+        if (stencil) grid.appendChild(makeStencilTile(stencil, true));
+      }
+      wrap.appendChild(grid);
+      list.appendChild(wrap);
+    }
 
     for (const cat of STENCILS.CATEGORIES) {
-      const items = groups[cat].filter((s) =>
-        !filter || s.name.toLowerCase().includes(filter) || s.id.toLowerCase().includes(filter)
-      );
+      let items = groups[cat] || [];
+      if (filter) {
+        items = items
+          .map((s) => ({ s, score: Math.max(fuzzyScore(s.name, filter), fuzzyScore(s.id, filter)) }))
+          .filter((x) => x.score >= 0)
+          .sort((a, b) => a.score - b.score)
+          .map((x) => x.s);
+      }
       if (!items.length) continue;
       const wrap = document.createElement('div');
       wrap.className = 'stencil-category';
@@ -186,31 +245,41 @@
       wrap.appendChild(header);
       const grid = document.createElement('div');
       grid.className = 'stencil-grid';
-      for (const stencil of items) {
-        const tile = document.createElement('div');
-        tile.className = 'stencil-tile';
-        tile.draggable = true;
-        tile.dataset.stencil = stencil.id;
-        tile.title = stencil.name;
-        const thumb = R.renderStencilThumb(stencil, 36);
-        tile.appendChild(thumb);
-        const name = document.createElement('div');
-        name.className = 'stencil-tile-name';
-        name.textContent = stencil.name;
-        tile.appendChild(name);
-        tile.addEventListener('dragstart', (e) => {
-          e.dataTransfer.setData('application/x-rodman-stencil', stencil.id);
-          e.dataTransfer.effectAllowed = 'copy';
-        });
-        tile.addEventListener('click', () => {
-          // click-to-drop at canvas center
-          dropStencilAt(stencil.id, activePage().w / 2, activePage().h / 2);
-        });
-        grid.appendChild(tile);
-      }
+      for (const stencil of items) grid.appendChild(makeStencilTile(stencil));
       wrap.appendChild(grid);
       list.appendChild(wrap);
     }
+  }
+
+  function makeStencilTile(stencil, isFavorite) {
+    const tile = document.createElement('div');
+    tile.className = 'stencil-tile';
+    tile.draggable = true;
+    tile.dataset.stencil = stencil.id;
+    tile.title = `${stencil.name} (right-click to ${isFavorite ? 'unpin' : 'pin'})`;
+    const thumb = R.renderStencilThumb(stencil, 36);
+    tile.appendChild(thumb);
+    const name = document.createElement('div');
+    name.className = 'stencil-tile-name';
+    name.textContent = stencil.name;
+    tile.appendChild(name);
+    tile.addEventListener('dragstart', (e) => {
+      e.dataTransfer.setData('application/x-rodman-stencil', stencil.id);
+      e.dataTransfer.effectAllowed = 'copy';
+    });
+    tile.addEventListener('click', () => {
+      dropStencilAt(stencil.id, activePage().w / 2, activePage().h / 2);
+    });
+    tile.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      const favs = loadFavorites();
+      const idx = favs.indexOf(stencil.id);
+      if (idx === -1) favs.push(stencil.id);
+      else favs.splice(idx, 1);
+      saveFavorites(favs);
+      renderStencilDrawer();
+    });
+    return tile;
   }
 
   function bindStencilSearch() {
@@ -1405,6 +1474,50 @@
       state.showRulers = !state.showRulers;
       $('#rulersToggle').checked = state.showRulers;
       renderCanvas();
+    },
+
+    // Replace selected shape's stencil (preserves geometry / text /
+    // connectors / data). Opens the Replace dialog with a stencil list.
+    showReplaceShape() {
+      if (state.selectedShapeIds.size === 0) return;
+      const dlg = $('#replaceShapeDialog');
+      const list = $('#replaceShapeList');
+      list.innerHTML = '';
+      const groups = STENCILS.stencilsByCategory();
+      for (const cat of STENCILS.CATEGORIES) {
+        const items = groups[cat] || [];
+        if (!items.length) continue;
+        const header = document.createElement('div');
+        header.className = 'stencil-category-header';
+        header.textContent = cat;
+        list.appendChild(header);
+        const grid = document.createElement('div');
+        grid.className = 'stencil-grid';
+        for (const stencil of items) {
+          const tile = document.createElement('div');
+          tile.className = 'stencil-tile';
+          tile.title = stencil.name;
+          tile.appendChild(R.renderStencilThumb(stencil, 32));
+          const name = document.createElement('div');
+          name.className = 'stencil-tile-name';
+          name.textContent = stencil.name;
+          tile.appendChild(name);
+          tile.addEventListener('click', () => {
+            const page = activePage();
+            for (const id of state.selectedShapeIds) {
+              const sh = D.findShape(page, id);
+              if (sh) sh.stencil = stencil.id;
+            }
+            scheduleSave();
+            renderCanvas();
+            dlg.close();
+          });
+          grid.appendChild(tile);
+        }
+        list.appendChild(grid);
+      }
+      if (typeof dlg.showModal === 'function') dlg.showModal();
+      else dlg.setAttribute('open', '');
     },
   };
 

@@ -258,6 +258,12 @@
         </div>
         <div class="group-label">Quick shapes</div>
       </div>
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn wide" data-cmd="showReplaceShape" title="Replace selected shape's stencil">Replace shape…</button>
+        </div>
+        <div class="group-label">Shape</div>
+      </div>
     </div>
 
     <!-- Design -->
@@ -419,6 +425,18 @@
   </dialog>
 
   <input type="file" id="openFileInput" accept=".vsdx,.vsdm,.svg" hidden />
+
+  <dialog class="save-dialog replace-shape-dialog" id="replaceShapeDialog">
+    <form method="dialog">
+      <header>
+        <h3>Replace shape</h3>
+        <button type="button" id="replaceShapeCloseBtn" aria-label="Close" onclick="this.closest('dialog').close()">&times;</button>
+      </header>
+      <div class="body" style="max-height:60vh;overflow-y:auto;">
+        <div id="replaceShapeList"></div>
+      </div>
+    </form>
+  </dialog>
 
   <dialog class="save-dialog find-dialog" id="findDialog">
     <form method="dialog">
