@@ -2700,7 +2700,113 @@
   }
 
   // ---------- Ask Claude ----------
-  // Same wiring pattern as slides/app.js initAskClaudePanel.
+  // Same wiring pattern as slides/app.js initAskClaudePanel, plus a
+  // "build a diagram" path: when Claude returns a JSON spec instead
+  // of prose, we render an Insert card that materialises the spec as
+  // shapes + connectors on a new page (auto-laid-out, undo-able).
+  function buildClaudeSystemPrompt() {
+    const stencilIds = Object.keys(STENCILS.STENCILS).join(', ');
+    return [
+      'You are Claude inside RodmanVision, a browser-based Visio clone.',
+      '',
+      'When the user asks you to BUILD or DRAW a diagram (flowchart, BPMN, network, org chart, swimlane, wireframe, mind map, etc.), respond with ONLY a JSON object — no prose before or after, no markdown fences. Schema:',
+      '',
+      '{',
+      '  "summary": "Short title for this diagram",',
+      '  "shapes": [',
+      '    { "id": "n1", "stencil": "<stencilId>", "text": "Label" }',
+      '  ],',
+      '  "connectors": [',
+      '    { "from": "n1", "to": "n2", "label": "optional" }',
+      '  ]',
+      '}',
+      '',
+      'Valid stencilId values (use these exactly, no others):',
+      stencilIds,
+      '',
+      'Rules:',
+      '- Omit x / y / size. The app auto-lays out shapes.',
+      '- Keep diagrams under 25 shapes.',
+      '- Match the stencil to the meaning: bpmnStartEvent for the starting point of a process, flowDecision for branching, bpmnEndEvent for terminus, etc.',
+      '- For flowcharts prefer flowProcess / flowDecision / flowTerminator.',
+      '- For BPMN prefer the bpmn* stencils.',
+      '- For network use the net* stencils. For org charts use org*.',
+      '',
+      'When the user asks a QUESTION instead of requesting a diagram, respond in plain English as you normally would — no JSON.',
+    ].join('\n');
+  }
+
+  function tryParseDiagramSpec(reply) {
+    if (!reply) return null;
+    let candidate = String(reply).trim();
+    // Tolerate the model wrapping JSON in ```json fences.
+    candidate = candidate.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+    // Tolerate a leading/trailing brace search if the model adds
+    // a single line of prose around the JSON.
+    if (!candidate.startsWith('{')) {
+      const start = candidate.indexOf('{');
+      const end = candidate.lastIndexOf('}');
+      if (start !== -1 && end > start) candidate = candidate.slice(start, end + 1);
+    }
+    let obj;
+    try { obj = JSON.parse(candidate); } catch (_) { return null; }
+    if (!obj || !Array.isArray(obj.shapes) || obj.shapes.length === 0) return null;
+    // Defensive: cap shape count to keep our auto-layout fast.
+    if (obj.shapes.length > 60) obj.shapes = obj.shapes.slice(0, 60);
+    obj.connectors = Array.isArray(obj.connectors) ? obj.connectors : [];
+    return obj;
+  }
+
+  function applyClaudeDiagram(spec) {
+    const theme = THEMES_MOD.getTheme(diagram.theme);
+    // Insert on a brand new page so the user's existing work is never
+    // overwritten. The page is the active one immediately so the user
+    // sees the result and can Ctrl+Z to undo the entire insert.
+    const pageName = (spec.summary || 'Claude diagram').slice(0, 60);
+    const page = D.addPage(diagram, { name: pageName });
+    // Build the shapes, remembering Claude's id → our internal id map.
+    const idMap = new Map();
+    for (const s of spec.shapes) {
+      const stencilId = s.stencil && STENCILS.STENCILS[s.stencil] ? s.stencil : 'rectangle';
+      const shape = D.newShape({
+        stencil: stencilId,
+        text: typeof s.text === 'string' ? s.text : '',
+        fill: theme.fill,
+        stroke: theme.stroke,
+        textStyle: {
+          fontFamily: '', fontSize: 14, color: theme.textColor,
+          bold: false, italic: false, align: 'center',
+        },
+        layerId: activeLayer().id,
+      });
+      page.shapes.push(shape);
+      if (s.id) idMap.set(String(s.id), shape.id);
+    }
+    for (const c of spec.connectors) {
+      const fromId = idMap.get(String(c.from));
+      const toId = idMap.get(String(c.to));
+      if (!fromId || !toId || fromId === toId) continue;
+      page.connectors.push(D.newConnector({
+        fromShapeId: fromId,
+        toShapeId: toId,
+        stroke: theme.stroke,
+        layerId: activeLayer().id,
+        label: typeof c.label === 'string' ? c.label : '',
+      }));
+    }
+    // Auto-layout for free — same routine the Insert tab's Hierarchy
+    // button uses. Then snap selection + active page so the user is
+    // immediately looking at the result.
+    state.activePageId = page.id;
+    autoLayoutHierarchical(page);
+    state.selectedShapeIds = new Set(page.shapes.map((s) => s.id));
+    state.selectedConnectorIds.clear();
+    pushHistory();
+    scheduleSave();
+    renderAll();
+    setTimeout(() => commands.zoomFit(), 0);
+  }
+
   function bindAskClaude() {
     const button = $('#askClaudeBtn');
     const panel = $('#askClaudePanel');
@@ -2719,6 +2825,44 @@
       output.textContent = message || '';
       output.classList.toggle('status', kind === 'status');
       output.classList.toggle('error', kind === 'error');
+      output.classList.remove('diagram-card');
+    };
+
+    const renderDiagramCard = (spec) => {
+      if (!output) return;
+      output.hidden = false;
+      output.classList.remove('status', 'error');
+      output.classList.add('diagram-card');
+      const shapeCount = spec.shapes.length;
+      const connCount = (spec.connectors || []).length;
+      const summary = spec.summary || 'Claude diagram';
+      output.innerHTML = '';
+      const titleEl = document.createElement('div');
+      titleEl.className = 'claude-diagram-title';
+      titleEl.textContent = summary;
+      const countsEl = document.createElement('div');
+      countsEl.className = 'claude-diagram-counts';
+      countsEl.textContent = `Will create ${shapeCount} shape${shapeCount === 1 ? '' : 's'} and ${connCount} connector${connCount === 1 ? '' : 's'} on a new page.`;
+      const btnRow = document.createElement('div');
+      btnRow.className = 'claude-diagram-actions';
+      const insertBtn = document.createElement('button');
+      insertBtn.type = 'button';
+      insertBtn.className = 'claude-diagram-insert';
+      insertBtn.textContent = 'Insert as new page';
+      insertBtn.addEventListener('click', () => {
+        applyClaudeDiagram(spec);
+        setOutput(`Inserted ${shapeCount} shape${shapeCount === 1 ? '' : 's'} on page "${summary}".`, 'status');
+      });
+      const discardBtn = document.createElement('button');
+      discardBtn.type = 'button';
+      discardBtn.className = 'claude-diagram-discard';
+      discardBtn.textContent = 'Discard';
+      discardBtn.addEventListener('click', () => setOutput(''));
+      btnRow.appendChild(insertBtn);
+      btnRow.appendChild(discardBtn);
+      output.appendChild(titleEl);
+      output.appendChild(countsEl);
+      output.appendChild(btnRow);
     };
 
     const updateSend = () => {
@@ -2740,10 +2884,18 @@
     panel.addEventListener('click', (e) => {
       const chip = e.target.closest('[data-claude-prompt]');
       if (!chip || !input) return;
+      const seedOnly = chip.dataset.claudeMode === 'seed';
       input.value = chip.dataset.claudePrompt || chip.textContent.trim();
       updateSend();
       if (keyInput && !keyInput.value.trim()) keyInput.focus();
-      else { input.focus(); input.select(); }
+      else {
+        input.focus();
+        // For "Build a flowchart for…" we want the cursor at end so
+        // the user can type the topic; for full prompts we select all
+        // so they can replace.
+        if (seedOnly) input.setSelectionRange(input.value.length, input.value.length);
+        else input.select();
+      }
     });
     keyInput?.addEventListener('input', updateSend);
     input?.addEventListener('input', updateSend);
@@ -2760,10 +2912,13 @@
       try {
         const result = await window.RodmanClaude.sendClaudeMessage({
           apiKey,
-          system: 'You are Claude inside RodmanVision. Help the user design clear diagrams — flowcharts, BPMN, network topologies, and Visio-style drawings. Propose shape choices, layout improvements, and labels the user can apply manually. Be concise.',
+          system: buildClaudeSystemPrompt(),
           messages: [{ role: 'user', content: prompt }],
         });
-        setOutput(result.text || 'Claude returned an empty response.');
+        const reply = result.text || '';
+        const spec = tryParseDiagramSpec(reply);
+        if (spec) renderDiagramCard(spec);
+        else setOutput(reply || 'Claude returned an empty response.');
       } catch (err) {
         setOutput(err instanceof Error ? err.message : String(err), 'error');
       } finally {

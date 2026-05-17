@@ -59,17 +59,19 @@
         </label>
       </div>
       <div class="claude-panel-intro">
-        <h3>Skip the menus - just ask.</h3>
+        <h3>Describe a diagram. Claude draws it.</h3>
         <p>
-          Sketch diagrams in plain English. Claude can suggest layouts,
-          BPMN choices, and stencil ideas for your flow.
+          Type what you want and Claude returns shapes + connectors
+          you can drop onto a new page in one click. Or ask a question
+          for a plain-English answer.
         </p>
         <p class="claude-panel-label">Try one of these:</p>
         <div class="claude-panel-chips">
-          <button type="button" data-claude-prompt="What BPMN shape should I use for a parallel split?">What BPMN shape for a parallel split?</button>
-          <button type="button" data-claude-prompt="Suggest a clean flowchart for an order-fulfilment process.">Sketch an order-fulfilment flowchart.</button>
-          <button type="button" data-claude-prompt="Which network topology fits a small office with two switches?">Network topology for a small office?</button>
-          <button type="button" data-claude-prompt="Recommend a colour scheme that prints well in black and white.">B&amp;W-safe colour scheme.</button>
+          <button type="button" data-claude-prompt="Build a flowchart for " data-claude-mode="seed">Build a flowchart for…</button>
+          <button type="button" data-claude-prompt="Build a BPMN diagram for an expense approval workflow with at least one decision gateway.">BPMN for expense approval</button>
+          <button type="button" data-claude-prompt="Build a network diagram for a small office: 2 switches, 1 router, 1 firewall, 1 cloud, 4 workstations and a printer.">Network topology for a small office</button>
+          <button type="button" data-claude-prompt="Build an org chart for a 6-person engineering team with one director, two leads, and three engineers.">Org chart for a 6-person team</button>
+          <button type="button" data-claude-prompt="What BPMN shape should I use for a parallel split?">Q&amp;A: what BPMN shape for a parallel split?</button>
         </div>
       </div>
     </div>

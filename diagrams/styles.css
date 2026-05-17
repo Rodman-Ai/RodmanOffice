@@ -948,6 +948,52 @@ body.format-painter-active .canvas-svg { cursor: crosshair; }
   pointer-events: none;
 }
 
+/* Ask Claude — diagram-spec result card ----------------------------------- */
+.claude-panel-output.diagram-card {
+  white-space: normal;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: #ecfeff;
+  border-color: #a5f3fc;
+}
+.claude-diagram-title {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--primary-dark);
+}
+.claude-diagram-counts {
+  font-size: 12px;
+  color: var(--text);
+}
+.claude-diagram-actions {
+  display: flex;
+  gap: 6px;
+}
+.claude-diagram-insert {
+  flex: 1;
+  border: 0;
+  border-radius: 4px;
+  padding: 6px 10px;
+  background: var(--primary);
+  color: #fff;
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.claude-diagram-insert:hover { background: var(--primary-dark); }
+.claude-diagram-discard {
+  border: 1px solid var(--ribbon-border);
+  border-radius: 4px;
+  padding: 6px 10px;
+  background: #fff;
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.claude-diagram-discard:hover { background: var(--hover); }
+
 /* Mobile / small screens --------------------------------------------------- */
 @media (max-width: 720px) {
   body { font-size: 14px; }
