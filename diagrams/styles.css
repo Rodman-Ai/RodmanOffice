@@ -809,6 +809,51 @@ body.format-painter-active .canvas-svg { cursor: crosshair; }
   background: var(--hover);
 }
 
+/* AutoConnect arrows ------------------------------------------------------- */
+.autoconnect-arrow {
+  position: absolute;
+  width: 16px; height: 16px;
+  background: var(--primary);
+  color: #fff;
+  border: 1px solid var(--primary-dark);
+  border-radius: 50%;
+  font-size: 9px;
+  line-height: 1;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  z-index: 65;
+  opacity: 0.85;
+  transition: transform 0.1s, opacity 0.1s;
+}
+.autoconnect-arrow:hover {
+  transform: scale(1.25);
+  opacity: 1;
+}
+
+/* Connector handles (bend / waypoint) ------------------------------------- */
+.connector-handle {
+  position: absolute;
+  z-index: 75;
+}
+.connector-handle.waypoint {
+  width: 10px; height: 10px;
+  background: var(--primary);
+  border: 1.5px solid #fff;
+  border-radius: 50%;
+  cursor: grab;
+}
+.connector-handle.midpoint {
+  width: 8px; height: 8px;
+  background: #fff;
+  border: 1px dashed var(--primary);
+  border-radius: 50%;
+  cursor: grab;
+  opacity: 0.7;
+}
+.connector-handle.midpoint:hover { opacity: 1; }
+
 /* Mobile / small screens --------------------------------------------------- */
 @media (max-width: 720px) {
   body { font-size: 14px; }

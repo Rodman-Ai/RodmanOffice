@@ -163,7 +163,23 @@
 
     const a = portPoint(fromShape, conn.fromPort);
     const b = portPoint(toShape, conn.toPort);
-    const d = orthogonalPath(a, b, conn.fromPort, conn.toPort);
+    const route = conn.routeStyle || 'orthogonal';
+    const wp = Array.isArray(conn.waypoints) ? conn.waypoints : [];
+    let d;
+    if (route === 'straight') {
+      d = `M${a.x},${a.y} L${b.x},${b.y}`;
+    } else if (route === 'curved') {
+      const dx = b.x - a.x;
+      d = `M${a.x},${a.y} C${a.x + dx * 0.4},${a.y} ${b.x - dx * 0.4},${b.y} ${b.x},${b.y}`;
+    } else if (route === 'tree') {
+      const midX = (a.x + b.x) / 2;
+      d = `M${a.x},${a.y} L${midX},${a.y} L${midX},${b.y} L${b.x},${b.y}`;
+    } else if (wp.length) {
+      // Orthogonal with user-placed waypoints.
+      d = `M${a.x},${a.y}` + wp.map((p) => ` L${p.x},${p.y}`).join('') + ` L${b.x},${b.y}`;
+    } else {
+      d = orthogonalPath(a, b, conn.fromPort, conn.toPort);
+    }
 
     const g = el('g', {
       class: 'connector',
@@ -171,15 +187,29 @@
       opacity: (layerOpacity ?? 1),
     }, parent);
 
-    el('path', {
+    const stroke = conn.stroke || '#444';
+    const sw = conn.strokeWidth || 1.5;
+    const dashAttr = lineStyleDash(conn.lineStyle, sw);
+
+    const lineAttrs = {
       d,
       fill: 'none',
-      stroke: conn.stroke || '#444',
-      'stroke-width': conn.strokeWidth || 1.5,
+      stroke,
+      'stroke-width': sw,
       class: 'connector-path',
-      ...(conn.endStart === 'arrow' ? { 'marker-start': 'url(#arr)' } : {}),
-      ...(conn.endEnd === 'arrow' ? { 'marker-end': 'url(#arr)' } : {}),
-    }, g);
+    };
+    if (dashAttr) lineAttrs['stroke-dasharray'] = dashAttr;
+    if (conn.endStart === 'arrow') lineAttrs['marker-start'] = 'url(#arr)';
+    if (conn.endEnd === 'arrow') lineAttrs['marker-end'] = 'url(#arr)';
+
+    el('path', lineAttrs, g);
+
+    // Double-line: render a second offset path. Quick approximation —
+    // not a true parallel offset, but matches the visual of double-rule
+    // borders close enough for diagram use.
+    if (conn.lineStyle === 'double') {
+      el('path', { d, fill: 'none', stroke, 'stroke-width': Math.max(1, sw + 2), opacity: 0.4 }, g);
+    }
 
     // Wider invisible hit path for easier clicking
     el('path', {
@@ -208,7 +238,28 @@
     return g;
   }
 
+  function lineStyleDash(style, sw) {
+    switch (style) {
+      case 'dashed': return `${sw * 3} ${sw * 2}`;
+      case 'dotted': return `${sw} ${sw * 1.5}`;
+      case 'double': return null;
+      default: return null;
+    }
+  }
+
   function portPoint(shape, port) {
+    // Custom ports are stored as fractional offsets in [0..1] and
+    // addressed as "custom:<index>".
+    if (typeof port === 'string' && port.startsWith('custom:')) {
+      const idx = parseInt(port.slice(7), 10);
+      const custom = shape.customPorts && shape.customPorts[idx];
+      if (custom) {
+        return {
+          x: shape.x + custom.fx * shape.w,
+          y: shape.y + custom.fy * shape.h,
+        };
+      }
+    }
     switch (port) {
       case 'top':    return { x: shape.x + shape.w / 2, y: shape.y };
       case 'right':  return { x: shape.x + shape.w,     y: shape.y + shape.h / 2 };

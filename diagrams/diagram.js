@@ -76,6 +76,9 @@
       label: opts.label || '',
       layerId: opts.layerId || null,
       _themed: opts._themed !== false,
+      routeStyle: opts.routeStyle || 'orthogonal', // 'orthogonal' | 'straight' | 'curved' | 'tree'
+      lineStyle: opts.lineStyle || 'solid',        // 'solid' | 'dashed' | 'dotted' | 'double'
+      waypoints: Array.isArray(opts.waypoints) ? [...opts.waypoints] : [], // [{ x, y }]
     };
   }
 

@@ -235,6 +235,43 @@
     <div class="ribbon-panel" data-panel="insert">
       <div class="group">
         <div class="group-row">
+          <button class="ribbon-btn" data-cmd="setConnectorRoute" data-route="orthogonal" title="Orthogonal connector route">▥</button>
+          <button class="ribbon-btn" data-cmd="setConnectorRoute" data-route="straight"   title="Straight connector route">／</button>
+          <button class="ribbon-btn" data-cmd="setConnectorRoute" data-route="curved"     title="Curved connector route">⌒</button>
+          <button class="ribbon-btn" data-cmd="setConnectorRoute" data-route="tree"       title="Tree connector route">┐</button>
+        </div>
+        <div class="group-row">
+          <button class="ribbon-btn" data-cmd="setConnectorLine" data-line="solid"  title="Solid line">─</button>
+          <button class="ribbon-btn" data-cmd="setConnectorLine" data-line="dashed" title="Dashed line">╌</button>
+          <button class="ribbon-btn" data-cmd="setConnectorLine" data-line="dotted" title="Dotted line">⋯</button>
+          <button class="ribbon-btn" data-cmd="setConnectorLine" data-line="double" title="Double line">═</button>
+        </div>
+        <div class="group-row">
+          <button class="ribbon-btn" data-cmd="setConnectorWeight" data-weight="0.5" title="Weight 0.5">·</button>
+          <button class="ribbon-btn" data-cmd="setConnectorWeight" data-weight="1"   title="Weight 1">1</button>
+          <button class="ribbon-btn" data-cmd="setConnectorWeight" data-weight="2"   title="Weight 2">2</button>
+          <button class="ribbon-btn" data-cmd="setConnectorWeight" data-weight="3"   title="Weight 3">3</button>
+          <button class="ribbon-btn" data-cmd="setConnectorWeight" data-weight="5"   title="Weight 5">5</button>
+        </div>
+        <div class="group-row">
+          <button class="ribbon-btn" data-cmd="editConnectorLabel" title="Edit connector label">Label…</button>
+        </div>
+        <div class="group-label">Connector</div>
+      </div>
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn wide" data-cmd="autoLayoutHierarchy" title="Hierarchical auto-layout">⇣ Hierarchy</button>
+        </div>
+        <div class="group-row">
+          <button class="ribbon-btn wide" data-cmd="autoLayoutForce" title="Force-directed auto-layout">⚛ Force</button>
+        </div>
+        <div class="group-row">
+          <button class="ribbon-btn" data-cmd="addCustomPort" title="Add custom connection point to selected shape">+ Port</button>
+        </div>
+        <div class="group-label">Layout</div>
+      </div>
+      <div class="group">
+        <div class="group-row">
           <button class="ribbon-btn wide" data-cmd="addPage">+ Page</button>
           <button class="ribbon-btn" data-cmd="duplicatePage" title="Duplicate page">⎘</button>
           <button class="ribbon-btn" data-cmd="deletePage" title="Delete page">🗑</button>

@@ -302,6 +302,8 @@
     renderSelectionOverlays(shadow);
     renderHoverPorts(shadow);
     renderSmartGuides(shadow);
+    renderAutoConnectArrows(shadow);
+    renderConnectorHandles(shadow);
     renderRulers();
     renderPageStrip();
     updateStatusBar();
@@ -681,7 +683,8 @@
     return { snapX: bestX, snapY: bestY, lines };
   }
 
-  function dropStencilAt(stencilId, cx, cy) {
+  function dropStencilAt(stencilId, cx, cy, opts) {
+    opts = opts || {};
     const stencil = STENCILS.getStencil(stencilId);
     const w = 140, h = 80;
     const theme = THEMES_MOD.getTheme(diagram.theme);
@@ -700,12 +703,16 @@
       text: stencil.name,
     });
     activePage().shapes.push(shape);
-    state.selectedShapeIds.clear();
-    state.selectedConnectorIds.clear();
-    state.selectedShapeIds.add(shape.id);
+    lastDroppedStencil = stencilId;
+    if (!opts.suppressSelect) {
+      state.selectedShapeIds.clear();
+      state.selectedConnectorIds.clear();
+      state.selectedShapeIds.add(shape.id);
+    }
     scheduleSave();
     renderCanvas();
     renderPropertiesPanel();
+    return shape;
   }
 
   // ---------- Selection overlays + handles ----------
@@ -1476,6 +1483,44 @@
       renderCanvas();
     },
 
+    // ---------- Phase 3: connectors + layout ----------
+    setConnectorRoute(btn) { setConnectorProp('routeStyle', btn?.dataset.route || 'orthogonal'); },
+    setConnectorLine(btn)  { setConnectorProp('lineStyle',  btn?.dataset.line  || 'solid'); },
+    setConnectorWeight(btn){ setConnectorProp('strokeWidth', parseFloat(btn?.dataset.weight) || 1.5); },
+    editConnectorLabel() {
+      const page = activePage();
+      if (state.selectedConnectorIds.size !== 1) return;
+      const c = D.findConnector(page, [...state.selectedConnectorIds][0]);
+      if (!c) return;
+      const next = prompt('Connector label', c.label || '');
+      if (next != null) { c.label = next; scheduleSave(); renderCanvas(); }
+    },
+    autoLayoutHierarchy() {
+      const page = activePage();
+      autoLayoutHierarchical(page);
+      scheduleSave();
+      renderCanvas();
+    },
+    autoLayoutForce() {
+      const page = activePage();
+      autoLayoutForceDirected(page, 120);
+      scheduleSave();
+      renderCanvas();
+    },
+    addCustomPort() {
+      if (state.selectedShapeIds.size !== 1) return;
+      const page = activePage();
+      const sh = D.findShape(page, [...state.selectedShapeIds][0]);
+      if (!sh) return;
+      const fx = parseFloat(prompt('Port X (0..1 across width)', '0.5'));
+      const fy = parseFloat(prompt('Port Y (0..1 down height)', '0.5'));
+      if (!isFinite(fx) || !isFinite(fy)) return;
+      sh.customPorts = sh.customPorts || [];
+      sh.customPorts.push({ fx: Math.max(0, Math.min(1, fx)), fy: Math.max(0, Math.min(1, fy)) });
+      scheduleSave();
+      renderCanvas();
+    },
+
     // Replace selected shape's stencil (preserves geometry / text /
     // connectors / data). Opens the Replace dialog with a stencil list.
     showReplaceShape() {
@@ -1637,6 +1682,241 @@
     state.selectedConnectorIds.clear();
     renderCanvas();
     renderPropertiesPanel();
+  }
+
+  // ---------- Phase 3 helpers ----------
+  function setConnectorProp(field, value) {
+    const page = activePage();
+    let changed = false;
+    for (const id of state.selectedConnectorIds) {
+      const c = D.findConnector(page, id);
+      if (c) { c[field] = value; changed = true; }
+    }
+    if (changed) { scheduleSave(); renderCanvas(); renderPropertiesPanel(); }
+  }
+
+  // Hierarchical (Sugiyama-lite) auto-layout: assign layers by BFS
+  // depth from roots (shapes with no incoming connectors), then
+  // arrange each layer left-to-right with even spacing.
+  function autoLayoutHierarchical(page) {
+    if (!page.shapes.length) return;
+    const inDeg = new Map(page.shapes.map((s) => [s.id, 0]));
+    const adj = new Map(page.shapes.map((s) => [s.id, []]));
+    for (const c of page.connectors) {
+      if (inDeg.has(c.toShapeId)) inDeg.set(c.toShapeId, inDeg.get(c.toShapeId) + 1);
+      if (adj.has(c.fromShapeId)) adj.get(c.fromShapeId).push(c.toShapeId);
+    }
+    const layer = new Map();
+    const queue = page.shapes.filter((s) => inDeg.get(s.id) === 0).map((s) => s.id);
+    if (!queue.length && page.shapes.length) queue.push(page.shapes[0].id);
+    for (const id of queue) layer.set(id, 0);
+    let head = 0;
+    while (head < queue.length) {
+      const id = queue[head++];
+      const l = layer.get(id);
+      for (const next of adj.get(id) || []) {
+        const nextLayer = l + 1;
+        if (!layer.has(next) || layer.get(next) < nextLayer) {
+          layer.set(next, nextLayer);
+          queue.push(next);
+        }
+      }
+    }
+    // Default un-layered shapes to layer 0 (disconnected nodes).
+    for (const s of page.shapes) if (!layer.has(s.id)) layer.set(s.id, 0);
+
+    // Bucket by layer.
+    const buckets = new Map();
+    for (const s of page.shapes) {
+      const l = layer.get(s.id);
+      if (!buckets.has(l)) buckets.set(l, []);
+      buckets.get(l).push(s);
+    }
+    const layers = [...buckets.keys()].sort((a, b) => a - b);
+    const ySpacing = 140;
+    const xSpacing = 200;
+    const startX = 100;
+    const startY = 100;
+    for (let li = 0; li < layers.length; li++) {
+      const l = layers[li];
+      const shapes = buckets.get(l);
+      const rowY = startY + li * ySpacing;
+      shapes.forEach((s, i) => {
+        s.x = startX + i * xSpacing;
+        s.y = rowY;
+      });
+    }
+  }
+
+  // Force-directed (spring-electric) auto-layout. Light-weight,
+  // suitable for ~50 shapes; not a Fruchterman-Reingold textbook
+  // implementation but produces readable layouts.
+  function autoLayoutForceDirected(page, iterations) {
+    const shapes = page.shapes;
+    if (shapes.length < 2) return;
+    const k = 120;          // ideal edge length
+    const repulsion = 8000; // node-node repulsion strength
+    const damp = 0.85;
+    const adj = new Map(shapes.map((s) => [s.id, new Set()]));
+    for (const c of page.connectors) {
+      if (adj.has(c.fromShapeId)) adj.get(c.fromShapeId).add(c.toShapeId);
+      if (adj.has(c.toShapeId))   adj.get(c.toShapeId).add(c.fromShapeId);
+    }
+    // Velocity state.
+    const vel = new Map(shapes.map((s) => [s.id, { vx: 0, vy: 0 }]));
+    for (let iter = 0; iter < iterations; iter++) {
+      for (const a of shapes) {
+        let fx = 0, fy = 0;
+        const acx = a.x + a.w / 2, acy = a.y + a.h / 2;
+        // Repulsion from every other shape.
+        for (const b of shapes) {
+          if (a === b) continue;
+          const bcx = b.x + b.w / 2, bcy = b.y + b.h / 2;
+          const dx = acx - bcx, dy = acy - bcy;
+          const distSq = Math.max(dx * dx + dy * dy, 100);
+          const f = repulsion / distSq;
+          fx += (dx / Math.sqrt(distSq)) * f;
+          fy += (dy / Math.sqrt(distSq)) * f;
+        }
+        // Spring attraction along edges.
+        for (const otherId of adj.get(a.id)) {
+          const b = shapes.find((s) => s.id === otherId);
+          if (!b) continue;
+          const bcx = b.x + b.w / 2, bcy = b.y + b.h / 2;
+          const dx = bcx - acx, dy = bcy - acy;
+          const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+          const f = (dist - k) * 0.05;
+          fx += (dx / dist) * f;
+          fy += (dy / dist) * f;
+        }
+        const v = vel.get(a.id);
+        v.vx = (v.vx + fx) * damp;
+        v.vy = (v.vy + fy) * damp;
+      }
+      for (const s of shapes) {
+        const v = vel.get(s.id);
+        s.x = Math.max(20, Math.min(page.w - s.w - 20, s.x + v.vx));
+        s.y = Math.max(20, Math.min(page.h - s.h - 20, s.y + v.vy));
+      }
+    }
+    for (const s of shapes) { s.x = Math.round(s.x); s.y = Math.round(s.y); }
+  }
+
+  // AutoConnect: when a single shape is selected and the cursor is
+  // near (but outside) its edge, show 4 small blue arrows that drop a
+  // pre-connected copy of the most-recently-used stencil on click.
+  // The state is tracked in canvas-level event listeners below.
+  let lastDroppedStencil = 'rectangle';
+  function renderAutoConnectArrows(shadow) {
+    shadow.querySelectorAll('.autoconnect-arrow').forEach((el) => el.remove());
+    if (state.selectedShapeIds.size !== 1) return;
+    const page = activePage();
+    const sh = D.findShape(page, [...state.selectedShapeIds][0]);
+    if (!sh) return;
+    const arrows = [
+      { dir: 'top',    x: sh.x + sh.w / 2 - 8, y: sh.y - 22, glyph: '▲', port: 'top',    place: { dx: 0,           dy: -120 } },
+      { dir: 'right',  x: sh.x + sh.w + 8,     y: sh.y + sh.h / 2 - 8, glyph: '▶', port: 'right',  place: { dx: 160,         dy: 0 } },
+      { dir: 'bottom', x: sh.x + sh.w / 2 - 8, y: sh.y + sh.h + 8, glyph: '▼', port: 'bottom', place: { dx: 0,           dy: 120 } },
+      { dir: 'left',   x: sh.x - 22,           y: sh.y + sh.h / 2 - 8, glyph: '◀', port: 'left',   place: { dx: -160,        dy: 0 } },
+    ];
+    for (const a of arrows) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'autoconnect-arrow';
+      btn.textContent = a.glyph;
+      btn.style.left = a.x + 'px';
+      btn.style.top = a.y + 'px';
+      btn.title = `AutoConnect ${a.dir}`;
+      btn.addEventListener('mousedown', (e) => e.stopPropagation());
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const cx = sh.x + sh.w / 2 + a.place.dx;
+        const cy = sh.y + sh.h / 2 + a.place.dy;
+        const newShape = dropStencilAt(lastDroppedStencil, cx, cy, { suppressSelect: true });
+        if (!newShape) return;
+        const opposite = { top: 'bottom', bottom: 'top', left: 'right', right: 'left' }[a.port];
+        const theme = THEMES_MOD.getTheme(diagram.theme);
+        page.connectors.push(D.newConnector({
+          fromShapeId: sh.id, toShapeId: newShape.id,
+          fromPort: a.port, toPort: opposite,
+          stroke: theme.stroke, layerId: activeLayer().id,
+        }));
+        scheduleSave();
+        renderCanvas();
+      });
+      shadow.appendChild(btn);
+    }
+  }
+
+  // Connector bend handles: midpoints of each segment become drag
+  // handles that insert a new waypoint. Existing waypoints become
+  // draggable round handles.
+  function renderConnectorHandles(shadow) {
+    shadow.querySelectorAll('.connector-handle').forEach((el) => el.remove());
+    if (state.selectedConnectorIds.size !== 1) return;
+    const page = activePage();
+    const c = D.findConnector(page, [...state.selectedConnectorIds][0]);
+    if (!c) return;
+    const fromShape = page.shapes.find((s) => s.id === c.fromShapeId);
+    const toShape   = page.shapes.find((s) => s.id === c.toShapeId);
+    if (!fromShape || !toShape) return;
+    const a = R.portPoint(fromShape, c.fromPort);
+    const b = R.portPoint(toShape, c.toPort);
+    const points = [a, ...(c.waypoints || []), b];
+    // Existing waypoints
+    (c.waypoints || []).forEach((wp, idx) => {
+      const h = document.createElement('div');
+      h.className = 'connector-handle waypoint';
+      h.style.left = (wp.x - 5) + 'px';
+      h.style.top = (wp.y - 5) + 'px';
+      h.addEventListener('mousedown', (e) => startWaypointDrag(e, c, idx));
+      shadow.appendChild(h);
+    });
+    // Midpoint "add" handles between consecutive points
+    for (let i = 0; i < points.length - 1; i++) {
+      const p1 = points[i], p2 = points[i + 1];
+      const mid = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
+      const h = document.createElement('div');
+      h.className = 'connector-handle midpoint';
+      h.style.left = (mid.x - 4) + 'px';
+      h.style.top = (mid.y - 4) + 'px';
+      h.addEventListener('mousedown', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        c.waypoints = c.waypoints || [];
+        c.waypoints.splice(i, 0, mid);
+        startWaypointDrag(e, c, i);
+      });
+      shadow.appendChild(h);
+    }
+  }
+
+  function startWaypointDrag(e, conn, idx) {
+    e.stopPropagation();
+    e.preventDefault();
+    const shadow = $('#canvasShadow');
+    drag = {
+      mode: 'waypoint',
+      connId: conn.id,
+      waypointIdx: idx,
+      hasMoved: false,
+    };
+    // Reuse the document-level mousemove via a custom branch below.
+    function move(ev) {
+      const pt = eventToPagePoint(ev, shadow);
+      conn.waypoints[idx] = { x: Math.round(pt.x), y: Math.round(pt.y) };
+      drag.hasMoved = true;
+      renderCanvas();
+    }
+    function up() {
+      document.removeEventListener('mousemove', move);
+      document.removeEventListener('mouseup', up);
+      if (drag && drag.hasMoved) scheduleSave();
+      drag = null;
+      renderCanvas();
+    }
+    document.addEventListener('mousemove', move);
+    document.addEventListener('mouseup', up);
   }
 
   function applyTextStyle(opts) {
