@@ -749,6 +749,66 @@ dialog.save-dialog::backdrop {
 .help-modal-body ul { margin: 0; padding-left: 18px; }
 .help-modal-body li + li { margin-top: 8px; }
 
+/* Rulers ------------------------------------------------------------------ */
+.canvas-area.with-rulers .canvas-scroll {
+  padding-top: 22px;
+  padding-left: 22px;
+}
+.ruler {
+  position: absolute;
+  z-index: 50;
+  pointer-events: none;
+  background: #f8fafc;
+  border: 1px solid var(--pane-border);
+}
+.ruler-top {
+  top: 0;
+  left: 22px;
+  right: 0;
+  height: 22px;
+  border-bottom: 1px solid var(--pane-border);
+}
+.ruler-left {
+  left: 0;
+  top: 22px;
+  bottom: 0;
+  width: 22px;
+  border-right: 1px solid var(--pane-border);
+}
+
+/* Format painter ---------------------------------------------------------- */
+body.format-painter-active .shape { cursor: crosshair; }
+body.format-painter-active .canvas-svg { cursor: crosshair; }
+
+/* Find dialog ------------------------------------------------------------- */
+.find-dialog .find-results {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 240px;
+  overflow-y: auto;
+  border: 1px solid var(--ribbon-border);
+  border-radius: 4px;
+  padding: 4px;
+  background: #fff;
+}
+.find-dialog .find-result {
+  text-align: left;
+  background: transparent;
+  border: 0;
+  padding: 4px 8px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.find-dialog .find-result:hover {
+  background: var(--hover);
+}
+
 /* Mobile / small screens --------------------------------------------------- */
 @media (max-width: 720px) {
   body { font-size: 14px; }

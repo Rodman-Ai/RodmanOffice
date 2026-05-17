@@ -72,14 +72,30 @@
   }
 
   function renderShape(shape, parent, layerOpacity) {
+    const transforms = [`translate(${shape.x},${shape.y})`];
+    if (shape.rotation) transforms.push(`rotate(${shape.rotation} ${shape.w / 2} ${shape.h / 2})`);
+    if (shape.flipH || shape.flipV) {
+      const sx = shape.flipH ? -1 : 1;
+      const sy = shape.flipV ? -1 : 1;
+      // Scale around the shape's center: move center → origin, scale, move back.
+      transforms.push(`translate(${shape.w / 2},${shape.h / 2})`);
+      transforms.push(`scale(${sx},${sy})`);
+      transforms.push(`translate(${-shape.w / 2},${-shape.h / 2})`);
+    }
     const g = el('g', {
       class: 'shape',
       'data-shape-id': shape.id,
-      transform: shape.rotation
-        ? `translate(${shape.x},${shape.y}) rotate(${shape.rotation} ${shape.w / 2} ${shape.h / 2})`
-        : `translate(${shape.x},${shape.y})`,
+      transform: transforms.join(' '),
       opacity: (shape.opacity ?? 1) * (layerOpacity ?? 1),
     }, parent);
+
+    // Native tooltip — stencil name + dimensions (+ shape data summary in later phases)
+    if (window.RodmanStencils) {
+      const stDef = window.RodmanStencils.getStencil(shape.stencil || 'rectangle');
+      const title = document.createElementNS(SVG_NS, 'title');
+      title.textContent = `${stDef.name} • ${Math.round(shape.w)}×${Math.round(shape.h)}`;
+      g.appendChild(title);
+    }
 
     const st = STENCILS.getStencil(shape.stencil || 'rectangle');
     const body = st.draw(shape.w, shape.h);

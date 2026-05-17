@@ -39,11 +39,51 @@
     zoom: 1,
     showGrid: true,
     snapToGrid: true,
+    showRulers: false,
     sideTab: 'properties',  // 'properties' | 'layers'
     panOpen: { stencils: true, side: true },
     clipboard: null,
     isEditingText: false,
+    paintMode: null,        // { fill, stroke, strokeWidth, opacity, textStyle } | null
+    smartGuides: [],        // active guide lines during drag: { x1, y1, x2, y2 }
   };
+
+  // ---------- Undo / Redo history ----------
+  // We snapshot the entire diagram before each mutation. Cheap because
+  // diagrams are small and JSON.stringify is fast for our model.
+  const HISTORY_MAX = 50;
+  const history = { stack: [], index: -1 };
+
+  function snapshotDiagram() {
+    return JSON.stringify(diagram);
+  }
+
+  function restoreSnapshot(snap) {
+    try {
+      const obj = JSON.parse(snap);
+      sanitizeDiagram(obj);
+      diagram = obj;
+      // Keep activePageId pointing at a real page.
+      if (!D.findPage(diagram, state.activePageId)) {
+        state.activePageId = diagram.pages[0].id;
+      }
+      state.selectedShapeIds.clear();
+      state.selectedConnectorIds.clear();
+      $('#diagramTitle').value = diagram.title;
+      renderAll();
+    } catch (_) { /* ignore */ }
+  }
+
+  function pushHistory() {
+    const snap = snapshotDiagram();
+    // Drop any redo tail.
+    if (history.index < history.stack.length - 1) {
+      history.stack = history.stack.slice(0, history.index + 1);
+    }
+    history.stack.push(snap);
+    if (history.stack.length > HISTORY_MAX) history.stack.shift();
+    history.index = history.stack.length - 1;
+  }
 
   // ---------- Helpers ----------
   function $(sel, root) { return (root || document).querySelector(sel); }
@@ -78,10 +118,18 @@
 
   // ---------- Autosave ----------
   let saveTimer = null;
+  let historyPushPending = false;
   function scheduleSave() {
     setSaveIndicator('saving');
+    // Coalesce history pushes per "mutation batch" so drag-moves don't
+    // record dozens of intermediate states. We push once per save flush.
+    historyPushPending = true;
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
+      if (historyPushPending) {
+        pushHistory();
+        historyPushPending = false;
+      }
       const ok = D.save(diagram);
       setSaveIndicator(ok ? 'saved' : 'error');
     }, 400);
@@ -184,8 +232,134 @@
     bindCanvasInteractions(svg, shadow);
     renderSelectionOverlays(shadow);
     renderHoverPorts(shadow);
+    renderSmartGuides(shadow);
+    renderRulers();
     renderPageStrip();
     updateStatusBar();
+  }
+
+  // ---------- Rulers ----------
+  function renderRulers() {
+    const wrap = $('#canvasArea');
+    if (!wrap) return;
+    let topRuler = wrap.querySelector('.ruler-top');
+    let leftRuler = wrap.querySelector('.ruler-left');
+    if (!state.showRulers) {
+      if (topRuler) topRuler.remove();
+      if (leftRuler) leftRuler.remove();
+      wrap.classList.remove('with-rulers');
+      return;
+    }
+    wrap.classList.add('with-rulers');
+    if (!topRuler) {
+      topRuler = document.createElement('canvas');
+      topRuler.className = 'ruler ruler-top';
+      wrap.appendChild(topRuler);
+    }
+    if (!leftRuler) {
+      leftRuler = document.createElement('canvas');
+      leftRuler.className = 'ruler ruler-left';
+      wrap.appendChild(leftRuler);
+    }
+    const scroll = $('#canvasScroll');
+    const sw = scroll.clientWidth;
+    const sh = scroll.clientHeight;
+    const dpr = window.devicePixelRatio || 1;
+    drawRuler(topRuler, sw - 22, 22, 'horizontal', dpr);
+    drawRuler(leftRuler, 22, sh - 22, 'vertical', dpr);
+  }
+
+  function drawRuler(canvas, w, h, orientation, dpr) {
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+    canvas.style.width = w + 'px';
+    canvas.style.height = h + 'px';
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = '#f8fafc';
+    ctx.fillRect(0, 0, w, h);
+    ctx.strokeStyle = '#94a3b8';
+    ctx.fillStyle = '#475569';
+    ctx.font = '10px Segoe UI, sans-serif';
+    const minor = 10 * state.zoom;
+    const major = 100 * state.zoom;
+    const scroll = $('#canvasScroll');
+    const shadow = $('#canvasShadow');
+    const sRect = shadow.getBoundingClientRect();
+    const cRect = scroll.getBoundingClientRect();
+    if (orientation === 'horizontal') {
+      const originPx = sRect.left - cRect.left;
+      for (let x = 0; x < w; x++) {
+        const pageX = (x - originPx) / state.zoom;
+        if (pageX < 0) continue;
+        const onMajor = Math.abs(((x - originPx) % major)) < 1;
+        const onMinor = Math.abs(((x - originPx) % minor)) < 1;
+        if (onMajor) {
+          ctx.beginPath();
+          ctx.moveTo(x + 0.5, h * 0.4);
+          ctx.lineTo(x + 0.5, h);
+          ctx.stroke();
+          ctx.fillText(String(Math.round(pageX)), x + 2, h * 0.4);
+        } else if (onMinor) {
+          ctx.beginPath();
+          ctx.moveTo(x + 0.5, h * 0.7);
+          ctx.lineTo(x + 0.5, h);
+          ctx.stroke();
+        }
+      }
+    } else {
+      const originPx = sRect.top - cRect.top;
+      for (let y = 0; y < h; y++) {
+        const pageY = (y - originPx) / state.zoom;
+        if (pageY < 0) continue;
+        const onMajor = Math.abs(((y - originPx) % major)) < 1;
+        const onMinor = Math.abs(((y - originPx) % minor)) < 1;
+        if (onMajor) {
+          ctx.beginPath();
+          ctx.moveTo(w * 0.4, y + 0.5);
+          ctx.lineTo(w, y + 0.5);
+          ctx.stroke();
+          ctx.save();
+          ctx.translate(w * 0.4 - 2, y + 2);
+          ctx.rotate(-Math.PI / 2);
+          ctx.fillText(String(Math.round(pageY)), 0, 0);
+          ctx.restore();
+        } else if (onMinor) {
+          ctx.beginPath();
+          ctx.moveTo(w * 0.7, y + 0.5);
+          ctx.lineTo(w, y + 0.5);
+          ctx.stroke();
+        }
+      }
+    }
+  }
+
+  // ---------- Smart guides (alignment lines during drag) ----------
+  function renderSmartGuides(shadow) {
+    shadow.querySelectorAll('.smart-guide').forEach((el) => el.remove());
+    if (!state.smartGuides || !state.smartGuides.length) return;
+    const ns = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('class', 'smart-guide');
+    const page = activePage();
+    svg.setAttribute('width', page.w);
+    svg.setAttribute('height', page.h);
+    svg.style.position = 'absolute';
+    svg.style.left = '0';
+    svg.style.top = '0';
+    svg.style.pointerEvents = 'none';
+    for (const ln of state.smartGuides) {
+      const line = document.createElementNS(ns, 'line');
+      line.setAttribute('x1', ln.x1);
+      line.setAttribute('y1', ln.y1);
+      line.setAttribute('x2', ln.x2);
+      line.setAttribute('y2', ln.y2);
+      line.setAttribute('stroke', '#ec4899');
+      line.setAttribute('stroke-width', '1');
+      line.setAttribute('stroke-dasharray', '4 3');
+      svg.appendChild(line);
+    }
+    shadow.appendChild(svg);
   }
 
   // Mouse coords → page-local coords (accounting for zoom + scroll).
@@ -215,6 +389,29 @@
 
       if (target.classList.contains('shape')) {
         const id = target.getAttribute('data-shape-id');
+        const page = activePage();
+
+        // Format painter: clicking a shape paints, doesn't select.
+        if (state.paintMode) {
+          const sh = D.findShape(page, id);
+          if (sh) {
+            sh.fill = state.paintMode.fill;
+            sh.stroke = state.paintMode.stroke;
+            sh.strokeWidth = state.paintMode.strokeWidth;
+            sh.opacity = state.paintMode.opacity;
+            sh.textStyle = JSON.parse(JSON.stringify(state.paintMode.textStyle));
+            sh._themed = false;
+            scheduleSave();
+            renderCanvas();
+          }
+          // Hold Alt to keep painting; otherwise exit after first paint.
+          if (!e.altKey) {
+            state.paintMode = null;
+            document.body.classList.remove('format-painter-active');
+          }
+          return;
+        }
+
         if (e.shiftKey) {
           if (state.selectedShapeIds.has(id)) state.selectedShapeIds.delete(id);
           else state.selectedShapeIds.add(id);
@@ -223,8 +420,11 @@
           state.selectedConnectorIds.clear();
           state.selectedShapeIds.add(id);
         }
+        // Group-aware selection: if any selected shape is in a group,
+        // pull every group member into the selection.
+        state.selectedShapeIds = D.expandSelectionToGroups(page, state.selectedShapeIds);
+
         // Start a move drag carrying every selected shape.
-        const page = activePage();
         const initial = new Map();
         for (const sid of state.selectedShapeIds) {
           const sh = D.findShape(page, sid);
@@ -280,9 +480,24 @@
     const shadow = $('#canvasShadow');
     const pt = eventToPagePoint(e, shadow);
     if (drag.mode === 'move') {
-      const dx = pt.x - drag.startX;
-      const dy = pt.y - drag.startY;
+      let dx = pt.x - drag.startX;
+      let dy = pt.y - drag.startY;
       const page = activePage();
+      // Smart guides: snap the *primary* dragged shape's edges/center to
+      // matching edges/centers of any non-selected shape. The other
+      // selected shapes follow the same dx/dy so multi-selection drag
+      // stays coherent.
+      const primaryId = [...drag.initial.keys()][0];
+      const primaryInit = drag.initial.get(primaryId);
+      const primary = D.findShape(page, primaryId);
+      if (primary && primaryInit) {
+        const guides = computeSmartGuides(page, primary, primaryInit, dx, dy);
+        if (guides.snapX != null) dx = guides.snapX - primaryInit.x;
+        if (guides.snapY != null) dy = guides.snapY - primaryInit.y;
+        state.smartGuides = guides.lines;
+      } else {
+        state.smartGuides = [];
+      }
       for (const [sid, init] of drag.initial.entries()) {
         const sh = D.findShape(page, sid);
         if (!sh) continue;
@@ -331,8 +546,71 @@
       scheduleSave();
     }
     drag = null;
+    state.smartGuides = [];
     renderCanvas();
   });
+
+  // Compute smart-guide snap suggestions for a moving shape.
+  // Returns { snapX, snapY, lines } where snapX/snapY are absolute
+  // top-left coordinates the shape should snap to (or null) and lines
+  // is the list of pink alignment lines to draw in page space.
+  const SMART_GUIDE_THRESHOLD = 5;
+  function computeSmartGuides(page, primary, primaryInit, dx, dy) {
+    const targetX = primaryInit.x + dx;
+    const targetY = primaryInit.y + dy;
+    const candidateX = [
+      { v: targetX, kind: 'left' },
+      { v: targetX + primary.w / 2, kind: 'cx' },
+      { v: targetX + primary.w, kind: 'right' },
+    ];
+    const candidateY = [
+      { v: targetY, kind: 'top' },
+      { v: targetY + primary.h / 2, kind: 'cy' },
+      { v: targetY + primary.h, kind: 'bottom' },
+    ];
+    let bestX = null, bestY = null;
+    const lines = [];
+    for (const other of page.shapes) {
+      if (state.selectedShapeIds.has(other.id)) continue;
+      const otherEdges = [
+        { v: other.x, line: other.x },
+        { v: other.x + other.w / 2, line: other.x + other.w / 2 },
+        { v: other.x + other.w, line: other.x + other.w },
+      ];
+      for (const cx of candidateX) {
+        for (const ox of otherEdges) {
+          if (Math.abs(cx.v - ox.v) < SMART_GUIDE_THRESHOLD) {
+            const candidate = ox.v - (cx.kind === 'left' ? 0 : cx.kind === 'cx' ? primary.w / 2 : primary.w);
+            if (bestX == null || Math.abs(candidate - targetX) < Math.abs(bestX - targetX)) {
+              bestX = candidate;
+            }
+            const top = Math.min(other.y, targetY) - 12;
+            const bot = Math.max(other.y + other.h, targetY + primary.h) + 12;
+            lines.push({ x1: ox.line, y1: top, x2: ox.line, y2: bot });
+          }
+        }
+      }
+      const otherEdgesY = [
+        { v: other.y, line: other.y },
+        { v: other.y + other.h / 2, line: other.y + other.h / 2 },
+        { v: other.y + other.h, line: other.y + other.h },
+      ];
+      for (const cy of candidateY) {
+        for (const oy of otherEdgesY) {
+          if (Math.abs(cy.v - oy.v) < SMART_GUIDE_THRESHOLD) {
+            const candidate = oy.v - (cy.kind === 'top' ? 0 : cy.kind === 'cy' ? primary.h / 2 : primary.h);
+            if (bestY == null || Math.abs(candidate - targetY) < Math.abs(bestY - targetY)) {
+              bestY = candidate;
+            }
+            const left = Math.min(other.x, targetX) - 12;
+            const right = Math.max(other.x + other.w, targetX + primary.w) + 12;
+            lines.push({ x1: left, y1: oy.line, x2: right, y2: oy.line });
+          }
+        }
+      }
+    }
+    return { snapX: bestX, snapY: bestY, lines };
+  }
 
   function dropStencilAt(stencilId, cx, cy) {
     const stencil = STENCILS.getStencil(stencilId);
@@ -969,8 +1247,67 @@
       [...state.selectedShapeIds].forEach((id) => D.sendBackward(page, id));
       scheduleSave(); renderCanvas();
     },
-    group() { /* Placeholder: visual grouping; current model treats them as a multi-select. */ },
-    ungroup() { /* Mirror of group(). */ },
+    group() {
+      const page = activePage();
+      const ids = [...state.selectedShapeIds];
+      if (ids.length < 2) return;
+      D.groupShapes(page, ids);
+      scheduleSave();
+      renderCanvas();
+    },
+    ungroup() {
+      const page = activePage();
+      const ids = [...state.selectedShapeIds];
+      if (!ids.length) return;
+      if (D.ungroupShapes(page, ids)) {
+        scheduleSave();
+        renderCanvas();
+      }
+    },
+
+    // Align (selection ≥ 2 shapes)
+    alignSelLeft()   { alignSelection('left'); },
+    alignSelCenter() { alignSelection('center'); },
+    alignSelRight()  { alignSelection('right'); },
+    alignSelTop()    { alignSelection('top'); },
+    alignSelMiddle() { alignSelection('middle'); },
+    alignSelBottom() { alignSelection('bottom'); },
+
+    // Distribute (selection ≥ 3 shapes)
+    distributeH()    { distributeSelection('horizontal'); },
+    distributeV()    { distributeSelection('vertical'); },
+    spaceEvenly()    { distributeSelection('evenly'); },
+
+    // Flip
+    flipH() { flipSelection('h'); },
+    flipV() { flipSelection('v'); },
+
+    // Format painter
+    pickFormat() {
+      if (state.selectedShapeIds.size !== 1) {
+        alert('Select one shape to copy its format, then click Format Painter again on the targets.');
+        return;
+      }
+      const page = activePage();
+      const sh = D.findShape(page, [...state.selectedShapeIds][0]);
+      if (!sh) return;
+      state.paintMode = {
+        fill: sh.fill,
+        stroke: sh.stroke,
+        strokeWidth: sh.strokeWidth,
+        opacity: sh.opacity,
+        textStyle: JSON.parse(JSON.stringify(sh.textStyle || {})),
+      };
+      document.body.classList.add('format-painter-active');
+    },
+
+    // Find / Replace
+    showFind() {
+      const dlg = $('#findDialog');
+      if (typeof dlg.showModal === 'function') dlg.showModal();
+      else dlg.setAttribute('open', '');
+      $('#findInput').focus();
+    },
 
     // Insert
     addPage() {
@@ -1049,10 +1386,145 @@
       else ($('#askClaudeKey')?.value.trim() ? $('#askClaudeInput') : $('#askClaudeKey'))?.focus();
     },
 
-    // Stubs for forward compatibility
-    undo() { /* roadmap */ },
-    redo() { /* roadmap */ },
+    // Undo / Redo (real)
+    undo() {
+      if (history.index <= 0) return;
+      history.index--;
+      restoreSnapshot(history.stack[history.index]);
+      setSaveIndicator('saved');
+    },
+    redo() {
+      if (history.index >= history.stack.length - 1) return;
+      history.index++;
+      restoreSnapshot(history.stack[history.index]);
+      setSaveIndicator('saved');
+    },
+
+    // View toggles
+    toggleRulers() {
+      state.showRulers = !state.showRulers;
+      $('#rulersToggle').checked = state.showRulers;
+      renderCanvas();
+    },
   };
+
+  // ---------- Align / Distribute / Flip implementations ----------
+  function alignSelection(mode) {
+    const page = activePage();
+    const shapes = [...state.selectedShapeIds]
+      .map((id) => D.findShape(page, id))
+      .filter(Boolean);
+    if (shapes.length < 2) return;
+    const bounds = D.boundsOfShapes(shapes);
+    for (const s of shapes) {
+      switch (mode) {
+        case 'left':   s.x = bounds.x; break;
+        case 'center': s.x = bounds.x + (bounds.w - s.w) / 2; break;
+        case 'right':  s.x = bounds.x + bounds.w - s.w; break;
+        case 'top':    s.y = bounds.y; break;
+        case 'middle': s.y = bounds.y + (bounds.h - s.h) / 2; break;
+        case 'bottom': s.y = bounds.y + bounds.h - s.h; break;
+      }
+      s.x = Math.round(s.x);
+      s.y = Math.round(s.y);
+    }
+    scheduleSave();
+    renderCanvas();
+  }
+
+  function distributeSelection(mode) {
+    const page = activePage();
+    const shapes = [...state.selectedShapeIds]
+      .map((id) => D.findShape(page, id))
+      .filter(Boolean);
+    if (shapes.length < 3) return;
+    if (mode === 'horizontal' || mode === 'evenly') {
+      shapes.sort((a, b) => (a.x + a.w / 2) - (b.x + b.w / 2));
+      const first = shapes[0];
+      const last = shapes[shapes.length - 1];
+      const firstCx = first.x + first.w / 2;
+      const lastCx = last.x + last.w / 2;
+      const step = (lastCx - firstCx) / (shapes.length - 1);
+      shapes.forEach((s, i) => {
+        if (i === 0 || i === shapes.length - 1) return;
+        const cx = firstCx + i * step;
+        s.x = Math.round(cx - s.w / 2);
+      });
+    }
+    if (mode === 'vertical' || mode === 'evenly') {
+      shapes.sort((a, b) => (a.y + a.h / 2) - (b.y + b.h / 2));
+      const first = shapes[0];
+      const last = shapes[shapes.length - 1];
+      const firstCy = first.y + first.h / 2;
+      const lastCy = last.y + last.h / 2;
+      const step = (lastCy - firstCy) / (shapes.length - 1);
+      shapes.forEach((s, i) => {
+        if (i === 0 || i === shapes.length - 1) return;
+        const cy = firstCy + i * step;
+        s.y = Math.round(cy - s.h / 2);
+      });
+    }
+    scheduleSave();
+    renderCanvas();
+  }
+
+  function flipSelection(axis) {
+    const page = activePage();
+    let changed = false;
+    for (const id of state.selectedShapeIds) {
+      const sh = D.findShape(page, id);
+      if (!sh) continue;
+      if (axis === 'h') sh.flipH = !sh.flipH;
+      else if (axis === 'v') sh.flipV = !sh.flipV;
+      changed = true;
+    }
+    if (changed) { scheduleSave(); renderCanvas(); }
+  }
+
+  // ---------- Find / Replace ----------
+  function findMatches(query, caseSensitive) {
+    const results = [];
+    if (!query) return results;
+    const normalized = caseSensitive ? query : query.toLowerCase();
+    for (let pi = 0; pi < diagram.pages.length; pi++) {
+      const page = diagram.pages[pi];
+      for (const s of page.shapes) {
+        const txt = (s.text || '');
+        const probe = caseSensitive ? txt : txt.toLowerCase();
+        if (probe.includes(normalized)) {
+          results.push({ pageIndex: pi, shapeId: s.id, text: txt });
+        }
+      }
+    }
+    return results;
+  }
+
+  function replaceInDiagram(query, replacement, caseSensitive) {
+    const re = new RegExp(
+      query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
+      caseSensitive ? 'g' : 'gi'
+    );
+    let count = 0;
+    for (const page of diagram.pages) {
+      for (const s of page.shapes) {
+        if (s.text && re.test(s.text)) {
+          s.text = s.text.replace(re, replacement);
+          count++;
+          re.lastIndex = 0;
+        }
+      }
+    }
+    if (count) { scheduleSave(); renderCanvas(); }
+    return count;
+  }
+
+  function jumpToMatch(match) {
+    state.activePageId = diagram.pages[match.pageIndex].id;
+    state.selectedShapeIds = new Set([match.shapeId]);
+    state.selectedConnectorIds.clear();
+    renderCanvas();
+    renderPropertiesPanel();
+  }
 
   function applyTextStyle(opts) {
     const page = activePage();
@@ -1146,6 +1618,7 @@
     // Design controls
     $('#snapToggle').addEventListener('change', (e) => { state.snapToGrid = e.target.checked; });
     $('#gridToggle').addEventListener('change', (e) => { state.showGrid = e.target.checked; renderCanvas(); });
+    $('#rulersToggle').addEventListener('change', (e) => { state.showRulers = e.target.checked; renderCanvas(); });
     $('#pageSizeSelect').addEventListener('change', (e) => {
       const [w, h] = e.target.value.split(',').map(Number);
       const page = activePage();
@@ -1351,6 +1824,31 @@
         commands.showSaveDialog();
         return;
       }
+      // Find: Ctrl/Cmd+F
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
+        e.preventDefault();
+        commands.showFind();
+        return;
+      }
+      // Undo / Redo: Ctrl/Cmd+Z (shift = redo) and Ctrl/Cmd+Y
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) commands.redo();
+        else commands.undo();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+        e.preventDefault();
+        commands.redo();
+        return;
+      }
+      // Group / Ungroup: Ctrl/Cmd+G, Ctrl/Cmd+Shift+G
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'g') {
+        e.preventDefault();
+        if (e.shiftKey) commands.ungroup();
+        else commands.group();
+        return;
+      }
       if (inField && target.id === 'diagramTitle') return;
       if (inField) return;
 
@@ -1421,12 +1919,69 @@
     bindOpenFile();
     bindAskClaude();
     bindHelpModal();
+    bindFindDialog();
     bindPropertyInputs();
     bindKeyboard();
     renderAll();
     setSaveIndicator('saved');
+    // Seed the history stack with the initial diagram so the first
+    // undo never empties out below an unsaved state.
+    pushHistory();
+    // Keep rulers redraw in sync with viewport changes.
+    window.addEventListener('resize', () => { if (state.showRulers) renderRulers(); });
+    $('#canvasScroll')?.addEventListener('scroll', () => { if (state.showRulers) renderRulers(); });
     // Resize fit-to-window on first paint
     setTimeout(() => commands.zoomFit(), 0);
+  }
+
+  function bindFindDialog() {
+    const dlg = $('#findDialog');
+    if (!dlg) return;
+    const input = $('#findInput');
+    const replInput = $('#findReplaceInput');
+    const caseChk = $('#findCaseChk');
+    const resultsEl = $('#findResults');
+    const status = $('#findStatus');
+
+    function renderResults() {
+      const q = input.value;
+      const cs = caseChk.checked;
+      resultsEl.innerHTML = '';
+      if (!q) {
+        status.textContent = '';
+        return;
+      }
+      const matches = findMatches(q, cs);
+      status.textContent = matches.length === 0
+        ? 'No matches.'
+        : `${matches.length} match${matches.length === 1 ? '' : 'es'}`;
+      matches.forEach((m, i) => {
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'find-result';
+        const page = diagram.pages[m.pageIndex];
+        item.textContent = `${page.name}: ${m.text.slice(0, 60)}`;
+        item.addEventListener('click', () => {
+          jumpToMatch(m);
+        });
+        resultsEl.appendChild(item);
+      });
+    }
+
+    input.addEventListener('input', renderResults);
+    caseChk.addEventListener('change', renderResults);
+    $('#findCloseBtn').addEventListener('click', () => dlg.close());
+    $('#findReplaceBtn').addEventListener('click', (e) => {
+      e.preventDefault();
+      const q = input.value;
+      if (!q) return;
+      const cs = caseChk.checked;
+      const count = replaceInDiagram(q, replInput.value, cs);
+      status.textContent = count === 0
+        ? 'No replacements made.'
+        : `Replaced ${count} occurrence${count === 1 ? '' : 's'}.`;
+      renderResults();
+    });
   }
 
   // ---------- Misc utilities ----------

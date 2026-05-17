@@ -195,7 +195,29 @@
           <button class="ribbon-btn" data-cmd="group" title="Group (Ctrl+G)">Group</button>
           <button class="ribbon-btn" data-cmd="ungroup" title="Ungroup (Ctrl+Shift+G)">Ungroup</button>
         </div>
+        <div class="group-row">
+          <button class="ribbon-btn" data-cmd="flipH" title="Flip horizontal">⇋</button>
+          <button class="ribbon-btn" data-cmd="flipV" title="Flip vertical">⇅</button>
+          <button class="ribbon-btn" data-cmd="pickFormat" title="Format painter — click to copy format, then click target shapes">🖌</button>
+        </div>
         <div class="group-label">Arrange</div>
+      </div>
+
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn" data-cmd="alignSelLeft"   title="Align left">⫷</button>
+          <button class="ribbon-btn" data-cmd="alignSelCenter" title="Align center horizontally">⫶</button>
+          <button class="ribbon-btn" data-cmd="alignSelRight"  title="Align right">⫸</button>
+          <button class="ribbon-btn" data-cmd="alignSelTop"    title="Align top">⫯</button>
+          <button class="ribbon-btn" data-cmd="alignSelMiddle" title="Align middle vertically">⫰</button>
+          <button class="ribbon-btn" data-cmd="alignSelBottom" title="Align bottom">⫱</button>
+        </div>
+        <div class="group-row">
+          <button class="ribbon-btn" data-cmd="distributeH" title="Distribute horizontally">⇔</button>
+          <button class="ribbon-btn" data-cmd="distributeV" title="Distribute vertically">⇕</button>
+          <button class="ribbon-btn" data-cmd="spaceEvenly" title="Space evenly (both axes)">⫾</button>
+        </div>
+        <div class="group-label">Align</div>
       </div>
 
       <div class="group">
@@ -203,6 +225,7 @@
           <button class="ribbon-btn" data-cmd="duplicateSelection" title="Duplicate (Ctrl+D)">Duplicate</button>
           <button class="ribbon-btn" data-cmd="deleteSelection" title="Delete (Del)">Delete</button>
           <button class="ribbon-btn" data-cmd="selectAll" title="Select all (Ctrl+A)">All</button>
+          <button class="ribbon-btn" data-cmd="showFind" title="Find &amp; Replace (Ctrl+F)">🔍</button>
         </div>
         <div class="group-label">Editing</div>
       </div>
@@ -283,6 +306,11 @@
         <div class="group-row">
           <button class="ribbon-btn wide" data-cmd="toggleStencils">Stencils panel</button>
           <button class="ribbon-btn wide" data-cmd="toggleSidePane">Properties / Layers</button>
+        </div>
+        <div class="group-row">
+          <label class="select sm" style="display:inline-flex;align-items:center;gap:3px;border:1px solid var(--ribbon-border);padding:2px 6px;background:#fff;">
+            <input type="checkbox" id="rulersToggle" /> Rulers
+          </label>
         </div>
         <div class="group-label">Panels</div>
       </div>
@@ -391,6 +419,34 @@
   </dialog>
 
   <input type="file" id="openFileInput" accept=".vsdx,.vsdm,.svg" hidden />
+
+  <dialog class="save-dialog find-dialog" id="findDialog">
+    <form method="dialog">
+      <header>
+        <h3>Find &amp; Replace</h3>
+        <button type="button" id="findCloseBtn" aria-label="Close">&times;</button>
+      </header>
+      <div class="body">
+        <label>
+          Find
+          <input id="findInput" type="text" autocomplete="off" />
+        </label>
+        <label>
+          Replace with
+          <input id="findReplaceInput" type="text" autocomplete="off" />
+        </label>
+        <label style="display:flex;flex-direction:row;align-items:center;gap:6px;">
+          <input id="findCaseChk" type="checkbox" /> Case sensitive
+        </label>
+        <div id="findStatus" style="font-size:12px;color:var(--muted);min-height:1.2em;"></div>
+        <div id="findResults" class="find-results"></div>
+      </div>
+      <footer>
+        <button type="button" id="findReplaceBtn">Replace all</button>
+        <button type="submit" class="primary">Close</button>
+      </footer>
+    </form>
+  </dialog>
 
   <div class="help-modal" id="helpInfoModal" hidden role="dialog" aria-modal="true" aria-labelledby="helpInfoTitle">
     <div class="help-modal-card">
