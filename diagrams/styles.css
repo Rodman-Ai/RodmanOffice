@@ -254,7 +254,24 @@ body {
   width: 100%; box-sizing: border-box;
   overflow-x: hidden; overflow-y: visible;
 }
+.ribbon.collapsed { display: none !important; }
 .ribbon > .group { display: none !important; }
+
+/* "▾" / "▴" toggle anchored at the right edge of the .tabs row.
+   Single-tap collapses or shows the ribbon — a visible
+   affordance for the dbltap gesture, which Safari handles
+   unreliably on mobile. */
+.ribbon-collapse-btn {
+  margin-left: auto;
+  background: transparent;
+  border: 0;
+  color: rgba(255, 255, 255, 0.9);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 4px 12px;
+}
+.ribbon-collapse-btn:hover { background: rgba(255, 255, 255, 0.12); }
 
 .ribbon-panel {
   display: none;
@@ -411,7 +428,13 @@ body {
 .canvas-scroll {
   flex: 1; overflow: auto;
   display: flex; align-items: center; justify-content: center;
-  padding: 24px;
+  /* Viewport-sized padding guarantees scroll headroom in every
+     direction at every zoom level. Without this, fit-to-window zoom
+     left .canvas-shadow exactly the size of #canvasScroll so plain
+     wheel events + the gestures-helper touch-pan had nothing to
+     scroll. commands.zoomFit() re-centers scrollLeft / scrollTop
+     after the padding so the canvas still appears centered on load. */
+  padding: 50vh 50vw;
   background: var(--workspace-bg);
 }
 .canvas-shadow {
@@ -1101,7 +1124,7 @@ body.format-painter-active .canvas-svg { cursor: crosshair; }
     transition: bottom 0.2s;
   }
   .side-pane.is-open { bottom: 100px; }
-  .canvas-scroll { padding: 12px; }
+  .canvas-scroll { padding: 50vh 50vw; }
   .claude-panel {
     top: 42px; right: 8px; bottom: 8px;
     width: calc(100vw - 16px);
