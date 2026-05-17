@@ -59,6 +59,10 @@
       }, opts.textStyle || {}),
       layerId: opts.layerId || null,
       _themed: opts._themed !== false,
+      data: opts.data ? { ...opts.data } : {},        // shape data fields { name: { value, type } }
+      hyperlinks: Array.isArray(opts.hyperlinks) ? [...opts.hyperlinks] : [], // [{ kind, target, label }]
+      comments: Array.isArray(opts.comments) ? [...opts.comments] : [],       // [{ author, ts, text }]
+      customPorts: Array.isArray(opts.customPorts) ? [...opts.customPorts] : [],
     };
   }
 
@@ -99,6 +103,8 @@
       pages: [newPage()],
       layers: [layer],
       activeLayerId: layer.id,
+      // Data graphics config: { field, mode: 'color'|'icon'|'bar', palette? }
+      dataGraphics: null,
     };
   }
 

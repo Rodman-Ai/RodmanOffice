@@ -462,6 +462,15 @@
         const id = target.getAttribute('data-shape-id');
         const page = activePage();
 
+        // Cmd/Ctrl-click on a shape with hyperlinks follows the first.
+        if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey) {
+          const sh = D.findShape(page, id);
+          if (sh && Array.isArray(sh.hyperlinks) && sh.hyperlinks.length) {
+            followHyperlink(sh.hyperlinks[0]);
+            return;
+          }
+        }
+
         // Format painter: clicking a shape paints, doesn't select.
         if (state.paintMode) {
           const sh = D.findShape(page, id);
@@ -982,6 +991,7 @@
   }
 
   function renderPropertiesPanel() {
+    renderDataPanel(); // Keep Data tab in sync with selection.
     const empty = $('#propsEmpty');
     const grid = $('#propsGrid');
     if (state.selectedShapeIds.size !== 1) {
@@ -1483,6 +1493,164 @@
       renderCanvas();
     },
 
+    // ---------- Phase 4: data, validation, comments ----------
+    addShapeDataField() {
+      if (state.selectedShapeIds.size !== 1) return;
+      const name = prompt('Field name'); if (!name) return;
+      const value = prompt('Value', '') || '';
+      const page = activePage();
+      const sh = D.findShape(page, [...state.selectedShapeIds][0]);
+      if (!sh) return;
+      sh.data = sh.data || {};
+      sh.data[name] = { value, type: inferType(value) };
+      scheduleSave();
+      renderDataPanel();
+      renderCanvas();
+    },
+    removeShapeDataField(btn) {
+      if (state.selectedShapeIds.size !== 1) return;
+      const page = activePage();
+      const sh = D.findShape(page, [...state.selectedShapeIds][0]);
+      if (!sh || !sh.data) return;
+      delete sh.data[btn.dataset.field];
+      scheduleSave();
+      renderDataPanel();
+      renderCanvas();
+    },
+    addHyperlink() {
+      if (state.selectedShapeIds.size !== 1) return;
+      const page = activePage();
+      const sh = D.findShape(page, [...state.selectedShapeIds][0]);
+      if (!sh) return;
+      const kindStr = prompt('Hyperlink kind: url, page, or mailto', 'url');
+      if (!kindStr) return;
+      const kind = kindStr.trim().toLowerCase();
+      let target;
+      if (kind === 'page') {
+        const pageNames = diagram.pages.map((p, i) => `${i + 1}: ${p.name}`).join('\n');
+        target = prompt('Target page (1-based index):\n' + pageNames, '1');
+      } else {
+        target = prompt(kind === 'mailto' ? 'Email address' : 'URL', '');
+      }
+      if (!target) return;
+      const label = prompt('Label (optional)', target) || target;
+      sh.hyperlinks = sh.hyperlinks || [];
+      sh.hyperlinks.push({ kind, target, label });
+      scheduleSave();
+      renderDataPanel();
+      renderCanvas();
+    },
+    removeHyperlink(btn) {
+      if (state.selectedShapeIds.size !== 1) return;
+      const page = activePage();
+      const sh = D.findShape(page, [...state.selectedShapeIds][0]);
+      if (!sh || !sh.hyperlinks) return;
+      const idx = parseInt(btn.dataset.idx, 10);
+      sh.hyperlinks.splice(idx, 1);
+      scheduleSave();
+      renderDataPanel();
+      renderCanvas();
+    },
+    addComment() {
+      if (state.selectedShapeIds.size !== 1) return;
+      const text = prompt('Comment'); if (!text) return;
+      const author = prompt('Author', 'You') || 'You';
+      const page = activePage();
+      const sh = D.findShape(page, [...state.selectedShapeIds][0]);
+      if (!sh) return;
+      sh.comments = sh.comments || [];
+      sh.comments.push({ author, ts: Date.now(), text });
+      scheduleSave();
+      renderDataPanel();
+      renderCanvas();
+    },
+    removeComment(btn) {
+      if (state.selectedShapeIds.size !== 1) return;
+      const page = activePage();
+      const sh = D.findShape(page, [...state.selectedShapeIds][0]);
+      if (!sh || !sh.comments) return;
+      const idx = parseInt(btn.dataset.idx, 10);
+      sh.comments.splice(idx, 1);
+      scheduleSave();
+      renderDataPanel();
+      renderCanvas();
+    },
+    importDataCsv() {
+      const dlg = $('#csvImportDialog');
+      $('#csvImportInput').value = '';
+      if (typeof dlg.showModal === 'function') dlg.showModal();
+      else dlg.setAttribute('open', '');
+    },
+    runValidation() {
+      const issues = validateDiagram();
+      const body = issues.length
+        ? '<ul>' + issues.map((i) => `<li><b>${escHtml(i.severity)}</b>: ${escHtml(i.message)} <button data-shape="${i.shapeId}" data-page="${i.pageIndex}" class="ribbon-btn">Locate</button></li>`).join('') + '</ul>'
+        : '<p>No validation issues found. 🎉</p>';
+      showHelpModal('Validation results', body);
+      // Wire locate buttons
+      $('#helpInfoBody').querySelectorAll('button[data-shape]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const pi = parseInt(btn.dataset.page, 10);
+          const sid = btn.dataset.shape;
+          state.activePageId = diagram.pages[pi].id;
+          state.selectedShapeIds = new Set([sid]);
+          state.selectedConnectorIds.clear();
+          renderCanvas();
+          renderPropertiesPanel();
+          $('#helpInfoModal').hidden = true;
+        });
+      });
+    },
+    exportReport() {
+      const rows = [];
+      const fields = new Set();
+      for (const page of diagram.pages) {
+        for (const s of page.shapes) {
+          if (s.data) Object.keys(s.data).forEach((k) => fields.add(k));
+        }
+      }
+      const cols = ['page', 'shape', 'stencil', 'text', ...fields];
+      rows.push(cols.join(','));
+      for (let pi = 0; pi < diagram.pages.length; pi++) {
+        const page = diagram.pages[pi];
+        for (const s of page.shapes) {
+          const row = [csvCell(page.name), csvCell(s.id), csvCell(s.stencil), csvCell(s.text || '')];
+          for (const f of fields) {
+            const entry = s.data && s.data[f];
+            row.push(csvCell(entry ? (entry.value != null ? entry.value : entry) : ''));
+          }
+          rows.push(row.join(','));
+        }
+      }
+      const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
+      downloadBlob(blob, (diagram.title || 'diagram').replace(/[^\w\-]+/g, '_') + '_report.csv');
+    },
+    configureDataGraphics() {
+      const fields = collectDataFields();
+      if (!fields.size) { alert('Add shape data fields first.'); return; }
+      const field = prompt('Field to visualize:\n' + [...fields].join('\n'), [...fields][0]);
+      if (!field) return;
+      const mode = prompt('Mode: color, icon, bar', 'color');
+      if (!mode) return;
+      if (mode === 'bar') {
+        const max = parseFloat(prompt('Max value for bar scale', '100'));
+        diagram.dataGraphics = { field, mode: 'bar', min: 0, max: isFinite(max) ? max : 100, barColor: '#0ea5e9' };
+      } else if (mode === 'icon') {
+        diagram.dataGraphics = { field, mode: 'icon', iconMap: { true: '✓', false: '✗', warning: '⚠', high: '⚠', low: '✓' } };
+      } else {
+        diagram.dataGraphics = { field, mode: 'color', palette: {} };
+      }
+      window.RodmanRender.dataGraphicsCfg = diagram.dataGraphics;
+      scheduleSave();
+      renderCanvas();
+    },
+    clearDataGraphics() {
+      diagram.dataGraphics = null;
+      window.RodmanRender.dataGraphicsCfg = null;
+      scheduleSave();
+      renderCanvas();
+    },
+
     // ---------- Phase 3: connectors + layout ----------
     setConnectorRoute(btn) { setConnectorProp('routeStyle', btn?.dataset.route || 'orthogonal'); },
     setConnectorLine(btn)  { setConnectorProp('lineStyle',  btn?.dataset.line  || 'solid'); },
@@ -1674,6 +1842,204 @@
     }
     if (count) { scheduleSave(); renderCanvas(); }
     return count;
+  }
+
+  // ---------- Phase 4 helpers ----------
+  // (escHtml is defined in the misc-utilities section near end of file.)
+  function inferType(v) {
+    if (v === '' || v == null) return 'string';
+    if (!isNaN(parseFloat(v)) && isFinite(v)) return 'number';
+    if (v === 'true' || v === 'false') return 'boolean';
+    return 'string';
+  }
+  function csvCell(v) {
+    const s = String(v == null ? '' : v);
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  }
+  function collectDataFields() {
+    const fields = new Set();
+    for (const page of diagram.pages) {
+      for (const s of page.shapes) {
+        if (s.data) Object.keys(s.data).forEach((f) => fields.add(f));
+      }
+    }
+    return fields;
+  }
+
+  // Built-in validation rules. Each returns array of
+  // { severity: 'warn'|'error', message, pageIndex, shapeId }.
+  const VALIDATION_RULES = [
+    {
+      name: 'orphan-shape',
+      check(diagram) {
+        const issues = [];
+        for (let pi = 0; pi < diagram.pages.length; pi++) {
+          const p = diagram.pages[pi];
+          for (const s of p.shapes) {
+            const used = p.connectors.some((c) => c.fromShapeId === s.id || c.toShapeId === s.id);
+            if (!used && p.shapes.length > 1) {
+              issues.push({ severity: 'warn', message: `Orphan shape "${s.text || s.stencil}"`, pageIndex: pi, shapeId: s.id });
+            }
+          }
+        }
+        return issues;
+      },
+    },
+    {
+      name: 'decision-outputs',
+      check(diagram) {
+        const issues = [];
+        for (let pi = 0; pi < diagram.pages.length; pi++) {
+          const p = diagram.pages[pi];
+          for (const s of p.shapes) {
+            if (!/decision|bpmnExclusive|bpmnInclusive|bpmnParallel/i.test(s.stencil)) continue;
+            const outDeg = p.connectors.filter((c) => c.fromShapeId === s.id).length;
+            if (outDeg < 2) {
+              issues.push({ severity: 'warn', message: `Decision "${s.text || s.stencil}" should have ≥2 outgoing connectors (has ${outDeg})`, pageIndex: pi, shapeId: s.id });
+            }
+          }
+        }
+        return issues;
+      },
+    },
+    {
+      name: 'start-event-inputs',
+      check(diagram) {
+        const issues = [];
+        for (let pi = 0; pi < diagram.pages.length; pi++) {
+          const p = diagram.pages[pi];
+          for (const s of p.shapes) {
+            if (!/bpmnStartEvent/i.test(s.stencil)) continue;
+            const inDeg = p.connectors.filter((c) => c.toShapeId === s.id).length;
+            if (inDeg > 0) {
+              issues.push({ severity: 'error', message: `Start Event "${s.text || s.stencil}" should have 0 incoming connectors (has ${inDeg})`, pageIndex: pi, shapeId: s.id });
+            }
+          }
+        }
+        return issues;
+      },
+    },
+    {
+      name: 'end-event-outputs',
+      check(diagram) {
+        const issues = [];
+        for (let pi = 0; pi < diagram.pages.length; pi++) {
+          const p = diagram.pages[pi];
+          for (const s of p.shapes) {
+            if (!/bpmnEndEvent/i.test(s.stencil)) continue;
+            const outDeg = p.connectors.filter((c) => c.fromShapeId === s.id).length;
+            if (outDeg > 0) {
+              issues.push({ severity: 'error', message: `End Event "${s.text || s.stencil}" should have 0 outgoing connectors (has ${outDeg})`, pageIndex: pi, shapeId: s.id });
+            }
+          }
+        }
+        return issues;
+      },
+    },
+  ];
+
+  function validateDiagram() {
+    const all = [];
+    for (const rule of VALIDATION_RULES) all.push(...rule.check(diagram));
+    return all;
+  }
+
+  function followHyperlink(link) {
+    if (!link) return;
+    if (link.kind === 'page') {
+      const idx = parseInt(link.target, 10) - 1;
+      if (idx >= 0 && idx < diagram.pages.length) {
+        state.activePageId = diagram.pages[idx].id;
+        clearSelection();
+        renderCanvas();
+      }
+    } else if (link.kind === 'mailto') {
+      window.open('mailto:' + link.target, '_self');
+    } else {
+      window.open(link.target, '_blank', 'noopener');
+    }
+  }
+
+  // Render the new Data side-pane tab.
+  function renderDataPanel() {
+    const body = $('#sidePaneData');
+    if (!body) return;
+    if (state.selectedShapeIds.size !== 1) {
+      body.innerHTML = '<div class="props-empty">Select a single shape to edit its data, hyperlinks, and comments.</div>';
+      return;
+    }
+    const page = activePage();
+    const sh = D.findShape(page, [...state.selectedShapeIds][0]);
+    if (!sh) return;
+    let html = '';
+    // Shape Data
+    html += '<div class="props-section-title">Shape Data</div>';
+    if (!sh.data || !Object.keys(sh.data).length) {
+      html += '<div class="props-empty" style="padding:6px;">No fields.</div>';
+    } else {
+      html += '<div class="data-field-list">';
+      for (const [k, v] of Object.entries(sh.data)) {
+        const value = v && v.value != null ? v.value : v;
+        html += `<div class="data-field-row">` +
+          `<input type="text" class="data-field-val" data-field="${escHtml(k)}" value="${escHtml(value)}" data-kind="value" />` +
+          `<span class="data-field-name">${escHtml(k)}</span>` +
+          `<button class="ribbon-btn sm" data-cmd="removeShapeDataField" data-field="${escHtml(k)}" title="Remove">×</button>` +
+          `</div>`;
+      }
+      html += '</div>';
+    }
+    html += '<div><button class="ribbon-btn" data-cmd="addShapeDataField">+ Field</button> ';
+    html += '<button class="ribbon-btn" data-cmd="importDataCsv" title="Paste CSV to import data fields">Import CSV…</button></div>';
+    // Hyperlinks
+    html += '<div class="props-section-title">Hyperlinks</div>';
+    if (!sh.hyperlinks || !sh.hyperlinks.length) {
+      html += '<div class="props-empty" style="padding:6px;">None.</div>';
+    } else {
+      html += '<div class="data-field-list">';
+      sh.hyperlinks.forEach((h, i) => {
+        html += `<div class="data-field-row hyperlink-row" data-idx="${i}">` +
+          `<span class="hyperlink-kind">${escHtml(h.kind)}</span>` +
+          `<span class="hyperlink-label" title="${escHtml(h.target)}">${escHtml(h.label || h.target)}</span>` +
+          `<button class="ribbon-btn sm" data-cmd="removeHyperlink" data-idx="${i}">×</button>` +
+          `</div>`;
+      });
+      html += '</div>';
+    }
+    html += '<div><button class="ribbon-btn" data-cmd="addHyperlink">+ Hyperlink</button></div>';
+    // Comments
+    html += '<div class="props-section-title">Comments</div>';
+    if (!sh.comments || !sh.comments.length) {
+      html += '<div class="props-empty" style="padding:6px;">No comments.</div>';
+    } else {
+      html += '<div class="comment-list">';
+      sh.comments.forEach((c, i) => {
+        const dt = new Date(c.ts || Date.now()).toLocaleString();
+        html += `<div class="comment-row">` +
+          `<div class="comment-meta"><b>${escHtml(c.author || 'Anon')}</b> · ${escHtml(dt)}</div>` +
+          `<div class="comment-text">${escHtml(c.text)}</div>` +
+          `<button class="ribbon-btn sm" data-cmd="removeComment" data-idx="${i}">×</button>` +
+          `</div>`;
+      });
+      html += '</div>';
+    }
+    html += '<div><button class="ribbon-btn" data-cmd="addComment">+ Comment</button></div>';
+    body.innerHTML = html;
+    // Wire all data-cmd buttons inside the panel.
+    body.querySelectorAll('[data-cmd]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const cmd = btn.dataset.cmd;
+        if (commands[cmd]) commands[cmd](btn);
+      });
+    });
+    body.querySelectorAll('.data-field-val').forEach((inp) => {
+      inp.addEventListener('change', () => {
+        const f = inp.dataset.field;
+        const value = inp.value;
+        sh.data[f] = { value, type: inferType(value) };
+        scheduleSave();
+        renderCanvas();
+      });
+    });
   }
 
   function jumpToMatch(match) {
@@ -2294,11 +2660,15 @@
 
   // ---------- Bootstrap ----------
   function renderAll() {
+    // Sync the live data-graphics ref so the renderer picks up any
+    // change after a load/restore.
+    if (window.RodmanRender) window.RodmanRender.dataGraphicsCfg = diagram.dataGraphics || null;
     renderStencilDrawer();
     renderThemeStrip();
     renderLayersPanel();
     renderCanvas();
     renderPropertiesPanel();
+    renderDataPanel();
   }
 
   function bootstrap() {
@@ -2313,6 +2683,7 @@
     bindAskClaude();
     bindHelpModal();
     bindFindDialog();
+    bindCsvImportDialog();
     bindPropertyInputs();
     bindKeyboard();
     renderAll();
@@ -2325,6 +2696,62 @@
     $('#canvasScroll')?.addEventListener('scroll', () => { if (state.showRulers) renderRulers(); });
     // Resize fit-to-window on first paint
     setTimeout(() => commands.zoomFit(), 0);
+  }
+
+  function bindCsvImportDialog() {
+    const dlg = $('#csvImportDialog');
+    if (!dlg) return;
+    $('#csvImportCancelBtn').addEventListener('click', (e) => { e.preventDefault(); dlg.close(); });
+    $('#csvImportApplyBtn').addEventListener('click', (e) => {
+      e.preventDefault();
+      const text = $('#csvImportInput').value;
+      if (!text.trim()) { dlg.close(); return; }
+      const rows = parseCsv(text);
+      if (!rows.length) { dlg.close(); return; }
+      const headers = rows[0];
+      const data = rows.slice(1);
+      const page = activePage();
+      let count = 0;
+      data.forEach((row, i) => {
+        const sh = page.shapes[i];
+        if (!sh) return;
+        sh.data = sh.data || {};
+        headers.forEach((h, j) => {
+          if (!h) return;
+          const v = row[j] == null ? '' : row[j];
+          sh.data[h] = { value: v, type: inferType(v) };
+        });
+        count++;
+      });
+      alert(`Imported ${count} row(s) into shape data.`);
+      scheduleSave();
+      renderCanvas();
+      renderDataPanel();
+      dlg.close();
+    });
+  }
+
+  // Tiny CSV parser: handles quoted fields with embedded quotes/commas.
+  function parseCsv(text) {
+    const out = [];
+    let row = [], field = '', inQuote = false;
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i];
+      if (inQuote) {
+        if (c === '"' && text[i + 1] === '"') { field += '"'; i++; }
+        else if (c === '"') inQuote = false;
+        else field += c;
+      } else {
+        if (c === '"') inQuote = true;
+        else if (c === ',') { row.push(field); field = ''; }
+        else if (c === '\n' || c === '\r') {
+          if (field || row.length) { row.push(field); out.push(row); row = []; field = ''; }
+          if (c === '\r' && text[i + 1] === '\n') i++;
+        } else field += c;
+      }
+    }
+    if (field || row.length) { row.push(field); out.push(row); }
+    return out.filter((r) => r.some((v) => v && v.trim()));
   }
 
   function bindFindDialog() {

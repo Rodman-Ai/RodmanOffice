@@ -127,7 +127,99 @@
     }
 
     if (shape.text) renderShapeText(shape, g);
+    renderDataGraphicsOverlay(shape, g);
+    renderShapeIndicators(shape, g);
     return g;
+  }
+
+  // Hyperlink / comment indicator badges in the top-right corner.
+  function renderShapeIndicators(shape, g) {
+    const has = (Array.isArray(shape.hyperlinks) && shape.hyperlinks.length)
+             || (Array.isArray(shape.comments)   && shape.comments.length);
+    if (!has) return;
+    const cx = shape.w - 6;
+    const cy = 8;
+    if (Array.isArray(shape.comments) && shape.comments.length) {
+      const c = el('circle', {
+        cx, cy, r: 5, fill: '#f59e0b', stroke: '#fff', 'stroke-width': 1,
+        class: 'shape-indicator comment',
+      }, g);
+      const t = el('text', {
+        x: cx, y: cy + 3,
+        'font-family': 'Segoe UI, sans-serif', 'font-size': 8,
+        fill: '#fff', 'text-anchor': 'middle',
+        'pointer-events': 'none',
+      }, g);
+      t.textContent = String(shape.comments.length);
+    }
+    if (Array.isArray(shape.hyperlinks) && shape.hyperlinks.length) {
+      const x = cx - (shape.comments?.length ? 14 : 0);
+      el('circle', {
+        cx: x, cy, r: 5, fill: '#3b82f6', stroke: '#fff', 'stroke-width': 1,
+        class: 'shape-indicator hyperlink',
+      }, g);
+      const t = el('text', {
+        x, y: cy + 3,
+        'font-family': 'Segoe UI, sans-serif', 'font-size': 8,
+        fill: '#fff', 'text-anchor': 'middle',
+        'pointer-events': 'none',
+      }, g);
+      t.textContent = '↗';
+    }
+  }
+
+  // Data graphics overlay: re-tint background, draw a corner icon, or
+  // overlay a bar based on a numeric field. Driven by the diagram-level
+  // dataGraphics config exposed via window.RodmanRender.dataGraphicsCfg.
+  function renderDataGraphicsOverlay(shape, g) {
+    const cfg = window.RodmanRender && window.RodmanRender.dataGraphicsCfg;
+    if (!cfg || !cfg.field) return;
+    const entry = shape.data && shape.data[cfg.field];
+    if (!entry) return;
+    const value = entry.value != null ? entry.value : entry;
+    if (cfg.mode === 'color' && cfg.palette) {
+      const color = cfg.palette[String(value)] || pickColorByHash(String(value), cfg.fallback || ['#fef3c7', '#dbeafe', '#dcfce7', '#fee2e2', '#fae8ff']);
+      // Overlay a translucent recolor rectangle.
+      el('rect', {
+        x: 0, y: 0, width: shape.w, height: shape.h,
+        fill: color, opacity: 0.5,
+        'pointer-events': 'none',
+        class: 'data-graphic color',
+      }, g);
+    } else if (cfg.mode === 'icon' && cfg.iconMap) {
+      const icon = cfg.iconMap[String(value)] || '•';
+      const t = el('text', {
+        x: 8, y: shape.h - 6,
+        'font-family': 'Segoe UI, sans-serif', 'font-size': 14,
+        fill: cfg.iconColor || '#0f172a',
+        class: 'data-graphic icon',
+        'pointer-events': 'none',
+      }, g);
+      t.textContent = icon;
+    } else if (cfg.mode === 'bar') {
+      const num = parseFloat(value);
+      if (!isFinite(num)) return;
+      const max = cfg.max || 100;
+      const min = cfg.min || 0;
+      const pct = Math.max(0, Math.min(1, (num - min) / (max - min)));
+      el('rect', {
+        x: 4, y: 2, width: Math.max(2, (shape.w - 8) * pct), height: 6,
+        fill: cfg.barColor || '#0ea5e9',
+        class: 'data-graphic bar',
+        'pointer-events': 'none',
+      }, g);
+      el('rect', {
+        x: 4, y: 2, width: shape.w - 8, height: 6,
+        fill: 'none', stroke: cfg.barColor || '#0ea5e9', 'stroke-width': 0.5, opacity: 0.5,
+        'pointer-events': 'none',
+      }, g);
+    }
+  }
+
+  function pickColorByHash(s, palette) {
+    let h = 0;
+    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+    return palette[Math.abs(h) % palette.length];
   }
 
   function renderShapeText(shape, parent) {
@@ -303,5 +395,7 @@
     renderPage, renderShape, renderConnector,
     portPoint, orthogonalPath,
     renderStencilThumb,
+    // Live data-graphics config the app sets before re-rendering.
+    dataGraphicsCfg: null,
   };
 })();

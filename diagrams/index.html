@@ -301,6 +301,22 @@
         </div>
         <div class="group-label">Shape</div>
       </div>
+      <div class="group">
+        <div class="group-row">
+          <button class="ribbon-btn" data-cmd="addShapeDataField" title="Add a data field to the selected shape">+ Data</button>
+          <button class="ribbon-btn" data-cmd="addHyperlink" title="Attach a hyperlink to the selected shape">+ Link</button>
+          <button class="ribbon-btn" data-cmd="addComment" title="Add a comment to the selected shape">+ Comment</button>
+        </div>
+        <div class="group-row">
+          <button class="ribbon-btn wide" data-cmd="configureDataGraphics" title="Drive shape colors/icons/bars from a data field">Data graphics…</button>
+          <button class="ribbon-btn" data-cmd="clearDataGraphics" title="Disable data graphics">Clear</button>
+        </div>
+        <div class="group-row">
+          <button class="ribbon-btn" data-cmd="runValidation" title="Run validation rules">Validate</button>
+          <button class="ribbon-btn" data-cmd="exportReport" title="Export shape data as CSV">Report</button>
+        </div>
+        <div class="group-label">Data</div>
+      </div>
     </div>
 
     <!-- Design -->
@@ -392,6 +408,7 @@
     <aside class="side-pane" id="sidePane" aria-label="Properties and Layers">
       <div class="side-pane-tabs">
         <button class="side-pane-tab active" data-side-tab="properties">Properties</button>
+        <button class="side-pane-tab" data-side-tab="data">Data</button>
         <button class="side-pane-tab" data-side-tab="layers">Layers</button>
       </div>
       <div class="side-pane-body" id="sidePaneProps" data-side-body="properties">
@@ -414,6 +431,9 @@
           <label for="propText">Label</label><input id="propText" type="text" />
           <label for="propLayer">Layer</label><select id="propLayer"></select>
         </div>
+      </div>
+      <div class="side-pane-body" id="sidePaneData" data-side-body="data" hidden>
+        <!-- populated by renderDataPanel() -->
       </div>
       <div class="side-pane-body" id="sidePaneLayers" data-side-body="layers" hidden>
         <div class="layers-toolbar">
@@ -462,6 +482,23 @@
   </dialog>
 
   <input type="file" id="openFileInput" accept=".vsdx,.vsdm,.svg" hidden />
+
+  <dialog class="save-dialog" id="csvImportDialog">
+    <form method="dialog">
+      <header>
+        <h3>Import data from CSV</h3>
+        <button type="button" aria-label="Close" onclick="this.closest('dialog').close()">&times;</button>
+      </header>
+      <div class="body">
+        <p style="margin:0;font-size:12px;color:var(--muted);">Paste CSV. Header row becomes field names. Each subsequent row maps to a shape (by row order) and writes shape data fields.</p>
+        <textarea id="csvImportInput" rows="10" style="font:inherit;font-family:Consolas,monospace;font-size:12px;width:100%;box-sizing:border-box;border:1px solid var(--ribbon-border);padding:6px;"></textarea>
+      </div>
+      <footer>
+        <button type="button" id="csvImportCancelBtn">Cancel</button>
+        <button type="submit" id="csvImportApplyBtn" class="primary">Apply</button>
+      </footer>
+    </form>
+  </dialog>
 
   <dialog class="save-dialog replace-shape-dialog" id="replaceShapeDialog">
     <form method="dialog">
