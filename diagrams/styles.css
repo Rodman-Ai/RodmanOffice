@@ -453,6 +453,21 @@ body {
 }
 .canvas-svg { display: block; width: 100%; height: 100%; }
 
+/* Wrapper for absolute-positioned overlays (selection handles,
+   port dots, marquee, AutoConnect arrows, smart guides, text-edit
+   overlay). Sized to page coordinates (page.w × page.h) and
+   transformed via `scale(state.zoom)` set inline by renderCanvas,
+   so overlay code can keep using page-coord positions (e.g.
+   `style.left = shape.x + 'px'`) without per-call math while
+   still visually aligning with the scaled SVG. */
+.overlay-layer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  transform-origin: top left;
+}
+
 /* Shape interactions */
 .shape { cursor: move; }
 .shape.is-selected > * {

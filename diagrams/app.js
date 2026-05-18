@@ -116,6 +116,14 @@
     }
   }
 
+  // ---------- Render state ----------
+  // overlayHost is the scaled wrapper div inside .canvas-shadow
+  // where every absolute-positioned overlay (selection handles,
+  // port dots, marquee, AutoConnect arrows, etc.) lives. Set by
+  // renderCanvas; read by every overlay helper called outside
+  // renderCanvas's direct scope (e.g. from event handlers).
+  let overlayHost = null;
+
   // ---------- Autosave ----------
   let saveTimer = null;
   let historyPushPending = false;
@@ -330,23 +338,39 @@
     }
     const svg = R.renderPage(page, diagram.layers, { showGrid: state.showGrid });
     shadow.appendChild(svg);
-    // Use a layout box sized to the *scaled* canvas so flex centering
-     // in .canvas-scroll works. The transform: scale() still applies
-     // visually to children (selection handles, port dots, etc.)
-     // positioned in page-coord space, so no overlay math needs to
-     // change. Without this, the layout box stayed at page.w×page.h
-     // even when zoom shrank the visual, leaving the centering
-     // calculation off and the canvas mostly off-screen on mobile.
+    // Layout box sized to the scaled canvas so flex centering in
+    // .canvas-scroll works AND mouse/touch coords map cleanly via
+    // eventToPagePoint. The SVG inside fills the shadow via
+    // width:100%/height:100% and its own viewBox handles internal
+    // scaling — no shadow transform: scale needed (PR #62 had one
+    // here but it double-scaled the visual to page.w * zoom * zoom,
+    // shrinking the canvas to ~28% of its intended size on iPhone
+    // and pushing it into the top-left corner via transform-origin:
+    // top left).
     shadow.style.width = (page.w * state.zoom) + 'px';
     shadow.style.height = (page.h * state.zoom) + 'px';
     shadow.style.background = page.bg || '#ffffff';
-    shadow.style.transform = `scale(${state.zoom})`;
+    shadow.style.transform = '';
+    // Overlay layer: page-coord-space wrapper for the absolutely-
+    // positioned children (selection handles, port dots, marquee,
+    // AutoConnect arrows, connector handles, smart guides, text-
+    // edit overlay). transform: scale(zoom) on this wrapper scales
+    // those children to match the SVG's visual size, so overlay
+    // code keeps using page-coords (e.g. shape.x as the left
+    // offset) without per-call math.
+    const overlay = document.createElement('div');
+    overlay.className = 'overlay-layer';
+    overlay.style.width = page.w + 'px';
+    overlay.style.height = page.h + 'px';
+    overlay.style.transform = `scale(${state.zoom})`;
+    shadow.appendChild(overlay);
+    overlayHost = overlay;
     bindCanvasInteractions(svg, shadow);
-    renderSelectionOverlays(shadow);
-    renderHoverPorts(shadow);
-    renderSmartGuides(shadow);
-    renderAutoConnectArrows(shadow);
-    renderConnectorHandles(shadow);
+    renderSelectionOverlays(overlay);
+    renderHoverPorts(overlay);
+    renderSmartGuides(overlay);
+    renderAutoConnectArrows(overlay);
+    renderConnectorHandles(overlay);
     renderRulers();
     renderPageStrip();
     updateStatusBar();
@@ -498,7 +522,7 @@
       if (!target) {
         if (!e.shiftKey) clearSelection();
         drag = { mode: 'marquee', startX: pt.x, startY: pt.y, x: pt.x, y: pt.y };
-        renderSelectionOverlays(shadow);
+        renderSelectionOverlays(overlayHost);
         return;
       }
 
@@ -555,7 +579,7 @@
           if (sh) initial.set(sid, { x: sh.x, y: sh.y });
         }
         drag = { mode: 'move', startX: pt.x, startY: pt.y, initial };
-        renderSelectionOverlays(shadow);
+        renderSelectionOverlays(overlayHost);
         renderPropertiesPanel();
       } else if (target.classList.contains('connector')) {
         const id = target.getAttribute('data-connector-id');
@@ -567,7 +591,7 @@
           state.selectedConnectorIds.clear();
           state.selectedConnectorIds.add(id);
         }
-        renderSelectionOverlays(shadow);
+        renderSelectionOverlays(overlayHost);
         renderPropertiesPanel();
       }
     });
@@ -576,7 +600,7 @@
       const target = e.target.closest('.shape');
       if (!target) return;
       const id = target.getAttribute('data-shape-id');
-      startTextEdit(id, shadow);
+      startTextEdit(id, overlayHost);
     });
 
     // DnD drop from stencil drawer
@@ -632,7 +656,7 @@
       renderCanvas();
     } else if (drag.mode === 'marquee') {
       drag.x = pt.x; drag.y = pt.y;
-      renderSelectionOverlays(shadow);
+      renderSelectionOverlays(overlayHost);
     } else if (drag.mode === 'resize') {
       resizeDrag(pt);
       renderCanvas();
@@ -641,7 +665,7 @@
       renderCanvas();
     } else if (drag.mode === 'connect') {
       drag.x = pt.x; drag.y = pt.y;
-      renderConnectorPreview(shadow);
+      renderConnectorPreview(overlayHost);
     }
   });
 
@@ -920,7 +944,7 @@
       fromPort,
       x: pt.x, y: pt.y,
     };
-    renderConnectorPreview(shadow);
+    renderConnectorPreview(overlayHost);
   }
 
   function renderConnectorPreview(shadow) {
@@ -981,7 +1005,7 @@
   }
 
   // ---------- Inline text editing ----------
-  function startTextEdit(shapeId, shadow) {
+  function startTextEdit(shapeId, host) {
     const page = activePage();
     const sh = D.findShape(page, shapeId);
     if (!sh) return;
@@ -996,7 +1020,7 @@
     overlay.style.font = `${(sh.textStyle.fontSize || 14)}px ${sh.textStyle.fontFamily || 'Segoe UI, sans-serif'}`;
     overlay.style.color = sh.textStyle.color || '#000000';
     overlay.style.textAlign = sh.textStyle.align || 'center';
-    shadow.appendChild(overlay);
+    host.appendChild(overlay);
     overlay.focus();
     overlay.select();
     overlay.addEventListener('blur', commit);
