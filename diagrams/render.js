@@ -32,9 +32,16 @@
     };
     const svg = el('svg', {
       class: 'canvas-svg',
-      width: page.w,
-      height: page.h,
+      // 100% so the SVG fills its parent (.canvas-shadow). Using
+      // page.w / page.h as fixed sizes here makes iOS Safari ignore
+      // the CSS `width: 100%` override and render the SVG at 1100×850
+      // regardless of shadow size — exactly the bug PR #66's overlay-
+      // layer fix tried to address. viewBox handles internal scaling
+      // independently of these outer dimensions.
+      width: '100%',
+      height: '100%',
       viewBox: `0 0 ${page.w} ${page.h}`,
+      preserveAspectRatio: 'none',
       xmlns: SVG_NS,
     });
 
