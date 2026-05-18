@@ -428,13 +428,16 @@ body {
 .canvas-scroll {
   flex: 1; overflow: auto;
   display: flex; align-items: center; justify-content: center;
-  /* Viewport-sized padding guarantees scroll headroom in every
+  /* Absolute-pixel padding guarantees scroll headroom in every
      direction at every zoom level. Without this, fit-to-window zoom
      left .canvas-shadow exactly the size of #canvasScroll so plain
      wheel events + the gestures-helper touch-pan had nothing to
-     scroll. commands.zoomFit() re-centers scrollLeft / scrollTop
-     after the padding so the canvas still appears centered on load. */
-  padding: 50vh 50vw;
+     scroll. Using absolute px instead of 50vh/50vw means iOS
+     Safari's URL-bar collapsing (which changes vh) doesn't shift
+     the scroll content. commands.zoomFit() re-centers scrollLeft /
+     scrollTop after the padding so the canvas still appears
+     centered on load. */
+  padding: 400px;
   background: var(--workspace-bg);
 }
 .canvas-shadow {
@@ -1037,25 +1040,17 @@ body.format-painter-active .canvas-svg { cursor: crosshair; }
     font-size: 13px;
   }
   .title-actions { gap: 2px; }
-  /* Mobile Ask Claude: shrink the "🤖 Ask Claude" pill to a 30px
-     emoji-only button to free up title-bar room for the pane toggles.
-     The button still has the same id/aria-label/click handler — only
-     the visible content changes. */
+  /* Mobile Ask Claude: hide the " Ask Claude" label span so the
+     visible content is just the 🤖 emoji (real text in the
+     .ask-claude-emoji span, not a ::before pseudo). This is
+     more reliable than the prior font-size:0 + ::before hack
+     which combined badly with display:grid on iOS Safari. */
   .title-bar .ask-claude {
-    padding: 0;
-    width: 30px;
+    padding: 0 8px;
     height: 28px;
-    font-size: 0;          /* hide the original "🤖 Ask Claude" text */
-    line-height: 0;
     border-radius: 4px;
-    display: grid;
-    place-items: center;
   }
-  .title-bar .ask-claude::before {
-    content: '🤖';
-    font-size: 16px;
-    line-height: 1;
-  }
+  .ask-claude-label { display: none; }
   .tab { padding: 8px 14px; font-size: 12px; }
   .ribbon { overflow: visible; }
   .ribbon-panel {
@@ -1063,7 +1058,11 @@ body.format-painter-active .canvas-svg { cursor: crosshair; }
     align-items: center; align-content: center;
     width: 100%; box-sizing: border-box;
     overflow-x: auto; overflow-y: hidden;
-    max-height: 52px; min-height: 0;
+    /* Explicit height so the ribbon row is the same size on every
+       tab. With max-height + min-height, Insert / Design / View
+       (taller groups) caused the workspace 1fr row to shrink and
+       the canvas scroll position to shift between tab switches. */
+    height: 52px;
     padding: 2px 4px; gap: 0;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: thin;
@@ -1124,7 +1123,7 @@ body.format-painter-active .canvas-svg { cursor: crosshair; }
     transition: bottom 0.2s;
   }
   .side-pane.is-open { bottom: 100px; }
-  .canvas-scroll { padding: 50vh 50vw; }
+  .canvas-scroll { padding: 400px; }
   .claude-panel {
     top: 42px; right: 8px; bottom: 8px;
     width: calc(100vw - 16px);
