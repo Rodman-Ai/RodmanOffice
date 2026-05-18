@@ -428,16 +428,17 @@ body {
 .canvas-scroll {
   flex: 1; overflow: auto;
   display: flex; align-items: center; justify-content: center;
-  /* Absolute-pixel padding guarantees scroll headroom in every
-     direction at every zoom level. Without this, fit-to-window zoom
-     left .canvas-shadow exactly the size of #canvasScroll so plain
-     wheel events + the gestures-helper touch-pan had nothing to
-     scroll. Using absolute px instead of 50vh/50vw means iOS
-     Safari's URL-bar collapsing (which changes vh) doesn't shift
-     the scroll content. commands.zoomFit() re-centers scrollLeft /
-     scrollTop after the padding so the canvas still appears
-     centered on load. */
-  padding: 400px;
+  /* Modest padding around the canvas. Earlier attempts to give
+     the helper "always-on" two-finger pan room used `padding:
+     50vh 50vw` (PR #63) and `padding: 400px` (PR #64), but
+     both fight `* { box-sizing: border-box }`: on a 390 px
+     iPhone, 400 px padding eats more than the entire element
+     width, leaving the canvas wedged off-screen at the right
+     edge. Reverted to small absolute padding — two-finger pan
+     now works whenever the canvas overflows (i.e. when zoomed
+     in past fit), which is the standard pattern Slides uses
+     and matches how maps-style apps behave. */
+  padding: 24px;
   background: var(--workspace-bg);
 }
 .canvas-shadow {
@@ -1123,7 +1124,7 @@ body.format-painter-active .canvas-svg { cursor: crosshair; }
     transition: bottom 0.2s;
   }
   .side-pane.is-open { bottom: 100px; }
-  .canvas-scroll { padding: 400px; }
+  .canvas-scroll { padding: 12px; }
   .claude-panel {
     top: 42px; right: 8px; bottom: 8px;
     width: calc(100vw - 16px);
