@@ -3,7 +3,7 @@
 // shell, so this SW owns /diagrams/ scope.
 // The shared engine at /lib/diagrams/ lives outside this SW's scope (./),
 // so it's fetched from the network on first save/export and HTTP-cached.
-const VERSION = 'rodman-vision-v3';
+const VERSION = 'rodman-vision-v4';
 const CACHE_PREFIX = 'rodman-vision-';
 const APP_SHELL = [
   './',
@@ -41,8 +41,13 @@ self.addEventListener('fetch', (e) => {
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
 
+  // `cache: 'no-cache'` makes the SW always revalidate against
+  // the network, bypassing the browser's HTTP cache. Stops iOS
+  // Safari (and others) from serving stale shell assets even
+  // when we've shipped a fix. Network-first cache fallback
+  // still applies on failure.
   e.respondWith(
-    fetch(req).then((r) => {
+    fetch(req, { cache: 'no-cache' }).then((r) => {
       if (r && r.ok) {
         const copy = r.clone();
         caches.open(VERSION).then((c) => c.put(req, copy)).catch(() => {});

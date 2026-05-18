@@ -1111,7 +1111,15 @@ body.format-painter-active .canvas-svg { cursor: crosshair; }
   .select.sm { min-width: 50px; }
   .color-input { width: 32px; height: 32px; flex-shrink: 0; }
   .theme-card { width: 76px; height: 46px; flex-shrink: 0; }
-  .workspace { grid-template-columns: 1fr; }
+  /* grid-template-rows: 1fr forces the workspace's single row
+     to fill its full height. Without it, the auto row sizes to
+     its in-flow children's max-content height; on mobile the
+     side panes are position: fixed (out of flow) so only
+     canvas-area is in flow, and its max-content is just the
+     page-strip (~30 px) because canvas-shadow's size is set by
+     JS *after* initial layout. That collapsed the canvas-area to
+     ~30 px tall on iPhone, hiding the canvas entirely. */
+  .workspace { grid-template-columns: 1fr; grid-template-rows: 1fr; }
   /* Both panes are hidden off-screen by default on mobile. The
      `bottom: -100vh` mechanic guarantees the entire pane sits below
      the viewport — replaces the old transform: translateY(100%) which

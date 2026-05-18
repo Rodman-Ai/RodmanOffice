@@ -322,12 +322,22 @@
     const shadow = $('#canvasShadow');
     shadow.innerHTML = '';
     const page = activePage();
+    // Explicit pixel SVG sizing. PR #67 had renderPage emit
+    // width="100%" attributes hoping CSS would size them. iOS
+    // Safari sometimes computes percentage SVG dims to 0 during
+    // initial layout passes — overriding the attributes with
+    // absolute pixel values bypasses all CSS-vs-attribute
+    // precedence issues on every browser.
+    const scaledW = page.w * state.zoom;
+    const scaledH = page.h * state.zoom;
     // Background page composition: render the referenced page first
     // at 40% opacity so the user can see what overlays which.
     if (page.bgPageId) {
       const bg = D.findPage(diagram, page.bgPageId);
       if (bg) {
         const bgSvg = R.renderPage(bg, diagram.layers, { showGrid: false });
+        bgSvg.setAttribute('width', String(scaledW));
+        bgSvg.setAttribute('height', String(scaledH));
         bgSvg.setAttribute('opacity', '0.4');
         bgSvg.style.position = 'absolute';
         bgSvg.style.left = '0';
@@ -337,6 +347,8 @@
       }
     }
     const svg = R.renderPage(page, diagram.layers, { showGrid: state.showGrid });
+    svg.setAttribute('width', String(scaledW));
+    svg.setAttribute('height', String(scaledH));
     shadow.appendChild(svg);
     // Layout box sized to the scaled canvas so flex centering in
     // .canvas-scroll works AND mouse/touch coords map cleanly via
@@ -347,8 +359,8 @@
     // shrinking the canvas to ~28% of its intended size on iPhone
     // and pushing it into the top-left corner via transform-origin:
     // top left).
-    shadow.style.width = (page.w * state.zoom) + 'px';
-    shadow.style.height = (page.h * state.zoom) + 'px';
+    shadow.style.width = scaledW + 'px';
+    shadow.style.height = scaledH + 'px';
     shadow.style.background = page.bg || '#ffffff';
     shadow.style.transform = '';
     // Overlay layer: page-coord-space wrapper for the absolutely-
