@@ -165,6 +165,14 @@
         $$('.ribbon-panel').forEach((p) => {
           p.classList.toggle('active', p.dataset.panel === id);
         });
+        // On mobile, ribbon-panel reflow + the 150ms panelIn
+        // animation can leave canvas-scroll's scrollLeft/Top
+        // pointing somewhere other than the centered canvas.
+        // Re-fit once layout settles. Desktop keeps the user's
+        // explicit zoom.
+        if (window.matchMedia('(max-width: 720px)').matches) {
+          requestAnimationFrame(() => requestAnimationFrame(() => commands.zoomFit()));
+        }
       });
     });
     // Custom dbltap detector for the Office-classic gesture
@@ -578,8 +586,30 @@
   let drag = null;
 
   function bindCanvasInteractions(svg, shadow) {
-    // Click on background = clear selection or start marquee
-    svg.addEventListener('mousedown', (e) => {
+    // Mouse path: handled by the inline listener below.
+    // Touch / pen path: a pointerdown listener calls the same body
+    // so iPhone Safari (which doesn't synthesize mousedown from
+    // single-finger touch on a generic SVG) can select + drag.
+    // Mouse pointerType is skipped — the mousedown listener owns it,
+    // and dispatching twice would double-handle clicks.
+    svg.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'mouse') return;
+      // Mark the touch as "fresh" so the canvas down handler can
+      // distinguish a first-tap-on-unselected (select only) from
+      // a tap-on-already-selected (immediate drag).
+      const target = e.target.closest('.shape');
+      if (target) {
+        const id = target.getAttribute('data-shape-id');
+        if (id && !state.selectedShapeIds.has(id)) {
+          state._touchSelectOnly = true;
+        }
+      }
+      handleCanvasDown(e);
+    });
+
+    svg.addEventListener('mousedown', handleCanvasDown);
+
+    function handleCanvasDown(e) {
       if (state.isEditingText) return;
       const target = e.target.closest('.shape, .connector');
       const pt = eventToPagePoint(e, shadow);
@@ -697,7 +727,15 @@
         renderSelectionOverlays(overlayHost);
         renderPropertiesPanel();
       }
-    });
+      // If this was a touch that landed on a previously-unselected
+      // shape, suppress the move portion of the drag — the user
+      // gets a "select only" tap. Drag becomes available on the
+      // next touch (which lands on a now-selected shape).
+      if (state._touchSelectOnly && drag && drag.mode === 'move') {
+        drag.suppressMove = true;
+      }
+      state._touchSelectOnly = false;
+    }
 
     svg.addEventListener('dblclick', (e) => {
       const target = e.target.closest('.shape');
@@ -725,12 +763,18 @@
   }
 
   // Listen at document level so drags don't abort when the pointer
-  // leaves the canvas.
-  document.addEventListener('mousemove', (e) => {
+  // leaves the canvas. Pointer events mirror mouse events for the
+  // touch / pen path on iOS Safari (which doesn't synthesize
+  // mousemove from single-finger touches).
+  function handleCanvasMove(e) {
     if (!drag) return;
     const shadow = $('#canvasShadow');
     const pt = eventToPagePoint(e, shadow);
     if (drag.mode === 'move') {
+      // First-tap-on-unselected suppression: select only, don't
+      // translate. The flag clears on mouseup; the user's next
+      // touch on the (now-selected) shape drags normally.
+      if (drag.suppressMove) return;
       let dx = pt.x - drag.startX;
       let dy = pt.y - drag.startY;
       const page = activePage();
@@ -780,9 +824,14 @@
       drag.x = pt.x; drag.y = pt.y;
       renderSelectionOverlays(overlayHost);
     }
+  }
+  document.addEventListener('mousemove', handleCanvasMove);
+  document.addEventListener('pointermove', (e) => {
+    if (e.pointerType === 'mouse') return;
+    handleCanvasMove(e);
   });
 
-  document.addEventListener('mouseup', (e) => {
+  function handleCanvasUp(e) {
     if (!drag) return;
     const shadow = $('#canvasShadow');
     if (drag.mode === 'marquee') {
@@ -822,6 +871,15 @@
     drag = null;
     state.smartGuides = [];
     renderCanvas();
+  }
+  document.addEventListener('mouseup', handleCanvasUp);
+  document.addEventListener('pointerup', (e) => {
+    if (e.pointerType === 'mouse') return;
+    handleCanvasUp(e);
+  });
+  document.addEventListener('pointercancel', (e) => {
+    if (e.pointerType === 'mouse') return;
+    handleCanvasUp(e);
   });
 
   // Compute smart-guide snap suggestions for a moving shape.
