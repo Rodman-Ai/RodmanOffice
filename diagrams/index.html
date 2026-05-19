@@ -417,6 +417,21 @@
           </label>
           <button class="ribbon-btn" data-cmd="toggleMiniMap" title="Mini-map (pan thumbnail)">⊞ Mini-map</button>
         </div>
+        <div class="group-row">
+          <button class="ribbon-btn wide" data-cmd="toggleReviewerMode" title="Toggle reviewer (read-only) mode">👁 Reviewer</button>
+        </div>
+        <div class="group-row">
+          <button class="ribbon-btn wide" data-cmd="startPresentation" title="Full-screen presentation (← → to page; Esc exits)">▶ Present</button>
+        </div>
+        <div class="group-row">
+          <button class="ribbon-btn wide" data-cmd="printPreview" title="Open print-friendly preview">🖨 Print preview</button>
+        </div>
+        <div class="group-row">
+          <button class="ribbon-btn wide" data-cmd="bookmarkPosition" title="Bookmark current view (page + scroll + zoom)">★ Bookmark</button>
+        </div>
+        <div class="group-row" id="bookmarksList" style="flex-wrap:wrap;gap:2px;max-width:240px;">
+          <!-- bookmark buttons populated by app.js -->
+        </div>
         <div class="group-label">Panels</div>
       </div>
     </div>
@@ -545,6 +560,15 @@
   <input type="file" id="openFileInput" accept=".vsdx,.vsdm,.svg" hidden />
 
   <div id="miniMap" hidden></div>
+
+  <!-- Wave 4: presentation overlay (full-screen slideshow) -->
+  <div id="presentationOverlay" hidden>
+    <div id="presentationToolbar">
+      <span id="presentationCounter">1 / 1</span>
+      <button type="button" id="presentationClose" aria-label="Exit presentation">✕</button>
+    </div>
+    <div id="presentationSurface"></div>
+  </div>
 
   <dialog class="save-dialog" id="themeBuilderDialog">
     <form method="dialog">

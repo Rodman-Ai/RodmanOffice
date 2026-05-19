@@ -2093,6 +2093,117 @@
       scheduleSave();
       renderCanvas();
     },
+    // ---------- Wave 4: review + presentation + bookmarks ----------
+    toggleReviewerMode() {
+      state.reviewerMode = !state.reviewerMode;
+      document.body.classList.toggle('reviewer-mode', state.reviewerMode);
+      // Force-deselect on enter so the user can't accidentally edit.
+      if (state.reviewerMode) {
+        state.selectedShapeIds.clear();
+        state.selectedConnectorIds.clear();
+        renderCanvas();
+      }
+    },
+    startPresentation() {
+      // Open the canvas in a full-screen overlay; arrow keys
+      // navigate pages. Esc exits.
+      const overlay = $('#presentationOverlay');
+      const surf = $('#presentationSurface');
+      let idx = diagram.pages.indexOf(activePage());
+      if (idx < 0) idx = 0;
+      const renderSlide = () => {
+        surf.innerHTML = '';
+        const page = diagram.pages[idx];
+        const svg = R.renderPage(page, diagram.layers, { showGrid: false });
+        // Fit page to overlay.
+        svg.setAttribute('width', '100%');
+        svg.setAttribute('height', '100%');
+        svg.setAttribute('viewBox', `0 0 ${page.w} ${page.h}`);
+        svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+        surf.appendChild(svg);
+        $('#presentationCounter').textContent = `${idx + 1} / ${diagram.pages.length}`;
+      };
+      const onKey = (e) => {
+        if (e.key === 'Escape') { closePresentation(); return; }
+        if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') {
+          idx = Math.min(diagram.pages.length - 1, idx + 1); renderSlide();
+        } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+          idx = Math.max(0, idx - 1); renderSlide();
+        } else if (e.key === 'Home') {
+          idx = 0; renderSlide();
+        } else if (e.key === 'End') {
+          idx = diagram.pages.length - 1; renderSlide();
+        }
+      };
+      const closePresentation = () => {
+        overlay.hidden = true;
+        document.removeEventListener('keydown', onKey);
+        if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+      };
+      $('#presentationClose').onclick = closePresentation;
+      overlay.hidden = false;
+      renderSlide();
+      document.addEventListener('keydown', onKey);
+      if (overlay.requestFullscreen) overlay.requestFullscreen().catch(() => {});
+    },
+    printPreview() {
+      // Open a new window with one printable page per diagram
+      // page. Uses the existing SVG renderer.
+      const w = window.open('', '_blank', 'width=900,height=1200');
+      if (!w) return;
+      const css = `
+        @page { margin: 0.5in; }
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; padding: 16px; }
+        h2 { margin: 0 0 8px; }
+        .slide { page-break-after: always; margin-bottom: 24px; }
+        .slide:last-child { page-break-after: auto; }
+        svg { width: 100%; height: auto; border: 1px solid #ccc; }
+      `;
+      let body = '';
+      for (let i = 0; i < diagram.pages.length; i++) {
+        const page = diagram.pages[i];
+        const svg = R.renderPage(page, diagram.layers, { showGrid: false });
+        svg.setAttribute('viewBox', `0 0 ${page.w} ${page.h}`);
+        svg.removeAttribute('width');
+        svg.removeAttribute('height');
+        body += `<div class="slide"><h2>${escHtml(page.name || ('Page ' + (i + 1)))}</h2>${svg.outerHTML}</div>`;
+      }
+      w.document.write(
+        `<!doctype html><html><head><title>${escHtml(diagram.title || 'Diagram')}</title>` +
+        `<style>${css}</style></head><body>${body}` +
+        `<script>setTimeout(()=>window.print(),300)<\/script></body></html>`
+      );
+      w.document.close();
+    },
+    bookmarkPosition() {
+      // Save the current page + scroll + zoom as a named bookmark.
+      const name = prompt('Bookmark name:', 'Bookmark ' + ((state.bookmarks?.length || 0) + 1));
+      if (!name) return;
+      const scroll = $('#canvasScroll');
+      state.bookmarks = state.bookmarks || [];
+      state.bookmarks.push({
+        name,
+        pageId: state.activePageId,
+        scrollLeft: scroll.scrollLeft,
+        scrollTop: scroll.scrollTop,
+        zoom: state.zoom,
+      });
+      renderBookmarksList();
+      scheduleSave();
+    },
+    jumpToBookmark(btn) {
+      const idx = parseInt(btn?.dataset?.idx || '-1', 10);
+      const bm = (state.bookmarks || [])[idx];
+      if (!bm) return;
+      state.activePageId = bm.pageId;
+      state.zoom = bm.zoom;
+      renderCanvas();
+      const scroll = $('#canvasScroll');
+      requestAnimationFrame(() => {
+        scroll.scrollLeft = bm.scrollLeft;
+        scroll.scrollTop = bm.scrollTop;
+      });
+    },
     autoLayoutTreeLR() {
       const page = activePage();
       autoLayoutHierarchical(page, { direction: 'LR' });
@@ -3476,6 +3587,7 @@
     renderCanvas();
     renderPropertiesPanel();
     renderDataPanel();
+    renderBookmarksList();
   }
 
   function bootstrap() {
@@ -3665,6 +3777,23 @@
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;');
+  }
+
+  // ---------- Wave 4: bookmarks ----------
+  function renderBookmarksList() {
+    const list = $('#bookmarksList');
+    if (!list) return;
+    list.innerHTML = '';
+    for (let i = 0; i < (state.bookmarks || []).length; i++) {
+      const bm = state.bookmarks[i];
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'bookmark-item';
+      btn.dataset.cmd = 'jumpToBookmark';
+      btn.dataset.idx = String(i);
+      btn.textContent = bm.name;
+      list.appendChild(btn);
+    }
   }
 
   if (document.readyState === 'loading') {
