@@ -725,6 +725,14 @@
           return;
         }
 
+        // Capture pre-selection state for the tap-on-selected →
+        // text edit branch in handleCanvasUp. wasSoloSelection
+        // means "before this tap, this shape was the single
+        // selected shape" — qualifies for tap-to-edit on touch.
+        const wasSoloSelection =
+          state.selectedShapeIds.size === 1 &&
+          state.selectedShapeIds.has(id);
+
         if (e.shiftKey) {
           if (state.selectedShapeIds.has(id)) state.selectedShapeIds.delete(id);
           else state.selectedShapeIds.add(id);
@@ -743,7 +751,17 @@
           const sh = D.findShape(page, sid);
           if (sh) initial.set(sid, { x: sh.x, y: sh.y });
         }
-        drag = { mode: 'move', startX: pt.x, startY: pt.y, initial };
+        drag = {
+          mode: 'move',
+          startX: pt.x, startY: pt.y,
+          initial,
+          // Tracked for the touch tap-on-selected → text edit
+          // path in handleCanvasUp. pointerType for mousedown is
+          // undefined; fall back to 'mouse'.
+          pointerType: e.pointerType || 'mouse',
+          wasSoloSelection,
+          touchTapTargetId: id,
+        };
         renderSelectionOverlays(overlayHost);
         renderPropertiesPanel();
       } else if (target.classList.contains('connector')) {
@@ -896,6 +914,40 @@
         }
       }
       state.lassoPath = [];
+    }
+    // Tap-on-selected (touch) → enter text-edit. Mirrors the
+    // desktop dblclick handler. Triggers only when:
+    //   - This was a touch pointer (mouse-up keeps single-click
+    //     selection unchanged; desktop dblclick still handles
+    //     mouse text-edit).
+    //   - The pointer didn't actually translate the shape.
+    //   - The same shape was the *only* selected shape before
+    //     this tap (so a fresh tap on an unselected shape just
+    //     selects, and a multi-select doesn't trip the trigger).
+    // Covers both UX flows: tap-tap on a fresh shape (first tap
+    // selects, second is now solo-selected and tap-edits) and
+    // tap an already-selected shape directly.
+    if (drag &&
+        drag.mode === 'move' &&
+        drag.pointerType === 'touch' &&
+        !drag.hasMoved &&
+        drag.wasSoloSelection &&
+        drag.touchTapTargetId &&
+        state.selectedShapeIds.size === 1 &&
+        state.selectedShapeIds.has(drag.touchTapTargetId)) {
+      const id = drag.touchTapTargetId;
+      drag = null;
+      state.smartGuides = [];
+      // Defer past the synthetic mouse event cycle that iOS
+      // Safari fires after a touch (pointerdown/pointerup →
+      // mousemove/mousedown/mouseup). If we open the textarea
+      // synchronously, the synthetic mousedown on the underlying
+      // rect immediately blurs the textarea and triggers its
+      // commit handler — wiping the editor before the user sees
+      // it. A 50ms delay puts the textarea creation + focus()
+      // call after the synthetic events have settled.
+      setTimeout(() => startTextEdit(id, overlayHost), 50);
+      return;
     }
     if (drag.hasMoved || drag.mode === 'resize' || drag.mode === 'rotate' || drag.mode === 'connect') {
       scheduleSave();
@@ -1262,6 +1314,13 @@
 
   // ---------- Inline text editing ----------
   function startTextEdit(shapeId, host) {
+    // Dedupe: if an edit is already in progress (e.g., the
+    // desktop dblclick handler raced with the new mobile
+    // tap-to-edit setTimeout), skip the second call. Otherwise
+    // two textareas stack, the second's focus() blurs the first
+    // which commits & removes itself, and the second's
+    // commit-on-blur removes it too — net result, no editor.
+    if (state.isEditingText) return;
     const page = activePage();
     const sh = D.findShape(page, shapeId);
     if (!sh) return;
