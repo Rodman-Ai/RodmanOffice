@@ -1209,6 +1209,22 @@ body.format-painter-active .canvas-svg { cursor: crosshair; }
     padding: 2px 4px; gap: 0;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: thin;
+    /* Explicit pan-x so single-finger horizontal swipes scroll
+       the ribbon on iOS Safari. Without this, swipes that land
+       on the empty gap between groups may be interpreted
+       ambiguously and not pan. */
+    touch-action: pan-x;
+  }
+  /* Buttons / inputs inside the ribbon must not block the parent's
+     horizontal pan. `manipulation` keeps tap-to-click instant and
+     disables the 300ms tap delay + double-tap-to-zoom — exactly
+     right for a toolbar that's also scrollable. */
+  .ribbon-panel .ribbon-btn,
+  .ribbon-panel .select,
+  .ribbon-panel input,
+  .ribbon-panel button,
+  .ribbon-panel label {
+    touch-action: manipulation;
   }
   .group {
     display: flex !important;
