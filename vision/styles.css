@@ -754,6 +754,8 @@ body[data-tool="pan"] .canvas-shadow:active { cursor: grabbing; }
 body[data-tool="eyedropper"] .canvas-svg { cursor: crosshair; }
 body[data-tool="lasso"] .canvas-svg { cursor: crosshair; }
 body[data-tool="stamp"] .canvas-svg { cursor: copy; }
+body[data-tool="connect"] .canvas-svg { cursor: crosshair; }
+body[data-tool="connect"] .canvas-svg .shape { cursor: pointer; }
 .group-frame {
   position: absolute;
   pointer-events: none;
@@ -1208,9 +1210,16 @@ body.format-painter-active .canvas-svg { cursor: crosshair; }
      ribbon tab; matches the Slides pattern. */
   .title-bar .title-actions .icon-btn { display: none; }
   .doc-title {
-    width: min(120px, 32vw);
-    max-width: 32vw;
+    /* Wide enough for "Untitled Diagram" to fit at 13px without
+       clipping (~110px text + 12px padding). Anything longer
+       falls back to text-overflow: ellipsis — works on <input>
+       in WebKit / Blink. */
+    width: min(200px, 50vw);
+    max-width: 50vw;
     font-size: 13px;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
   }
   .title-actions { gap: 2px; }
   /* Mobile Ask Claude: hide the " Ask Claude" label span so the
