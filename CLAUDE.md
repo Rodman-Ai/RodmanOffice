@@ -11,7 +11,7 @@ implemented from scratch under `/lib/`.
 ```
 /word/        Vanilla HTML + ESM word processor
 /slides/      Vanilla HTML + ESM presentation editor
-/diagrams/    Vanilla HTML + ESM Visio-clone (VSDX read/write) — RodmanVision
+/vision/      Vanilla HTML + ESM Visio-clone (VSDX read/write) — RodmanVision
 /image/       Vanilla HTML + ESM image editor (RetroPaint inside)
 /converter/   Vanilla HTML + ESM batch file converter
 /accounting/  Vanilla HTML + ESM bookkeeping app
