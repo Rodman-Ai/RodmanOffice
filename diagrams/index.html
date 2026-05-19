@@ -98,6 +98,7 @@
       <div class="group">
         <div class="group-row">
           <button class="ribbon-btn wide" data-cmd="newDiagram">New</button>
+          <button class="ribbon-btn wide" data-cmd="showTemplatePicker" title="Start from a template">📋 Templates…</button>
           <button class="ribbon-btn wide" data-cmd="openDiagram">📂 Open…</button>
         </div>
         <div class="group-label">Diagram</div>
@@ -193,6 +194,16 @@
 
       <div class="group">
         <div class="group-row">
+          <button class="ribbon-btn tool-btn active" data-cmd="setTool" data-tool="select" title="Select tool (default)">↖</button>
+          <button class="ribbon-btn tool-btn" data-cmd="setTool" data-tool="pan" title="Pan tool — drag canvas instead of selecting">✋</button>
+          <button class="ribbon-btn tool-btn" data-cmd="setTool" data-tool="lasso" title="Lasso (free-form) select">⤳</button>
+          <button class="ribbon-btn tool-btn" data-cmd="setTool" data-tool="eyedropper" title="Eyedropper — click a shape to copy its colors">💧</button>
+          <button class="ribbon-btn tool-btn" data-cmd="setTool" data-tool="stamp" title="Stamp — click to drop more of the last stencil">⎚</button>
+        </div>
+        <div class="group-label">Tool</div>
+      </div>
+      <div class="group">
+        <div class="group-row">
           <button class="ribbon-btn" data-cmd="bringForward" title="Bring forward">⤴</button>
           <button class="ribbon-btn" data-cmd="sendBackward" title="Send backward">⤵</button>
           <button class="ribbon-btn" data-cmd="group" title="Group (Ctrl+G)">Group</button>
@@ -202,6 +213,7 @@
           <button class="ribbon-btn" data-cmd="flipH" title="Flip horizontal">⇋</button>
           <button class="ribbon-btn" data-cmd="flipV" title="Flip vertical">⇅</button>
           <button class="ribbon-btn" data-cmd="pickFormat" title="Format painter — click to copy format, then click target shapes">🖌</button>
+          <button class="ribbon-btn" data-cmd="snapRotation15" title="Snap rotation of selected shapes to nearest 15°">15°</button>
         </div>
         <div class="group-label">Arrange</div>
       </div>
@@ -219,6 +231,8 @@
           <button class="ribbon-btn" data-cmd="distributeH" title="Distribute horizontally">⇔</button>
           <button class="ribbon-btn" data-cmd="distributeV" title="Distribute vertically">⇕</button>
           <button class="ribbon-btn" data-cmd="spaceEvenly" title="Space evenly (both axes)">⫾</button>
+          <button class="ribbon-btn" data-cmd="distributeOnArc" title="Distribute selection on a circle">◯</button>
+          <button class="ribbon-btn" data-cmd="centerSelectionOnPage" title="Center selection on page">⊕</button>
         </div>
         <div class="group-label">Align</div>
       </div>
@@ -259,14 +273,34 @@
         <div class="group-row">
           <button class="ribbon-btn" data-cmd="editConnectorLabel" title="Edit connector label">Label…</button>
         </div>
+        <div class="group-row" title="Arrow head (end)">
+          <button class="ribbon-btn" data-cmd="setConnectorArrow" data-end="end" data-kind="arrow"   title="End: closed arrow">▶</button>
+          <button class="ribbon-btn" data-cmd="setConnectorArrow" data-end="end" data-kind="open"    title="End: open arrow">›</button>
+          <button class="ribbon-btn" data-cmd="setConnectorArrow" data-end="end" data-kind="diamond" title="End: diamond">◆</button>
+          <button class="ribbon-btn" data-cmd="setConnectorArrow" data-end="end" data-kind="circle"  title="End: circle">●</button>
+          <button class="ribbon-btn" data-cmd="setConnectorArrow" data-end="end" data-kind="bar"     title="End: bar">|</button>
+          <button class="ribbon-btn" data-cmd="setConnectorArrow" data-end="end" data-kind="none"    title="End: none">✕</button>
+        </div>
+        <div class="group-row" title="Connector presets">
+          <button class="ribbon-btn" data-cmd="connectorPreset" data-preset="default" title="Default preset">Def</button>
+          <button class="ribbon-btn" data-cmd="connectorPreset" data-preset="thick"   title="Thick black preset">Thk</button>
+          <button class="ribbon-btn" data-cmd="connectorPreset" data-preset="thin"    title="Thin dashed preset">Thn</button>
+          <button class="ribbon-btn" data-cmd="connectorPreset" data-preset="accent"  title="Accent color preset">Acc</button>
+        </div>
         <div class="group-label">Connector</div>
       </div>
       <div class="group">
         <div class="group-row">
-          <button class="ribbon-btn wide" data-cmd="autoLayoutHierarchy" title="Hierarchical auto-layout">⇣ Hierarchy</button>
+          <button class="ribbon-btn wide" data-cmd="autoLayoutHierarchy" title="Hierarchical auto-layout (top-down)">⇣ Hierarchy</button>
+        </div>
+        <div class="group-row">
+          <button class="ribbon-btn wide" data-cmd="autoLayoutTreeLR" title="Hierarchical auto-layout (left-right)">⇉ Tree (LR)</button>
         </div>
         <div class="group-row">
           <button class="ribbon-btn wide" data-cmd="autoLayoutForce" title="Force-directed auto-layout">⚛ Force</button>
+        </div>
+        <div class="group-row">
+          <button class="ribbon-btn wide" data-cmd="autoLayoutRadial" title="Radial auto-layout (root in center)">◎ Radial</button>
         </div>
         <div class="group-row">
           <button class="ribbon-btn" data-cmd="addCustomPort" title="Add custom connection point to selected shape">+ Port</button>
@@ -295,6 +329,7 @@
           <button class="ribbon-btn" data-cmd="dropStencil" data-stencil="flowProcess">Proc</button>
           <button class="ribbon-btn" data-cmd="dropStencil" data-stencil="flowDecision">Dec</button>
           <button class="ribbon-btn" data-cmd="dropStencil" data-stencil="bpmnStartEvent">Start</button>
+          <button class="ribbon-btn" data-cmd="insertStickyNote" title="Insert a sticky note">📝</button>
         </div>
         <div class="group-label">Quick shapes</div>
       </div>
@@ -382,6 +417,21 @@
           </label>
           <button class="ribbon-btn" data-cmd="toggleMiniMap" title="Mini-map (pan thumbnail)">⊞ Mini-map</button>
         </div>
+        <div class="group-row">
+          <button class="ribbon-btn wide" data-cmd="toggleReviewerMode" title="Toggle reviewer (read-only) mode">👁 Reviewer</button>
+        </div>
+        <div class="group-row">
+          <button class="ribbon-btn wide" data-cmd="startPresentation" title="Full-screen presentation (← → to page; Esc exits)">▶ Present</button>
+        </div>
+        <div class="group-row">
+          <button class="ribbon-btn wide" data-cmd="printPreview" title="Open print-friendly preview">🖨 Print preview</button>
+        </div>
+        <div class="group-row">
+          <button class="ribbon-btn wide" data-cmd="bookmarkPosition" title="Bookmark current view (page + scroll + zoom)">★ Bookmark</button>
+        </div>
+        <div class="group-row" id="bookmarksList" style="flex-wrap:wrap;gap:2px;max-width:240px;">
+          <!-- bookmark buttons populated by app.js -->
+        </div>
         <div class="group-label">Panels</div>
       </div>
     </div>
@@ -403,6 +453,11 @@
     <aside class="stencil-pane" id="stencilPane" aria-label="Stencils">
       <div class="stencil-search">
         <input type="search" id="stencilSearch" placeholder="Search stencils…" aria-label="Search stencils" />
+      </div>
+      <div class="stencil-size-toggle" role="group" aria-label="Stencil tile size">
+        <button type="button" class="stencil-size-btn" data-cmd="setTileSize" data-size="small"  title="Small tiles">▫</button>
+        <button type="button" class="stencil-size-btn" data-cmd="setTileSize" data-size="medium" title="Medium tiles">◻</button>
+        <button type="button" class="stencil-size-btn" data-cmd="setTileSize" data-size="large"  title="Large tiles">⬜</button>
       </div>
       <div class="stencil-list" id="stencilList"><!-- populated by app.js --></div>
     </aside>
@@ -506,6 +561,15 @@
 
   <div id="miniMap" hidden></div>
 
+  <!-- Wave 4: presentation overlay (full-screen slideshow) -->
+  <div id="presentationOverlay" hidden>
+    <div id="presentationToolbar">
+      <span id="presentationCounter">1 / 1</span>
+      <button type="button" id="presentationClose" aria-label="Exit presentation">✕</button>
+    </div>
+    <div id="presentationSurface"></div>
+  </div>
+
   <dialog class="save-dialog" id="themeBuilderDialog">
     <form method="dialog">
       <header>
@@ -552,6 +616,18 @@
       </header>
       <div class="body" style="max-height:60vh;overflow-y:auto;">
         <div id="replaceShapeList"></div>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog class="save-dialog template-picker-dialog" id="templatePickerDialog">
+    <form method="dialog">
+      <header>
+        <h3>Start from a template</h3>
+        <button type="button" aria-label="Close" onclick="this.closest('dialog').close()">&times;</button>
+      </header>
+      <div class="body" style="max-height:60vh;overflow-y:auto;">
+        <div id="templatePickerList"></div>
       </div>
     </form>
   </dialog>
@@ -635,6 +711,7 @@
   </script>
   <script src="diagram.js" defer></script>
   <script src="render.js" defer></script>
+  <script src="templates.js" defer></script>
   <script src="app.js" defer></script>
 </body>
 </html>

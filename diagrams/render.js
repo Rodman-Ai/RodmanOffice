@@ -47,9 +47,25 @@
 
     // Defs (arrow markers + grid pattern)
     const defs = el('defs', null, svg);
+    // Wave 3: extra arrow-head markers. Each marker uses
+    // fill / stroke = context-stroke so the head inherits the
+    // connector's color. `arr` is the original closed-triangle
+    // head; the rest are wave-3 additions.
     defs.innerHTML =
       '<marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">' +
         '<path d="M0,0 L10,5 L0,10 z" fill="context-stroke"/>' +
+      '</marker>' +
+      '<marker id="arr-open" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">' +
+        '<path d="M0,0 L10,5 L0,10" fill="none" stroke="context-stroke" stroke-width="1.5"/>' +
+      '</marker>' +
+      '<marker id="arr-diamond" viewBox="0 0 12 10" refX="11" refY="5" markerWidth="8" markerHeight="6" orient="auto-start-reverse">' +
+        '<path d="M0,5 L6,0 L12,5 L6,10 z" fill="context-stroke"/>' +
+      '</marker>' +
+      '<marker id="arr-circle" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">' +
+        '<circle cx="5" cy="5" r="4" fill="context-stroke"/>' +
+      '</marker>' +
+      '<marker id="arr-bar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">' +
+        '<path d="M9,0 L9,10" stroke="context-stroke" stroke-width="2"/>' +
       '</marker>' +
       '<pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">' +
         '<path d="M 20 0 L 0 0 0 20" fill="none" stroke="#e5e7eb" stroke-width="1"/>' +
@@ -233,7 +249,22 @@
     const ts = shape.textStyle || {};
     const fontSize = ts.fontSize || 14;
     const lineHeight = fontSize * 1.2;
-    const lines = String(shape.text).split('\n');
+    // Bullet / numbered list pre-processing: lines that start with
+    // `- `, `* `, or `N. ` render with a bullet glyph / number.
+    // Auto-numbering tracks across consecutive numbered lines.
+    let numCount = 0;
+    const lines = String(shape.text).split('\n').map((raw) => {
+      if (/^\s*[-*]\s+/.test(raw)) {
+        numCount = 0;
+        return { prefix: '• ', body: raw.replace(/^\s*[-*]\s+/, '') };
+      }
+      if (/^\s*\d+\.\s+/.test(raw)) {
+        numCount++;
+        return { prefix: `${numCount}. `, body: raw.replace(/^\s*\d+\.\s+/, '') };
+      }
+      numCount = 0;
+      return { prefix: '', body: raw };
+    });
     const totalH = lineHeight * lines.length;
     const startY = shape.h / 2 - totalH / 2 + fontSize * 0.85;
     const align = ts.align || 'center';
@@ -251,8 +282,42 @@
         class: 'shape-text',
         'pointer-events': 'none',
       }, parent);
-      t.textContent = line;
+      // Light Markdown-style per-character rich text: **bold** and *italic*
+      // segments become <tspan> children with the corresponding font
+      // weight / style.
+      const full = line.prefix + line.body;
+      const runs = parseRichRuns(full);
+      if (runs.length === 1 && !runs[0].bold && !runs[0].italic) {
+        t.textContent = runs[0].text;
+      } else {
+        for (const r of runs) {
+          const ts2 = el('tspan', {}, t);
+          if (r.bold) ts2.setAttribute('font-weight', '700');
+          if (r.italic) ts2.setAttribute('font-style', 'italic');
+          ts2.textContent = r.text;
+        }
+      }
     });
+  }
+
+  // Parse a line into { text, bold, italic } runs. Recognises
+  // **bold** and *italic* (no nesting). Defensive against mismatched
+  // markers — extras render as literal characters.
+  function parseRichRuns(line) {
+    const runs = [];
+    let bold = false, italic = false, buf = '';
+    function flush() { if (buf) runs.push({ text: buf, bold, italic }); buf = ''; }
+    for (let i = 0; i < line.length; i++) {
+      if (line[i] === '*' && line[i + 1] === '*') {
+        flush(); bold = !bold; i++;
+      } else if (line[i] === '*') {
+        flush(); italic = !italic;
+      } else {
+        buf += line[i];
+      }
+    }
+    flush();
+    return runs.length ? runs : [{ text: line, bold: false, italic: false }];
   }
 
   function renderConnector(conn, page, parent, layerOpacity) {
@@ -298,8 +363,23 @@
       class: 'connector-path',
     };
     if (dashAttr) lineAttrs['stroke-dasharray'] = dashAttr;
-    if (conn.endStart === 'arrow') lineAttrs['marker-start'] = 'url(#arr)';
-    if (conn.endEnd === 'arrow') lineAttrs['marker-end'] = 'url(#arr)';
+    // Wave 3: per-end arrow-head choice. `endStart` / `endEnd` may
+    // be 'arrow' (default closed triangle), 'open', 'diamond',
+    // 'circle', 'bar', or 'none'. Legacy 'arrow' still works.
+    const markerForEnd = (kind) => {
+      switch (kind) {
+        case 'arrow': return 'url(#arr)';
+        case 'open': return 'url(#arr-open)';
+        case 'diamond': return 'url(#arr-diamond)';
+        case 'circle': return 'url(#arr-circle)';
+        case 'bar': return 'url(#arr-bar)';
+        default: return null;
+      }
+    };
+    const ms = markerForEnd(conn.endStart);
+    const me = markerForEnd(conn.endEnd);
+    if (ms) lineAttrs['marker-start'] = ms;
+    if (me) lineAttrs['marker-end'] = me;
 
     el('path', lineAttrs, g);
 
@@ -319,19 +399,38 @@
       class: 'connector-hit',
     }, g);
 
-    if (conn.label) {
-      const mx = (a.x + b.x) / 2;
-      const my = (a.y + b.y) / 2;
-      const t = el('text', {
-        x: mx, y: my - 4,
-        'font-family': 'Segoe UI, sans-serif',
-        'font-size': 11,
-        fill: conn.stroke || '#444',
-        'text-anchor': 'middle',
-        class: 'connector-label',
-        'pointer-events': 'none',
-      }, g);
-      t.textContent = conn.label;
+    // Wave 3: label position. labelPos in 'src' | 'mid' | 'dst'
+    // controls where label + text2 anchor along the connector.
+    if (conn.label || conn.text2) {
+      const pos = conn.labelPos === 'src' ? 0.2
+                 : conn.labelPos === 'dst' ? 0.8
+                 : 0.5;
+      const lx = a.x + (b.x - a.x) * pos;
+      const ly = a.y + (b.y - a.y) * pos;
+      if (conn.label) {
+        const t = el('text', {
+          x: lx, y: ly - 4,
+          'font-family': 'Segoe UI, sans-serif',
+          'font-size': 11,
+          fill: conn.stroke || '#444',
+          'text-anchor': 'middle',
+          class: 'connector-label',
+          'pointer-events': 'none',
+        }, g);
+        t.textContent = conn.label;
+      }
+      if (conn.text2) {
+        const t2 = el('text', {
+          x: lx, y: ly + 10,
+          'font-family': 'Segoe UI, sans-serif',
+          'font-size': 10,
+          fill: conn.stroke || '#888',
+          'text-anchor': 'middle',
+          class: 'connector-sublabel',
+          'pointer-events': 'none',
+        }, g);
+        t2.textContent = conn.text2;
+      }
     }
 
     return g;

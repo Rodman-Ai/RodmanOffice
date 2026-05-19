@@ -46,6 +46,9 @@
     isEditingText: false,
     paintMode: null,        // { fill, stroke, strokeWidth, opacity, textStyle } | null
     smartGuides: [],        // active guide lines during drag: { x1, y1, x2, y2 }
+    tool: 'select',         // 'select' | 'pan' | 'eyedropper' | 'lasso' | 'stamp'
+    stampStencil: null,     // last-dropped stencil id; click drops more in 'stamp' mode
+    lassoPath: [],          // [{ x, y }] page-coord points; populated during lasso drag
   };
 
   // ---------- Undo / Redo history ----------
@@ -197,6 +200,10 @@
 
   // ---------- Stencil drawer ----------
   const FAVORITES_KEY = 'vision.favorites.v1';
+  const RECENTS_KEY = 'vision.stencil.recents.v1';
+  const COLLAPSED_KEY = 'vision.stencil.collapsed.v1';
+  const TILE_SIZE_KEY = 'vision.stencil.tilesize.v1';
+  const RECENTS_MAX = 8;
   function loadFavorites() {
     try {
       const raw = localStorage.getItem(FAVORITES_KEY);
@@ -206,6 +213,36 @@
   }
   function saveFavorites(arr) {
     try { localStorage.setItem(FAVORITES_KEY, JSON.stringify(arr)); } catch (_) {}
+  }
+  function loadRecents() {
+    try {
+      const raw = localStorage.getItem(RECENTS_KEY);
+      const arr = raw ? JSON.parse(raw) : [];
+      return Array.isArray(arr) ? arr.filter((id) => STENCILS.STENCILS[id]) : [];
+    } catch (_) { return []; }
+  }
+  function recordRecent(id) {
+    if (!STENCILS.STENCILS[id]) return;
+    const arr = loadRecents().filter((x) => x !== id);
+    arr.unshift(id);
+    if (arr.length > RECENTS_MAX) arr.length = RECENTS_MAX;
+    try { localStorage.setItem(RECENTS_KEY, JSON.stringify(arr)); } catch (_) {}
+  }
+  function loadCollapsedCats() {
+    try {
+      const raw = localStorage.getItem(COLLAPSED_KEY);
+      return raw ? new Set(JSON.parse(raw)) : new Set();
+    } catch (_) { return new Set(); }
+  }
+  function saveCollapsedCats(set) {
+    try { localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...set])); } catch (_) {}
+  }
+  function loadTileSize() {
+    try { return localStorage.getItem(TILE_SIZE_KEY) || 'medium'; }
+    catch (_) { return 'medium'; }
+  }
+  function saveTileSize(size) {
+    try { localStorage.setItem(TILE_SIZE_KEY, size); } catch (_) {}
   }
 
   // Fuzzy match: subsequence of query chars in name (case-insensitive).
@@ -233,29 +270,44 @@
   function renderStencilDrawer() {
     const list = $('#stencilList');
     list.innerHTML = '';
+    list.dataset.tileSize = loadTileSize();
     const groups = STENCILS.stencilsByCategory();
     const filter = ($('#stencilSearch').value || '').trim();
     const favorites = loadFavorites();
+    const recents = loadRecents();
+    const collapsed = loadCollapsedCats();
 
-    // Favorites pseudo-category (only when populated)
-    if (favorites.length && !filter) {
+    function makeCategory(catName, items, opts = {}) {
       const wrap = document.createElement('div');
       wrap.className = 'stencil-category';
+      if (collapsed.has(catName)) wrap.classList.add('collapsed');
       const header = document.createElement('div');
       header.className = 'stencil-category-header';
-      header.textContent = '★ Favorites';
-      header.addEventListener('click', () => wrap.classList.toggle('collapsed'));
+      header.textContent = opts.label || catName;
+      header.addEventListener('click', () => {
+        wrap.classList.toggle('collapsed');
+        if (wrap.classList.contains('collapsed')) collapsed.add(catName);
+        else collapsed.delete(catName);
+        saveCollapsedCats(collapsed);
+      });
       wrap.appendChild(header);
       const grid = document.createElement('div');
       grid.className = 'stencil-grid';
-      for (const id of favorites) {
-        const stencil = STENCILS.getStencil(id);
-        if (stencil) grid.appendChild(makeStencilTile(stencil, true));
-      }
+      for (const stencil of items) grid.appendChild(makeStencilTile(stencil, opts.isFavorite));
       wrap.appendChild(grid);
       list.appendChild(wrap);
     }
 
+    // Recent pseudo-category (only when populated, only when not filtering)
+    if (recents.length && !filter) {
+      const items = recents.map((id) => STENCILS.getStencil(id)).filter(Boolean);
+      makeCategory('__recents__', items, { label: '⌚ Recent' });
+    }
+    // Favorites pseudo-category
+    if (favorites.length && !filter) {
+      const items = favorites.map((id) => STENCILS.getStencil(id)).filter(Boolean);
+      makeCategory('__favorites__', items, { label: '★ Favorites', isFavorite: true });
+    }
     for (const cat of STENCILS.CATEGORIES) {
       let items = groups[cat] || [];
       if (filter) {
@@ -266,19 +318,20 @@
           .map((x) => x.s);
       }
       if (!items.length) continue;
-      const wrap = document.createElement('div');
-      wrap.className = 'stencil-category';
-      const header = document.createElement('div');
-      header.className = 'stencil-category-header';
-      header.textContent = cat;
-      header.addEventListener('click', () => wrap.classList.toggle('collapsed'));
-      wrap.appendChild(header);
-      const grid = document.createElement('div');
-      grid.className = 'stencil-grid';
-      for (const stencil of items) grid.appendChild(makeStencilTile(stencil));
-      wrap.appendChild(grid);
-      list.appendChild(wrap);
+      makeCategory(cat, items);
     }
+  }
+
+  // ---------- Wave 2: custom stencils ----------
+  const CUSTOM_STENCILS_KEY = 'vision.stencils.custom.v1';
+  function loadCustomStencils() {
+    try {
+      const raw = localStorage.getItem(CUSTOM_STENCILS_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch (_) { return []; }
+  }
+  function saveCustomStencils(arr) {
+    try { localStorage.setItem(CUSTOM_STENCILS_KEY, JSON.stringify(arr)); } catch (_) {}
   }
 
   function makeStencilTile(stencil, isFavorite) {
@@ -531,6 +584,44 @@
       const target = e.target.closest('.shape, .connector');
       const pt = eventToPagePoint(e, shadow);
 
+      // Pan tool: drag canvas instead of selecting.
+      if (state.tool === 'pan') {
+        const scroll = $('#canvasScroll');
+        drag = {
+          mode: 'pan',
+          startClientX: e.clientX, startClientY: e.clientY,
+          startScrollLeft: scroll.scrollLeft,
+          startScrollTop: scroll.scrollTop,
+        };
+        e.preventDefault();
+        return;
+      }
+      // Eyedropper: clicking a shape copies its fill to the active picker.
+      if (state.tool === 'eyedropper' && target?.classList.contains('shape')) {
+        const sh = D.findShape(activePage(), target.getAttribute('data-shape-id'));
+        if (sh) {
+          $('#shapeFill').value = ensureHex(sh.fill);
+          $('#shapeStroke').value = ensureHex(sh.stroke);
+          $('#textColor').value = ensureHex(sh.textStyle?.color || '#000000');
+        }
+        // Stay in eyedropper for multi-pick; Esc exits.
+        return;
+      }
+      // Stamp: click on blank canvas drops another copy of the
+      // last-dropped stencil. Clicking a shape selects normally.
+      if (state.tool === 'stamp' && !target && state.stampStencil) {
+        dropStencilAt(state.stampStencil, pt.x, pt.y);
+        return;
+      }
+      // Lasso: start a free-form selection path.
+      if (state.tool === 'lasso' && !target) {
+        if (!e.shiftKey) clearSelection();
+        state.lassoPath = [{ x: pt.x, y: pt.y }];
+        drag = { mode: 'lasso', startX: pt.x, startY: pt.y, x: pt.x, y: pt.y };
+        renderSelectionOverlays(overlayHost);
+        return;
+      }
+
       if (!target) {
         if (!e.shiftKey) clearSelection();
         drag = { mode: 'marquee', startX: pt.x, startY: pt.y, x: pt.x, y: pt.y };
@@ -678,6 +769,16 @@
     } else if (drag.mode === 'connect') {
       drag.x = pt.x; drag.y = pt.y;
       renderConnectorPreview(overlayHost);
+    } else if (drag.mode === 'pan') {
+      // Pan tool: translate scrollLeft/Top by mouse delta.
+      const scroll = $('#canvasScroll');
+      scroll.scrollLeft = drag.startScrollLeft - (e.clientX - drag.startClientX);
+      scroll.scrollTop = drag.startScrollTop - (e.clientY - drag.startClientY);
+    } else if (drag.mode === 'lasso') {
+      // Lasso: append point to free-form path.
+      state.lassoPath.push({ x: pt.x, y: pt.y });
+      drag.x = pt.x; drag.y = pt.y;
+      renderSelectionOverlays(overlayHost);
     }
   });
 
@@ -701,6 +802,19 @@
       }
     } else if (drag.mode === 'connect') {
       finishConnectorDrag(e);
+    } else if (drag.mode === 'lasso') {
+      // Lasso: select every shape whose center is inside the path.
+      if (state.lassoPath.length >= 3) {
+        const page = activePage();
+        for (const sh of page.shapes) {
+          const cx = sh.x + sh.w / 2;
+          const cy = sh.y + sh.h / 2;
+          if (pointInPolygon(cx, cy, state.lassoPath)) {
+            state.selectedShapeIds.add(sh.id);
+          }
+        }
+      }
+      state.lassoPath = [];
     }
     if (drag.hasMoved || drag.mode === 'resize' || drag.mode === 'rotate' || drag.mode === 'connect') {
       scheduleSave();
@@ -793,6 +907,8 @@
     });
     activePage().shapes.push(shape);
     lastDroppedStencil = stencilId;
+    state.stampStencil = stencilId;
+    recordRecent(stencilId);
     if (!opts.suppressSelect) {
       state.selectedShapeIds.clear();
       state.selectedConnectorIds.clear();
@@ -812,8 +928,8 @@
   }
 
   function renderSelectionOverlays(shadow) {
-    // Remove any previous overlays + handles + marquee.
-    shadow.querySelectorAll('.selection-overlay, .selection-handles, .marquee, .connector-preview, .port-dot').forEach((el) => el.remove());
+    // Remove any previous overlays + handles + marquee + lasso.
+    shadow.querySelectorAll('.selection-overlay, .selection-handles, .marquee, .lasso-path, .connector-preview, .port-dot, .group-frame').forEach((el) => el.remove());
 
     if (drag && drag.mode === 'marquee') {
       const x0 = Math.min(drag.startX, drag.x);
@@ -827,6 +943,44 @@
       m.style.width = w + 'px';
       m.style.height = h + 'px';
       shadow.appendChild(m);
+    }
+    // Lasso (free-form select) — render an SVG polyline of the path.
+    if (drag && drag.mode === 'lasso' && state.lassoPath.length >= 2) {
+      const ns = 'http://www.w3.org/2000/svg';
+      const svg = document.createElementNS(ns, 'svg');
+      svg.setAttribute('class', 'lasso-path');
+      const page = activePage();
+      svg.setAttribute('width', page.w);
+      svg.setAttribute('height', page.h);
+      svg.style.position = 'absolute';
+      svg.style.left = '0';
+      svg.style.top = '0';
+      svg.style.pointerEvents = 'none';
+      const path = document.createElementNS(ns, 'path');
+      const d = 'M' + state.lassoPath.map((p) => `${p.x},${p.y}`).join(' L');
+      path.setAttribute('d', d + ' Z');
+      path.setAttribute('fill', 'rgba(26, 142, 154, 0.08)');
+      path.setAttribute('stroke', '#1a8e9a');
+      path.setAttribute('stroke-width', '1');
+      path.setAttribute('stroke-dasharray', '4 3');
+      svg.appendChild(path);
+      shadow.appendChild(svg);
+    }
+    // Group frames — render a dashed border around each group's bounds.
+    const page0 = activePage();
+    if (Array.isArray(page0.groups)) {
+      for (const g of page0.groups) {
+        const members = g.shapeIds.map((id) => D.findShape(page0, id)).filter(Boolean);
+        if (members.length < 2) continue;
+        const b = D.boundsOfShapes(members);
+        const f = document.createElement('div');
+        f.className = 'group-frame';
+        f.style.left = (b.x - 4) + 'px';
+        f.style.top = (b.y - 4) + 'px';
+        f.style.width = (b.w + 8) + 'px';
+        f.style.height = (b.h + 8) + 'px';
+        shadow.appendChild(f);
+      }
     }
 
     const page = activePage();
@@ -1326,6 +1480,40 @@
       // canvas-scroll's clientWidth.
       requestAnimationFrame(() => requestAnimationFrame(() => commands.zoomFit()));
     },
+    // Wave 2: starter templates. Opens a picker; on selection,
+    // creates a fresh diagram and inserts the template's shapes +
+    // connectors via the existing applyClaudeDiagram pipeline (which
+    // also runs hierarchical auto-layout).
+    setTileSize(btn) {
+      const size = btn?.dataset?.size || 'medium';
+      saveTileSize(size);
+      renderStencilDrawer();
+      $$('.stencil-size-btn').forEach((b) =>
+        b.classList.toggle('active', b.dataset.size === size));
+    },
+    showTemplatePicker() {
+      const dlg = $('#templatePickerDialog');
+      const list = $('#templatePickerList');
+      const tpls = window.RodmanVisionTemplates || {};
+      list.innerHTML = '';
+      for (const [key, t] of Object.entries(tpls)) {
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'template-pick';
+        item.innerHTML = `<div class="template-pick-name">${escHtml(t.name)}</div>` +
+                         `<div class="template-pick-summary">${escHtml(t.summary)}</div>` +
+                         `<div class="template-pick-counts">${t.shapes.length} shapes · ${t.connectors.length} connectors</div>`;
+        item.addEventListener('click', () => {
+          // Apply template on the current page (don't create a new
+          // diagram — user can start fresh themselves first).
+          applyClaudeDiagram(t);
+          dlg.close();
+        });
+        list.appendChild(item);
+      }
+      if (typeof dlg.showModal === 'function') dlg.showModal();
+      else dlg.setAttribute('open', '');
+    },
     openDiagram() { $('#openFileInput').click(); },
     showSaveDialog() {
       const dlg = $('#saveDialog');
@@ -1447,10 +1635,61 @@
     distributeH()    { distributeSelection('horizontal'); },
     distributeV()    { distributeSelection('vertical'); },
     spaceEvenly()    { distributeSelection('evenly'); },
+    distributeOnArc() { distributeOnCircle(); },
 
     // Flip
     flipH() { flipSelection('h'); },
     flipV() { flipSelection('v'); },
+
+    // ---------- Wave 1: Editing power tools ----------
+    setTool(btn) {
+      const t = btn?.dataset?.tool || 'select';
+      state.tool = t;
+      state.stampStencil = t === 'stamp' ? (state.stampStencil || 'rectangle') : state.stampStencil;
+      document.body.dataset.tool = t;
+      $$('.tool-btn').forEach((b) => b.classList.toggle('active', b.dataset.tool === t));
+    },
+    // Snap rotation of selected shapes to nearest 15°.
+    snapRotation15() {
+      const page = activePage();
+      let changed = false;
+      for (const id of state.selectedShapeIds) {
+        const sh = D.findShape(page, id);
+        if (!sh) continue;
+        sh.rotation = Math.round((sh.rotation || 0) / 15) * 15;
+        changed = true;
+      }
+      if (changed) { scheduleSave(); renderCanvas(); }
+    },
+    centerSelectionOnPage() {
+      const page = activePage();
+      const shapes = [...state.selectedShapeIds].map((id) => D.findShape(page, id)).filter(Boolean);
+      if (!shapes.length) return;
+      const bounds = D.boundsOfShapes(shapes);
+      const dx = (page.w - bounds.w) / 2 - bounds.x;
+      const dy = (page.h - bounds.h) / 2 - bounds.y;
+      for (const sh of shapes) { sh.x = Math.round(sh.x + dx); sh.y = Math.round(sh.y + dy); }
+      scheduleSave(); renderCanvas();
+    },
+    insertStickyNote() {
+      const page = activePage();
+      const sh = D.newShape({
+        stencil: 'stickyNote',
+        x: Math.round(page.w / 2 - 80),
+        y: Math.round(page.h / 2 - 50),
+        w: 160, h: 100,
+        fill: '#fef9c3',
+        stroke: '#ca8a04',
+        strokeWidth: 1,
+        text: 'Sticky note',
+        textStyle: { fontFamily: 'Comic Sans MS, cursive', fontSize: 14, color: '#713f12', align: 'left' },
+        layerId: activeLayer().id,
+      });
+      sh._themed = false;
+      page.shapes.push(sh);
+      state.selectedShapeIds = new Set([sh.id]);
+      scheduleSave(); renderCanvas();
+    },
 
     // Format painter
     pickFormat() {
@@ -1848,6 +2087,165 @@
       scheduleSave();
       renderCanvas();
     },
+    autoLayoutRadial() {
+      const page = activePage();
+      autoLayoutRadial(page);
+      scheduleSave();
+      renderCanvas();
+    },
+    // ---------- Wave 4: review + presentation + bookmarks ----------
+    toggleReviewerMode() {
+      state.reviewerMode = !state.reviewerMode;
+      document.body.classList.toggle('reviewer-mode', state.reviewerMode);
+      // Force-deselect on enter so the user can't accidentally edit.
+      if (state.reviewerMode) {
+        state.selectedShapeIds.clear();
+        state.selectedConnectorIds.clear();
+        renderCanvas();
+      }
+    },
+    startPresentation() {
+      // Open the canvas in a full-screen overlay; arrow keys
+      // navigate pages. Esc exits.
+      const overlay = $('#presentationOverlay');
+      const surf = $('#presentationSurface');
+      let idx = diagram.pages.indexOf(activePage());
+      if (idx < 0) idx = 0;
+      const renderSlide = () => {
+        surf.innerHTML = '';
+        const page = diagram.pages[idx];
+        const svg = R.renderPage(page, diagram.layers, { showGrid: false });
+        // Fit page to overlay.
+        svg.setAttribute('width', '100%');
+        svg.setAttribute('height', '100%');
+        svg.setAttribute('viewBox', `0 0 ${page.w} ${page.h}`);
+        svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+        surf.appendChild(svg);
+        $('#presentationCounter').textContent = `${idx + 1} / ${diagram.pages.length}`;
+      };
+      const onKey = (e) => {
+        if (e.key === 'Escape') { closePresentation(); return; }
+        if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') {
+          idx = Math.min(diagram.pages.length - 1, idx + 1); renderSlide();
+        } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+          idx = Math.max(0, idx - 1); renderSlide();
+        } else if (e.key === 'Home') {
+          idx = 0; renderSlide();
+        } else if (e.key === 'End') {
+          idx = diagram.pages.length - 1; renderSlide();
+        }
+      };
+      const closePresentation = () => {
+        overlay.hidden = true;
+        document.removeEventListener('keydown', onKey);
+        if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+      };
+      $('#presentationClose').onclick = closePresentation;
+      overlay.hidden = false;
+      renderSlide();
+      document.addEventListener('keydown', onKey);
+      if (overlay.requestFullscreen) overlay.requestFullscreen().catch(() => {});
+    },
+    printPreview() {
+      // Open a new window with one printable page per diagram
+      // page. Uses the existing SVG renderer.
+      const w = window.open('', '_blank', 'width=900,height=1200');
+      if (!w) return;
+      const css = `
+        @page { margin: 0.5in; }
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; padding: 16px; }
+        h2 { margin: 0 0 8px; }
+        .slide { page-break-after: always; margin-bottom: 24px; }
+        .slide:last-child { page-break-after: auto; }
+        svg { width: 100%; height: auto; border: 1px solid #ccc; }
+      `;
+      let body = '';
+      for (let i = 0; i < diagram.pages.length; i++) {
+        const page = diagram.pages[i];
+        const svg = R.renderPage(page, diagram.layers, { showGrid: false });
+        svg.setAttribute('viewBox', `0 0 ${page.w} ${page.h}`);
+        svg.removeAttribute('width');
+        svg.removeAttribute('height');
+        body += `<div class="slide"><h2>${escHtml(page.name || ('Page ' + (i + 1)))}</h2>${svg.outerHTML}</div>`;
+      }
+      w.document.write(
+        `<!doctype html><html><head><title>${escHtml(diagram.title || 'Diagram')}</title>` +
+        `<style>${css}</style></head><body>${body}` +
+        `<script>setTimeout(()=>window.print(),300)<\/script></body></html>`
+      );
+      w.document.close();
+    },
+    bookmarkPosition() {
+      // Save the current page + scroll + zoom as a named bookmark.
+      const name = prompt('Bookmark name:', 'Bookmark ' + ((state.bookmarks?.length || 0) + 1));
+      if (!name) return;
+      const scroll = $('#canvasScroll');
+      state.bookmarks = state.bookmarks || [];
+      state.bookmarks.push({
+        name,
+        pageId: state.activePageId,
+        scrollLeft: scroll.scrollLeft,
+        scrollTop: scroll.scrollTop,
+        zoom: state.zoom,
+      });
+      renderBookmarksList();
+      scheduleSave();
+    },
+    jumpToBookmark(btn) {
+      const idx = parseInt(btn?.dataset?.idx || '-1', 10);
+      const bm = (state.bookmarks || [])[idx];
+      if (!bm) return;
+      state.activePageId = bm.pageId;
+      state.zoom = bm.zoom;
+      renderCanvas();
+      const scroll = $('#canvasScroll');
+      requestAnimationFrame(() => {
+        scroll.scrollLeft = bm.scrollLeft;
+        scroll.scrollTop = bm.scrollTop;
+      });
+    },
+    autoLayoutTreeLR() {
+      const page = activePage();
+      autoLayoutHierarchical(page, { direction: 'LR' });
+      scheduleSave();
+      renderCanvas();
+    },
+    // Wave 3: connector style presets — restyle the currently-
+    // selected connectors with one of four named presets.
+    connectorPreset(btn) {
+      const preset = btn?.dataset?.preset || 'default';
+      const page = activePage();
+      const styles = {
+        default: { stroke: '#444', strokeWidth: 1.5, lineStyle: 'solid', endEnd: 'arrow' },
+        thick:   { stroke: '#222', strokeWidth: 3,   lineStyle: 'solid', endEnd: 'arrow' },
+        thin:    { stroke: '#888', strokeWidth: 1,   lineStyle: 'dashed', endEnd: 'arrow' },
+        accent:  { stroke: '#1a8e9a', strokeWidth: 2.5, lineStyle: 'solid', endEnd: 'arrow' },
+      };
+      const style = styles[preset] || styles.default;
+      let n = 0;
+      for (const cid of state.selectedConnectorIds) {
+        const c = page.connectors.find((x) => x.id === cid);
+        if (!c) continue;
+        Object.assign(c, style);
+        n++;
+      }
+      if (n) { scheduleSave(); renderCanvas(); renderPropertiesPanel(); }
+    },
+    // Wave 3: per-end arrow head choice for selected connectors.
+    setConnectorArrow(btn) {
+      const end = btn?.dataset?.end || 'end'; // 'start' or 'end'
+      const kind = btn?.dataset?.kind || 'arrow';
+      const page = activePage();
+      const field = end === 'start' ? 'endStart' : 'endEnd';
+      let n = 0;
+      for (const cid of state.selectedConnectorIds) {
+        const c = page.connectors.find((x) => x.id === cid);
+        if (!c) continue;
+        c[field] = kind === 'none' ? null : kind;
+        n++;
+      }
+      if (n) { scheduleSave(); renderCanvas(); renderPropertiesPanel(); }
+    },
     addCustomPort() {
       if (state.selectedShapeIds.size !== 1) return;
       const page = activePage();
@@ -1965,6 +2363,37 @@
     }
     scheduleSave();
     renderCanvas();
+  }
+
+  // Place N selected shapes at equal angles around a circle whose
+  // diameter matches the longer side of the selection bounds.
+  function distributeOnCircle() {
+    const page = activePage();
+    const shapes = [...state.selectedShapeIds].map((id) => D.findShape(page, id)).filter(Boolean);
+    if (shapes.length < 3) return;
+    const bounds = D.boundsOfShapes(shapes);
+    const cx = bounds.x + bounds.w / 2;
+    const cy = bounds.y + bounds.h / 2;
+    const r = Math.max(bounds.w, bounds.h) / 2;
+    shapes.forEach((s, i) => {
+      const angle = -Math.PI / 2 + (i / shapes.length) * 2 * Math.PI;
+      s.x = Math.round(cx + r * Math.cos(angle) - s.w / 2);
+      s.y = Math.round(cy + r * Math.sin(angle) - s.h / 2);
+    });
+    scheduleSave(); renderCanvas();
+  }
+
+  // Ray-cast point-in-polygon for lasso selection.
+  function pointInPolygon(px, py, poly) {
+    let inside = false;
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      const xi = poly[i].x, yi = poly[i].y;
+      const xj = poly[j].x, yj = poly[j].y;
+      const intersect = ((yi > py) !== (yj > py)) &&
+        (px < (xj - xi) * (py - yi) / (yj - yi) + xi);
+      if (intersect) inside = !inside;
+    }
+    return inside;
   }
 
   function flipSelection(axis) {
@@ -2299,8 +2728,10 @@
 
   // Hierarchical (Sugiyama-lite) auto-layout: assign layers by BFS
   // depth from roots (shapes with no incoming connectors), then
-  // arrange each layer left-to-right with even spacing.
-  function autoLayoutHierarchical(page) {
+  // arrange each layer in a row (TB default) or column (LR).
+  // opts.direction = 'TB' | 'LR'; opts.rankSep / opts.nodeSep
+  // override the default spacings.
+  function autoLayoutHierarchical(page, opts = {}) {
     if (!page.shapes.length) return;
     const inDeg = new Map(page.shapes.map((s) => [s.id, 0]));
     const adj = new Map(page.shapes.map((s) => [s.id, []]));
@@ -2324,10 +2755,8 @@
         }
       }
     }
-    // Default un-layered shapes to layer 0 (disconnected nodes).
     for (const s of page.shapes) if (!layer.has(s.id)) layer.set(s.id, 0);
 
-    // Bucket by layer.
     const buckets = new Map();
     for (const s of page.shapes) {
       const l = layer.get(s.id);
@@ -2335,17 +2764,65 @@
       buckets.get(l).push(s);
     }
     const layers = [...buckets.keys()].sort((a, b) => a - b);
-    const ySpacing = 140;
-    const xSpacing = 200;
+    const dir = opts.direction || state.layoutSettings?.direction || 'TB';
+    const rankSep = opts.rankSep || state.layoutSettings?.rankSep || 140;
+    const nodeSep = opts.nodeSep || state.layoutSettings?.nodeSep || 200;
     const startX = 100;
     const startY = 100;
     for (let li = 0; li < layers.length; li++) {
-      const l = layers[li];
-      const shapes = buckets.get(l);
-      const rowY = startY + li * ySpacing;
+      const shapes = buckets.get(layers[li]);
+      if (dir === 'LR') {
+        const colX = startX + li * rankSep * 1.4;
+        shapes.forEach((s, i) => { s.x = colX; s.y = startY + i * nodeSep * 0.7; });
+      } else {
+        const rowY = startY + li * rankSep;
+        shapes.forEach((s, i) => { s.x = startX + i * nodeSep; s.y = rowY; });
+      }
+    }
+  }
+
+  // Wave 3: radial layout — place the root (first shape with no
+  // incoming connectors, fallback to page.shapes[0]) at the page
+  // center, then descendants on concentric rings sized to fit each
+  // depth level.
+  function autoLayoutRadial(page) {
+    if (!page.shapes.length) return;
+    const inDeg = new Map(page.shapes.map((s) => [s.id, 0]));
+    const adj = new Map(page.shapes.map((s) => [s.id, []]));
+    for (const c of page.connectors) {
+      if (inDeg.has(c.toShapeId)) inDeg.set(c.toShapeId, inDeg.get(c.toShapeId) + 1);
+      if (adj.has(c.fromShapeId)) adj.get(c.fromShapeId).push(c.toShapeId);
+    }
+    let root = page.shapes.find((s) => inDeg.get(s.id) === 0) || page.shapes[0];
+    const depth = new Map([[root.id, 0]]);
+    const q = [root.id];
+    let h = 0;
+    while (h < q.length) {
+      const id = q[h++];
+      const d = depth.get(id);
+      for (const n of adj.get(id) || []) {
+        if (!depth.has(n)) { depth.set(n, d + 1); q.push(n); }
+      }
+    }
+    for (const s of page.shapes) if (!depth.has(s.id)) depth.set(s.id, 1);
+    const cx = page.w / 2, cy = page.h / 2;
+    const rings = new Map();
+    for (const s of page.shapes) {
+      const d = depth.get(s.id);
+      if (!rings.has(d)) rings.set(d, []);
+      rings.get(d).push(s);
+    }
+    const ringStep = 130;
+    for (const [d, shapes] of rings.entries()) {
+      if (d === 0) {
+        shapes.forEach((s) => { s.x = cx - s.w / 2; s.y = cy - s.h / 2; });
+        continue;
+      }
+      const r = d * ringStep;
       shapes.forEach((s, i) => {
-        s.x = startX + i * xSpacing;
-        s.y = rowY;
+        const angle = (i / shapes.length) * 2 * Math.PI - Math.PI / 2;
+        s.x = Math.round(cx + r * Math.cos(angle) - s.w / 2);
+        s.y = Math.round(cy + r * Math.sin(angle) - s.h / 2);
       });
     }
   }
@@ -3110,10 +3587,16 @@
     renderCanvas();
     renderPropertiesPanel();
     renderDataPanel();
+    renderBookmarksList();
   }
 
   function bootstrap() {
     $('#diagramTitle').value = diagram.title;
+    // Tile-size active state — reflects the persisted choice in
+    // the stencil-pane toggle buttons.
+    const initialSize = loadTileSize();
+    $$('.stencil-size-btn').forEach((b) =>
+      b.classList.toggle('active', b.dataset.size === initialSize));
     bindTabs();
     bindStencilSearch();
     bindSideTabs();
@@ -3294,6 +3777,23 @@
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;');
+  }
+
+  // ---------- Wave 4: bookmarks ----------
+  function renderBookmarksList() {
+    const list = $('#bookmarksList');
+    if (!list) return;
+    list.innerHTML = '';
+    for (let i = 0; i < (state.bookmarks || []).length; i++) {
+      const bm = state.bookmarks[i];
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'bookmark-item';
+      btn.dataset.cmd = 'jumpToBookmark';
+      btn.dataset.idx = String(i);
+      btn.textContent = bm.name;
+      list.appendChild(btn);
+    }
   }
 
   if (document.readyState === 'loading') {

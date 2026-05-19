@@ -710,6 +710,119 @@ body {
   font-size: 12px;
 }
 .status-bar .status-spacer { flex: 1; }
+
+/* Wave 1: Tool-mode indicator + group frame + lasso visuals --------------- */
+.ribbon-btn.tool-btn.active {
+  background: var(--active);
+  border-color: var(--primary);
+  color: var(--primary-dark);
+  font-weight: 700;
+}
+body[data-tool="pan"] .canvas-svg,
+body[data-tool="pan"] .canvas-shadow { cursor: grab; }
+body[data-tool="pan"] .canvas-svg:active,
+body[data-tool="pan"] .canvas-shadow:active { cursor: grabbing; }
+body[data-tool="eyedropper"] .canvas-svg { cursor: crosshair; }
+body[data-tool="lasso"] .canvas-svg { cursor: crosshair; }
+body[data-tool="stamp"] .canvas-svg { cursor: copy; }
+.group-frame {
+  position: absolute;
+  pointer-events: none;
+  border: 1.5px dashed rgba(26, 142, 154, 0.65);
+  border-radius: 4px;
+  z-index: 38;
+}
+
+/* Wave 2: Template picker + tile size variants -------------------------- */
+.template-pick {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: #fff;
+  border: 1px solid var(--ribbon-border);
+  border-radius: 4px;
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  cursor: pointer;
+  font: inherit;
+}
+.template-pick:hover { border-color: var(--primary); background: var(--hover); }
+.template-pick-name { font-weight: 600; font-size: 13px; color: var(--primary-dark); }
+.template-pick-summary { font-size: 12px; color: var(--text); margin: 2px 0; }
+.template-pick-counts { font-size: 11px; color: var(--muted); }
+/* Stencil grid tile sizes (controlled by parent #stencilList[data-tile-size]) */
+#stencilList[data-tile-size="small"]  .stencil-grid { grid-template-columns: 1fr 1fr 1fr; }
+#stencilList[data-tile-size="small"]  .stencil-tile { font-size: 9px; padding: 2px; }
+#stencilList[data-tile-size="medium"] .stencil-grid { grid-template-columns: 1fr 1fr; }
+#stencilList[data-tile-size="large"]  .stencil-grid { grid-template-columns: 1fr; }
+#stencilList[data-tile-size="large"]  .stencil-tile { font-size: 12px; padding: 6px; }
+.stencil-size-toggle {
+  display: flex;
+  gap: 2px;
+  padding: 2px 6px 4px;
+  border-bottom: 1px solid var(--ribbon-border);
+}
+.stencil-size-btn {
+  flex: 1;
+  padding: 2px 0;
+  background: #fff;
+  border: 1px solid var(--ribbon-border);
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--muted);
+}
+.stencil-size-btn:hover { background: var(--hover); }
+.stencil-size-btn.active {
+  background: var(--active);
+  border-color: var(--primary);
+  color: var(--primary-dark);
+}
+
+/* Wave 4: presentation, reviewer, bookmarks --------------------------- */
+#presentationOverlay {
+  position: fixed; inset: 0; background: #000; z-index: 9999;
+  display: flex; flex-direction: column;
+}
+#presentationToolbar {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 6px 12px; color: #fff; font: 13px 'Segoe UI', sans-serif;
+}
+#presentationToolbar button {
+  background: transparent; color: #fff; border: 1px solid #444;
+  border-radius: 3px; padding: 2px 10px; cursor: pointer;
+}
+#presentationToolbar button:hover { background: #222; }
+#presentationSurface {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  padding: 16px; min-height: 0;
+}
+#presentationSurface svg { max-width: 100%; max-height: 100%; }
+
+body.reviewer-mode .ribbon-tab[data-tab="home"],
+body.reviewer-mode .ribbon-tab[data-tab="insert"],
+body.reviewer-mode .ribbon-tab[data-tab="design"] { opacity: 0.5; }
+body.reviewer-mode .stencil-pane,
+body.reviewer-mode .side-pane { opacity: 0.6; pointer-events: none; }
+body.reviewer-mode .canvas-svg .shape,
+body.reviewer-mode .canvas-svg .connector { cursor: pointer; }
+body.reviewer-mode .selection-handles,
+body.reviewer-mode .resize-handle,
+body.reviewer-mode .rotate-handle { display: none !important; }
+
+.bookmark-item {
+  font-size: 11px;
+  padding: 2px 6px;
+  background: #fff;
+  border: 1px solid var(--ribbon-border);
+  border-radius: 3px;
+  cursor: pointer;
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bookmark-item:hover { background: var(--hover); border-color: var(--primary); }
 .status-bar .status-zoom-fit {
   background: transparent;
   border: 1px solid rgba(255, 255, 255, 0.35);
