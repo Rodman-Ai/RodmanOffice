@@ -98,6 +98,7 @@
       <div class="group">
         <div class="group-row">
           <button class="ribbon-btn wide" data-cmd="newDiagram">New</button>
+          <button class="ribbon-btn wide" data-cmd="showTemplatePicker" title="Start from a template">📋 Templates…</button>
           <button class="ribbon-btn wide" data-cmd="openDiagram">📂 Open…</button>
         </div>
         <div class="group-label">Diagram</div>
@@ -418,6 +419,11 @@
       <div class="stencil-search">
         <input type="search" id="stencilSearch" placeholder="Search stencils…" aria-label="Search stencils" />
       </div>
+      <div class="stencil-size-toggle" role="group" aria-label="Stencil tile size">
+        <button type="button" class="stencil-size-btn" data-cmd="setTileSize" data-size="small"  title="Small tiles">▫</button>
+        <button type="button" class="stencil-size-btn" data-cmd="setTileSize" data-size="medium" title="Medium tiles">◻</button>
+        <button type="button" class="stencil-size-btn" data-cmd="setTileSize" data-size="large"  title="Large tiles">⬜</button>
+      </div>
       <div class="stencil-list" id="stencilList"><!-- populated by app.js --></div>
     </aside>
 
@@ -570,6 +576,18 @@
     </form>
   </dialog>
 
+  <dialog class="save-dialog template-picker-dialog" id="templatePickerDialog">
+    <form method="dialog">
+      <header>
+        <h3>Start from a template</h3>
+        <button type="button" aria-label="Close" onclick="this.closest('dialog').close()">&times;</button>
+      </header>
+      <div class="body" style="max-height:60vh;overflow-y:auto;">
+        <div id="templatePickerList"></div>
+      </div>
+    </form>
+  </dialog>
+
   <dialog class="save-dialog find-dialog" id="findDialog">
     <form method="dialog">
       <header>
@@ -649,6 +667,7 @@
   </script>
   <script src="diagram.js" defer></script>
   <script src="render.js" defer></script>
+  <script src="templates.js" defer></script>
   <script src="app.js" defer></script>
 </body>
 </html>

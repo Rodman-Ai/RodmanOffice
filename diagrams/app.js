@@ -200,6 +200,10 @@
 
   // ---------- Stencil drawer ----------
   const FAVORITES_KEY = 'vision.favorites.v1';
+  const RECENTS_KEY = 'vision.stencil.recents.v1';
+  const COLLAPSED_KEY = 'vision.stencil.collapsed.v1';
+  const TILE_SIZE_KEY = 'vision.stencil.tilesize.v1';
+  const RECENTS_MAX = 8;
   function loadFavorites() {
     try {
       const raw = localStorage.getItem(FAVORITES_KEY);
@@ -209,6 +213,36 @@
   }
   function saveFavorites(arr) {
     try { localStorage.setItem(FAVORITES_KEY, JSON.stringify(arr)); } catch (_) {}
+  }
+  function loadRecents() {
+    try {
+      const raw = localStorage.getItem(RECENTS_KEY);
+      const arr = raw ? JSON.parse(raw) : [];
+      return Array.isArray(arr) ? arr.filter((id) => STENCILS.STENCILS[id]) : [];
+    } catch (_) { return []; }
+  }
+  function recordRecent(id) {
+    if (!STENCILS.STENCILS[id]) return;
+    const arr = loadRecents().filter((x) => x !== id);
+    arr.unshift(id);
+    if (arr.length > RECENTS_MAX) arr.length = RECENTS_MAX;
+    try { localStorage.setItem(RECENTS_KEY, JSON.stringify(arr)); } catch (_) {}
+  }
+  function loadCollapsedCats() {
+    try {
+      const raw = localStorage.getItem(COLLAPSED_KEY);
+      return raw ? new Set(JSON.parse(raw)) : new Set();
+    } catch (_) { return new Set(); }
+  }
+  function saveCollapsedCats(set) {
+    try { localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...set])); } catch (_) {}
+  }
+  function loadTileSize() {
+    try { return localStorage.getItem(TILE_SIZE_KEY) || 'medium'; }
+    catch (_) { return 'medium'; }
+  }
+  function saveTileSize(size) {
+    try { localStorage.setItem(TILE_SIZE_KEY, size); } catch (_) {}
   }
 
   // Fuzzy match: subsequence of query chars in name (case-insensitive).
@@ -236,29 +270,44 @@
   function renderStencilDrawer() {
     const list = $('#stencilList');
     list.innerHTML = '';
+    list.dataset.tileSize = loadTileSize();
     const groups = STENCILS.stencilsByCategory();
     const filter = ($('#stencilSearch').value || '').trim();
     const favorites = loadFavorites();
+    const recents = loadRecents();
+    const collapsed = loadCollapsedCats();
 
-    // Favorites pseudo-category (only when populated)
-    if (favorites.length && !filter) {
+    function makeCategory(catName, items, opts = {}) {
       const wrap = document.createElement('div');
       wrap.className = 'stencil-category';
+      if (collapsed.has(catName)) wrap.classList.add('collapsed');
       const header = document.createElement('div');
       header.className = 'stencil-category-header';
-      header.textContent = '★ Favorites';
-      header.addEventListener('click', () => wrap.classList.toggle('collapsed'));
+      header.textContent = opts.label || catName;
+      header.addEventListener('click', () => {
+        wrap.classList.toggle('collapsed');
+        if (wrap.classList.contains('collapsed')) collapsed.add(catName);
+        else collapsed.delete(catName);
+        saveCollapsedCats(collapsed);
+      });
       wrap.appendChild(header);
       const grid = document.createElement('div');
       grid.className = 'stencil-grid';
-      for (const id of favorites) {
-        const stencil = STENCILS.getStencil(id);
-        if (stencil) grid.appendChild(makeStencilTile(stencil, true));
-      }
+      for (const stencil of items) grid.appendChild(makeStencilTile(stencil, opts.isFavorite));
       wrap.appendChild(grid);
       list.appendChild(wrap);
     }
 
+    // Recent pseudo-category (only when populated, only when not filtering)
+    if (recents.length && !filter) {
+      const items = recents.map((id) => STENCILS.getStencil(id)).filter(Boolean);
+      makeCategory('__recents__', items, { label: '⌚ Recent' });
+    }
+    // Favorites pseudo-category
+    if (favorites.length && !filter) {
+      const items = favorites.map((id) => STENCILS.getStencil(id)).filter(Boolean);
+      makeCategory('__favorites__', items, { label: '★ Favorites', isFavorite: true });
+    }
     for (const cat of STENCILS.CATEGORIES) {
       let items = groups[cat] || [];
       if (filter) {
@@ -269,19 +318,20 @@
           .map((x) => x.s);
       }
       if (!items.length) continue;
-      const wrap = document.createElement('div');
-      wrap.className = 'stencil-category';
-      const header = document.createElement('div');
-      header.className = 'stencil-category-header';
-      header.textContent = cat;
-      header.addEventListener('click', () => wrap.classList.toggle('collapsed'));
-      wrap.appendChild(header);
-      const grid = document.createElement('div');
-      grid.className = 'stencil-grid';
-      for (const stencil of items) grid.appendChild(makeStencilTile(stencil));
-      wrap.appendChild(grid);
-      list.appendChild(wrap);
+      makeCategory(cat, items);
     }
+  }
+
+  // ---------- Wave 2: custom stencils ----------
+  const CUSTOM_STENCILS_KEY = 'vision.stencils.custom.v1';
+  function loadCustomStencils() {
+    try {
+      const raw = localStorage.getItem(CUSTOM_STENCILS_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch (_) { return []; }
+  }
+  function saveCustomStencils(arr) {
+    try { localStorage.setItem(CUSTOM_STENCILS_KEY, JSON.stringify(arr)); } catch (_) {}
   }
 
   function makeStencilTile(stencil, isFavorite) {
@@ -857,6 +907,8 @@
     });
     activePage().shapes.push(shape);
     lastDroppedStencil = stencilId;
+    state.stampStencil = stencilId;
+    recordRecent(stencilId);
     if (!opts.suppressSelect) {
       state.selectedShapeIds.clear();
       state.selectedConnectorIds.clear();
@@ -1427,6 +1479,40 @@
       // Double-rAF so renderAll's layout settles before measuring
       // canvas-scroll's clientWidth.
       requestAnimationFrame(() => requestAnimationFrame(() => commands.zoomFit()));
+    },
+    // Wave 2: starter templates. Opens a picker; on selection,
+    // creates a fresh diagram and inserts the template's shapes +
+    // connectors via the existing applyClaudeDiagram pipeline (which
+    // also runs hierarchical auto-layout).
+    setTileSize(btn) {
+      const size = btn?.dataset?.size || 'medium';
+      saveTileSize(size);
+      renderStencilDrawer();
+      $$('.stencil-size-btn').forEach((b) =>
+        b.classList.toggle('active', b.dataset.size === size));
+    },
+    showTemplatePicker() {
+      const dlg = $('#templatePickerDialog');
+      const list = $('#templatePickerList');
+      const tpls = window.RodmanVisionTemplates || {};
+      list.innerHTML = '';
+      for (const [key, t] of Object.entries(tpls)) {
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'template-pick';
+        item.innerHTML = `<div class="template-pick-name">${escHtml(t.name)}</div>` +
+                         `<div class="template-pick-summary">${escHtml(t.summary)}</div>` +
+                         `<div class="template-pick-counts">${t.shapes.length} shapes · ${t.connectors.length} connectors</div>`;
+        item.addEventListener('click', () => {
+          // Apply template on the current page (don't create a new
+          // diagram — user can start fresh themselves first).
+          applyClaudeDiagram(t);
+          dlg.close();
+        });
+        list.appendChild(item);
+      }
+      if (typeof dlg.showModal === 'function') dlg.showModal();
+      else dlg.setAttribute('open', '');
     },
     openDiagram() { $('#openFileInput').click(); },
     showSaveDialog() {
@@ -3298,6 +3384,11 @@
 
   function bootstrap() {
     $('#diagramTitle').value = diagram.title;
+    // Tile-size active state — reflects the persisted choice in
+    // the stencil-pane toggle buttons.
+    const initialSize = loadTileSize();
+    $$('.stencil-size-btn').forEach((b) =>
+      b.classList.toggle('active', b.dataset.size === initialSize));
     bindTabs();
     bindStencilSearch();
     bindSideTabs();
