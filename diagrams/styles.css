@@ -710,6 +710,28 @@ body {
   font-size: 12px;
 }
 .status-bar .status-spacer { flex: 1; }
+
+/* Wave 1: Tool-mode indicator + group frame + lasso visuals --------------- */
+.ribbon-btn.tool-btn.active {
+  background: var(--active);
+  border-color: var(--primary);
+  color: var(--primary-dark);
+  font-weight: 700;
+}
+body[data-tool="pan"] .canvas-svg,
+body[data-tool="pan"] .canvas-shadow { cursor: grab; }
+body[data-tool="pan"] .canvas-svg:active,
+body[data-tool="pan"] .canvas-shadow:active { cursor: grabbing; }
+body[data-tool="eyedropper"] .canvas-svg { cursor: crosshair; }
+body[data-tool="lasso"] .canvas-svg { cursor: crosshair; }
+body[data-tool="stamp"] .canvas-svg { cursor: copy; }
+.group-frame {
+  position: absolute;
+  pointer-events: none;
+  border: 1.5px dashed rgba(26, 142, 154, 0.65);
+  border-radius: 4px;
+  z-index: 38;
+}
 .status-bar .status-zoom-fit {
   background: transparent;
   border: 1px solid rgba(255, 255, 255, 0.35);

@@ -193,6 +193,16 @@
 
       <div class="group">
         <div class="group-row">
+          <button class="ribbon-btn tool-btn active" data-cmd="setTool" data-tool="select" title="Select tool (default)">↖</button>
+          <button class="ribbon-btn tool-btn" data-cmd="setTool" data-tool="pan" title="Pan tool — drag canvas instead of selecting">✋</button>
+          <button class="ribbon-btn tool-btn" data-cmd="setTool" data-tool="lasso" title="Lasso (free-form) select">⤳</button>
+          <button class="ribbon-btn tool-btn" data-cmd="setTool" data-tool="eyedropper" title="Eyedropper — click a shape to copy its colors">💧</button>
+          <button class="ribbon-btn tool-btn" data-cmd="setTool" data-tool="stamp" title="Stamp — click to drop more of the last stencil">⎚</button>
+        </div>
+        <div class="group-label">Tool</div>
+      </div>
+      <div class="group">
+        <div class="group-row">
           <button class="ribbon-btn" data-cmd="bringForward" title="Bring forward">⤴</button>
           <button class="ribbon-btn" data-cmd="sendBackward" title="Send backward">⤵</button>
           <button class="ribbon-btn" data-cmd="group" title="Group (Ctrl+G)">Group</button>
@@ -202,6 +212,7 @@
           <button class="ribbon-btn" data-cmd="flipH" title="Flip horizontal">⇋</button>
           <button class="ribbon-btn" data-cmd="flipV" title="Flip vertical">⇅</button>
           <button class="ribbon-btn" data-cmd="pickFormat" title="Format painter — click to copy format, then click target shapes">🖌</button>
+          <button class="ribbon-btn" data-cmd="snapRotation15" title="Snap rotation of selected shapes to nearest 15°">15°</button>
         </div>
         <div class="group-label">Arrange</div>
       </div>
@@ -219,6 +230,8 @@
           <button class="ribbon-btn" data-cmd="distributeH" title="Distribute horizontally">⇔</button>
           <button class="ribbon-btn" data-cmd="distributeV" title="Distribute vertically">⇕</button>
           <button class="ribbon-btn" data-cmd="spaceEvenly" title="Space evenly (both axes)">⫾</button>
+          <button class="ribbon-btn" data-cmd="distributeOnArc" title="Distribute selection on a circle">◯</button>
+          <button class="ribbon-btn" data-cmd="centerSelectionOnPage" title="Center selection on page">⊕</button>
         </div>
         <div class="group-label">Align</div>
       </div>
@@ -295,6 +308,7 @@
           <button class="ribbon-btn" data-cmd="dropStencil" data-stencil="flowProcess">Proc</button>
           <button class="ribbon-btn" data-cmd="dropStencil" data-stencil="flowDecision">Dec</button>
           <button class="ribbon-btn" data-cmd="dropStencil" data-stencil="bpmnStartEvent">Start</button>
+          <button class="ribbon-btn" data-cmd="insertStickyNote" title="Insert a sticky note">📝</button>
         </div>
         <div class="group-label">Quick shapes</div>
       </div>

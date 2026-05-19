@@ -233,7 +233,22 @@
     const ts = shape.textStyle || {};
     const fontSize = ts.fontSize || 14;
     const lineHeight = fontSize * 1.2;
-    const lines = String(shape.text).split('\n');
+    // Bullet / numbered list pre-processing: lines that start with
+    // `- `, `* `, or `N. ` render with a bullet glyph / number.
+    // Auto-numbering tracks across consecutive numbered lines.
+    let numCount = 0;
+    const lines = String(shape.text).split('\n').map((raw) => {
+      if (/^\s*[-*]\s+/.test(raw)) {
+        numCount = 0;
+        return { prefix: '• ', body: raw.replace(/^\s*[-*]\s+/, '') };
+      }
+      if (/^\s*\d+\.\s+/.test(raw)) {
+        numCount++;
+        return { prefix: `${numCount}. `, body: raw.replace(/^\s*\d+\.\s+/, '') };
+      }
+      numCount = 0;
+      return { prefix: '', body: raw };
+    });
     const totalH = lineHeight * lines.length;
     const startY = shape.h / 2 - totalH / 2 + fontSize * 0.85;
     const align = ts.align || 'center';
@@ -251,8 +266,42 @@
         class: 'shape-text',
         'pointer-events': 'none',
       }, parent);
-      t.textContent = line;
+      // Light Markdown-style per-character rich text: **bold** and *italic*
+      // segments become <tspan> children with the corresponding font
+      // weight / style.
+      const full = line.prefix + line.body;
+      const runs = parseRichRuns(full);
+      if (runs.length === 1 && !runs[0].bold && !runs[0].italic) {
+        t.textContent = runs[0].text;
+      } else {
+        for (const r of runs) {
+          const ts2 = el('tspan', {}, t);
+          if (r.bold) ts2.setAttribute('font-weight', '700');
+          if (r.italic) ts2.setAttribute('font-style', 'italic');
+          ts2.textContent = r.text;
+        }
+      }
     });
+  }
+
+  // Parse a line into { text, bold, italic } runs. Recognises
+  // **bold** and *italic* (no nesting). Defensive against mismatched
+  // markers — extras render as literal characters.
+  function parseRichRuns(line) {
+    const runs = [];
+    let bold = false, italic = false, buf = '';
+    function flush() { if (buf) runs.push({ text: buf, bold, italic }); buf = ''; }
+    for (let i = 0; i < line.length; i++) {
+      if (line[i] === '*' && line[i + 1] === '*') {
+        flush(); bold = !bold; i++;
+      } else if (line[i] === '*') {
+        flush(); italic = !italic;
+      } else {
+        buf += line[i];
+      }
+    }
+    flush();
+    return runs.length ? runs : [{ text: line, bold: false, italic: false }];
   }
 
   function renderConnector(conn, page, parent, layerOpacity) {

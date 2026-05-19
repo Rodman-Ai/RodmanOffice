@@ -46,6 +46,9 @@
     isEditingText: false,
     paintMode: null,        // { fill, stroke, strokeWidth, opacity, textStyle } | null
     smartGuides: [],        // active guide lines during drag: { x1, y1, x2, y2 }
+    tool: 'select',         // 'select' | 'pan' | 'eyedropper' | 'lasso' | 'stamp'
+    stampStencil: null,     // last-dropped stencil id; click drops more in 'stamp' mode
+    lassoPath: [],          // [{ x, y }] page-coord points; populated during lasso drag
   };
 
   // ---------- Undo / Redo history ----------
@@ -531,6 +534,44 @@
       const target = e.target.closest('.shape, .connector');
       const pt = eventToPagePoint(e, shadow);
 
+      // Pan tool: drag canvas instead of selecting.
+      if (state.tool === 'pan') {
+        const scroll = $('#canvasScroll');
+        drag = {
+          mode: 'pan',
+          startClientX: e.clientX, startClientY: e.clientY,
+          startScrollLeft: scroll.scrollLeft,
+          startScrollTop: scroll.scrollTop,
+        };
+        e.preventDefault();
+        return;
+      }
+      // Eyedropper: clicking a shape copies its fill to the active picker.
+      if (state.tool === 'eyedropper' && target?.classList.contains('shape')) {
+        const sh = D.findShape(activePage(), target.getAttribute('data-shape-id'));
+        if (sh) {
+          $('#shapeFill').value = ensureHex(sh.fill);
+          $('#shapeStroke').value = ensureHex(sh.stroke);
+          $('#textColor').value = ensureHex(sh.textStyle?.color || '#000000');
+        }
+        // Stay in eyedropper for multi-pick; Esc exits.
+        return;
+      }
+      // Stamp: click on blank canvas drops another copy of the
+      // last-dropped stencil. Clicking a shape selects normally.
+      if (state.tool === 'stamp' && !target && state.stampStencil) {
+        dropStencilAt(state.stampStencil, pt.x, pt.y);
+        return;
+      }
+      // Lasso: start a free-form selection path.
+      if (state.tool === 'lasso' && !target) {
+        if (!e.shiftKey) clearSelection();
+        state.lassoPath = [{ x: pt.x, y: pt.y }];
+        drag = { mode: 'lasso', startX: pt.x, startY: pt.y, x: pt.x, y: pt.y };
+        renderSelectionOverlays(overlayHost);
+        return;
+      }
+
       if (!target) {
         if (!e.shiftKey) clearSelection();
         drag = { mode: 'marquee', startX: pt.x, startY: pt.y, x: pt.x, y: pt.y };
@@ -678,6 +719,16 @@
     } else if (drag.mode === 'connect') {
       drag.x = pt.x; drag.y = pt.y;
       renderConnectorPreview(overlayHost);
+    } else if (drag.mode === 'pan') {
+      // Pan tool: translate scrollLeft/Top by mouse delta.
+      const scroll = $('#canvasScroll');
+      scroll.scrollLeft = drag.startScrollLeft - (e.clientX - drag.startClientX);
+      scroll.scrollTop = drag.startScrollTop - (e.clientY - drag.startClientY);
+    } else if (drag.mode === 'lasso') {
+      // Lasso: append point to free-form path.
+      state.lassoPath.push({ x: pt.x, y: pt.y });
+      drag.x = pt.x; drag.y = pt.y;
+      renderSelectionOverlays(overlayHost);
     }
   });
 
@@ -701,6 +752,19 @@
       }
     } else if (drag.mode === 'connect') {
       finishConnectorDrag(e);
+    } else if (drag.mode === 'lasso') {
+      // Lasso: select every shape whose center is inside the path.
+      if (state.lassoPath.length >= 3) {
+        const page = activePage();
+        for (const sh of page.shapes) {
+          const cx = sh.x + sh.w / 2;
+          const cy = sh.y + sh.h / 2;
+          if (pointInPolygon(cx, cy, state.lassoPath)) {
+            state.selectedShapeIds.add(sh.id);
+          }
+        }
+      }
+      state.lassoPath = [];
     }
     if (drag.hasMoved || drag.mode === 'resize' || drag.mode === 'rotate' || drag.mode === 'connect') {
       scheduleSave();
@@ -812,8 +876,8 @@
   }
 
   function renderSelectionOverlays(shadow) {
-    // Remove any previous overlays + handles + marquee.
-    shadow.querySelectorAll('.selection-overlay, .selection-handles, .marquee, .connector-preview, .port-dot').forEach((el) => el.remove());
+    // Remove any previous overlays + handles + marquee + lasso.
+    shadow.querySelectorAll('.selection-overlay, .selection-handles, .marquee, .lasso-path, .connector-preview, .port-dot, .group-frame').forEach((el) => el.remove());
 
     if (drag && drag.mode === 'marquee') {
       const x0 = Math.min(drag.startX, drag.x);
@@ -827,6 +891,44 @@
       m.style.width = w + 'px';
       m.style.height = h + 'px';
       shadow.appendChild(m);
+    }
+    // Lasso (free-form select) — render an SVG polyline of the path.
+    if (drag && drag.mode === 'lasso' && state.lassoPath.length >= 2) {
+      const ns = 'http://www.w3.org/2000/svg';
+      const svg = document.createElementNS(ns, 'svg');
+      svg.setAttribute('class', 'lasso-path');
+      const page = activePage();
+      svg.setAttribute('width', page.w);
+      svg.setAttribute('height', page.h);
+      svg.style.position = 'absolute';
+      svg.style.left = '0';
+      svg.style.top = '0';
+      svg.style.pointerEvents = 'none';
+      const path = document.createElementNS(ns, 'path');
+      const d = 'M' + state.lassoPath.map((p) => `${p.x},${p.y}`).join(' L');
+      path.setAttribute('d', d + ' Z');
+      path.setAttribute('fill', 'rgba(26, 142, 154, 0.08)');
+      path.setAttribute('stroke', '#1a8e9a');
+      path.setAttribute('stroke-width', '1');
+      path.setAttribute('stroke-dasharray', '4 3');
+      svg.appendChild(path);
+      shadow.appendChild(svg);
+    }
+    // Group frames — render a dashed border around each group's bounds.
+    const page0 = activePage();
+    if (Array.isArray(page0.groups)) {
+      for (const g of page0.groups) {
+        const members = g.shapeIds.map((id) => D.findShape(page0, id)).filter(Boolean);
+        if (members.length < 2) continue;
+        const b = D.boundsOfShapes(members);
+        const f = document.createElement('div');
+        f.className = 'group-frame';
+        f.style.left = (b.x - 4) + 'px';
+        f.style.top = (b.y - 4) + 'px';
+        f.style.width = (b.w + 8) + 'px';
+        f.style.height = (b.h + 8) + 'px';
+        shadow.appendChild(f);
+      }
     }
 
     const page = activePage();
@@ -1447,10 +1549,61 @@
     distributeH()    { distributeSelection('horizontal'); },
     distributeV()    { distributeSelection('vertical'); },
     spaceEvenly()    { distributeSelection('evenly'); },
+    distributeOnArc() { distributeOnCircle(); },
 
     // Flip
     flipH() { flipSelection('h'); },
     flipV() { flipSelection('v'); },
+
+    // ---------- Wave 1: Editing power tools ----------
+    setTool(btn) {
+      const t = btn?.dataset?.tool || 'select';
+      state.tool = t;
+      state.stampStencil = t === 'stamp' ? (state.stampStencil || 'rectangle') : state.stampStencil;
+      document.body.dataset.tool = t;
+      $$('.tool-btn').forEach((b) => b.classList.toggle('active', b.dataset.tool === t));
+    },
+    // Snap rotation of selected shapes to nearest 15°.
+    snapRotation15() {
+      const page = activePage();
+      let changed = false;
+      for (const id of state.selectedShapeIds) {
+        const sh = D.findShape(page, id);
+        if (!sh) continue;
+        sh.rotation = Math.round((sh.rotation || 0) / 15) * 15;
+        changed = true;
+      }
+      if (changed) { scheduleSave(); renderCanvas(); }
+    },
+    centerSelectionOnPage() {
+      const page = activePage();
+      const shapes = [...state.selectedShapeIds].map((id) => D.findShape(page, id)).filter(Boolean);
+      if (!shapes.length) return;
+      const bounds = D.boundsOfShapes(shapes);
+      const dx = (page.w - bounds.w) / 2 - bounds.x;
+      const dy = (page.h - bounds.h) / 2 - bounds.y;
+      for (const sh of shapes) { sh.x = Math.round(sh.x + dx); sh.y = Math.round(sh.y + dy); }
+      scheduleSave(); renderCanvas();
+    },
+    insertStickyNote() {
+      const page = activePage();
+      const sh = D.newShape({
+        stencil: 'stickyNote',
+        x: Math.round(page.w / 2 - 80),
+        y: Math.round(page.h / 2 - 50),
+        w: 160, h: 100,
+        fill: '#fef9c3',
+        stroke: '#ca8a04',
+        strokeWidth: 1,
+        text: 'Sticky note',
+        textStyle: { fontFamily: 'Comic Sans MS, cursive', fontSize: 14, color: '#713f12', align: 'left' },
+        layerId: activeLayer().id,
+      });
+      sh._themed = false;
+      page.shapes.push(sh);
+      state.selectedShapeIds = new Set([sh.id]);
+      scheduleSave(); renderCanvas();
+    },
 
     // Format painter
     pickFormat() {
@@ -1965,6 +2118,37 @@
     }
     scheduleSave();
     renderCanvas();
+  }
+
+  // Place N selected shapes at equal angles around a circle whose
+  // diameter matches the longer side of the selection bounds.
+  function distributeOnCircle() {
+    const page = activePage();
+    const shapes = [...state.selectedShapeIds].map((id) => D.findShape(page, id)).filter(Boolean);
+    if (shapes.length < 3) return;
+    const bounds = D.boundsOfShapes(shapes);
+    const cx = bounds.x + bounds.w / 2;
+    const cy = bounds.y + bounds.h / 2;
+    const r = Math.max(bounds.w, bounds.h) / 2;
+    shapes.forEach((s, i) => {
+      const angle = -Math.PI / 2 + (i / shapes.length) * 2 * Math.PI;
+      s.x = Math.round(cx + r * Math.cos(angle) - s.w / 2);
+      s.y = Math.round(cy + r * Math.sin(angle) - s.h / 2);
+    });
+    scheduleSave(); renderCanvas();
+  }
+
+  // Ray-cast point-in-polygon for lasso selection.
+  function pointInPolygon(px, py, poly) {
+    let inside = false;
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      const xi = poly[i].x, yi = poly[i].y;
+      const xj = poly[j].x, yj = poly[j].y;
+      const intersect = ((yi > py) !== (yj > py)) &&
+        (px < (xj - xi) * (py - yi) / (yj - yi) + xi);
+      if (intersect) inside = !inside;
+    }
+    return inside;
   }
 
   function flipSelection(axis) {
