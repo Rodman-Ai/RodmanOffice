@@ -273,14 +273,34 @@
         <div class="group-row">
           <button class="ribbon-btn" data-cmd="editConnectorLabel" title="Edit connector label">Label…</button>
         </div>
+        <div class="group-row" title="Arrow head (end)">
+          <button class="ribbon-btn" data-cmd="setConnectorArrow" data-end="end" data-kind="arrow"   title="End: closed arrow">▶</button>
+          <button class="ribbon-btn" data-cmd="setConnectorArrow" data-end="end" data-kind="open"    title="End: open arrow">›</button>
+          <button class="ribbon-btn" data-cmd="setConnectorArrow" data-end="end" data-kind="diamond" title="End: diamond">◆</button>
+          <button class="ribbon-btn" data-cmd="setConnectorArrow" data-end="end" data-kind="circle"  title="End: circle">●</button>
+          <button class="ribbon-btn" data-cmd="setConnectorArrow" data-end="end" data-kind="bar"     title="End: bar">|</button>
+          <button class="ribbon-btn" data-cmd="setConnectorArrow" data-end="end" data-kind="none"    title="End: none">✕</button>
+        </div>
+        <div class="group-row" title="Connector presets">
+          <button class="ribbon-btn" data-cmd="connectorPreset" data-preset="default" title="Default preset">Def</button>
+          <button class="ribbon-btn" data-cmd="connectorPreset" data-preset="thick"   title="Thick black preset">Thk</button>
+          <button class="ribbon-btn" data-cmd="connectorPreset" data-preset="thin"    title="Thin dashed preset">Thn</button>
+          <button class="ribbon-btn" data-cmd="connectorPreset" data-preset="accent"  title="Accent color preset">Acc</button>
+        </div>
         <div class="group-label">Connector</div>
       </div>
       <div class="group">
         <div class="group-row">
-          <button class="ribbon-btn wide" data-cmd="autoLayoutHierarchy" title="Hierarchical auto-layout">⇣ Hierarchy</button>
+          <button class="ribbon-btn wide" data-cmd="autoLayoutHierarchy" title="Hierarchical auto-layout (top-down)">⇣ Hierarchy</button>
+        </div>
+        <div class="group-row">
+          <button class="ribbon-btn wide" data-cmd="autoLayoutTreeLR" title="Hierarchical auto-layout (left-right)">⇉ Tree (LR)</button>
         </div>
         <div class="group-row">
           <button class="ribbon-btn wide" data-cmd="autoLayoutForce" title="Force-directed auto-layout">⚛ Force</button>
+        </div>
+        <div class="group-row">
+          <button class="ribbon-btn wide" data-cmd="autoLayoutRadial" title="Radial auto-layout (root in center)">◎ Radial</button>
         </div>
         <div class="group-row">
           <button class="ribbon-btn" data-cmd="addCustomPort" title="Add custom connection point to selected shape">+ Port</button>

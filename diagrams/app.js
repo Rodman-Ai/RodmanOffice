@@ -2087,6 +2087,54 @@
       scheduleSave();
       renderCanvas();
     },
+    autoLayoutRadial() {
+      const page = activePage();
+      autoLayoutRadial(page);
+      scheduleSave();
+      renderCanvas();
+    },
+    autoLayoutTreeLR() {
+      const page = activePage();
+      autoLayoutHierarchical(page, { direction: 'LR' });
+      scheduleSave();
+      renderCanvas();
+    },
+    // Wave 3: connector style presets — restyle the currently-
+    // selected connectors with one of four named presets.
+    connectorPreset(btn) {
+      const preset = btn?.dataset?.preset || 'default';
+      const page = activePage();
+      const styles = {
+        default: { stroke: '#444', strokeWidth: 1.5, lineStyle: 'solid', endEnd: 'arrow' },
+        thick:   { stroke: '#222', strokeWidth: 3,   lineStyle: 'solid', endEnd: 'arrow' },
+        thin:    { stroke: '#888', strokeWidth: 1,   lineStyle: 'dashed', endEnd: 'arrow' },
+        accent:  { stroke: '#1a8e9a', strokeWidth: 2.5, lineStyle: 'solid', endEnd: 'arrow' },
+      };
+      const style = styles[preset] || styles.default;
+      let n = 0;
+      for (const cid of state.selectedConnectorIds) {
+        const c = page.connectors.find((x) => x.id === cid);
+        if (!c) continue;
+        Object.assign(c, style);
+        n++;
+      }
+      if (n) { scheduleSave(); renderCanvas(); renderPropertiesPanel(); }
+    },
+    // Wave 3: per-end arrow head choice for selected connectors.
+    setConnectorArrow(btn) {
+      const end = btn?.dataset?.end || 'end'; // 'start' or 'end'
+      const kind = btn?.dataset?.kind || 'arrow';
+      const page = activePage();
+      const field = end === 'start' ? 'endStart' : 'endEnd';
+      let n = 0;
+      for (const cid of state.selectedConnectorIds) {
+        const c = page.connectors.find((x) => x.id === cid);
+        if (!c) continue;
+        c[field] = kind === 'none' ? null : kind;
+        n++;
+      }
+      if (n) { scheduleSave(); renderCanvas(); renderPropertiesPanel(); }
+    },
     addCustomPort() {
       if (state.selectedShapeIds.size !== 1) return;
       const page = activePage();
@@ -2569,8 +2617,10 @@
 
   // Hierarchical (Sugiyama-lite) auto-layout: assign layers by BFS
   // depth from roots (shapes with no incoming connectors), then
-  // arrange each layer left-to-right with even spacing.
-  function autoLayoutHierarchical(page) {
+  // arrange each layer in a row (TB default) or column (LR).
+  // opts.direction = 'TB' | 'LR'; opts.rankSep / opts.nodeSep
+  // override the default spacings.
+  function autoLayoutHierarchical(page, opts = {}) {
     if (!page.shapes.length) return;
     const inDeg = new Map(page.shapes.map((s) => [s.id, 0]));
     const adj = new Map(page.shapes.map((s) => [s.id, []]));
@@ -2594,10 +2644,8 @@
         }
       }
     }
-    // Default un-layered shapes to layer 0 (disconnected nodes).
     for (const s of page.shapes) if (!layer.has(s.id)) layer.set(s.id, 0);
 
-    // Bucket by layer.
     const buckets = new Map();
     for (const s of page.shapes) {
       const l = layer.get(s.id);
@@ -2605,17 +2653,65 @@
       buckets.get(l).push(s);
     }
     const layers = [...buckets.keys()].sort((a, b) => a - b);
-    const ySpacing = 140;
-    const xSpacing = 200;
+    const dir = opts.direction || state.layoutSettings?.direction || 'TB';
+    const rankSep = opts.rankSep || state.layoutSettings?.rankSep || 140;
+    const nodeSep = opts.nodeSep || state.layoutSettings?.nodeSep || 200;
     const startX = 100;
     const startY = 100;
     for (let li = 0; li < layers.length; li++) {
-      const l = layers[li];
-      const shapes = buckets.get(l);
-      const rowY = startY + li * ySpacing;
+      const shapes = buckets.get(layers[li]);
+      if (dir === 'LR') {
+        const colX = startX + li * rankSep * 1.4;
+        shapes.forEach((s, i) => { s.x = colX; s.y = startY + i * nodeSep * 0.7; });
+      } else {
+        const rowY = startY + li * rankSep;
+        shapes.forEach((s, i) => { s.x = startX + i * nodeSep; s.y = rowY; });
+      }
+    }
+  }
+
+  // Wave 3: radial layout — place the root (first shape with no
+  // incoming connectors, fallback to page.shapes[0]) at the page
+  // center, then descendants on concentric rings sized to fit each
+  // depth level.
+  function autoLayoutRadial(page) {
+    if (!page.shapes.length) return;
+    const inDeg = new Map(page.shapes.map((s) => [s.id, 0]));
+    const adj = new Map(page.shapes.map((s) => [s.id, []]));
+    for (const c of page.connectors) {
+      if (inDeg.has(c.toShapeId)) inDeg.set(c.toShapeId, inDeg.get(c.toShapeId) + 1);
+      if (adj.has(c.fromShapeId)) adj.get(c.fromShapeId).push(c.toShapeId);
+    }
+    let root = page.shapes.find((s) => inDeg.get(s.id) === 0) || page.shapes[0];
+    const depth = new Map([[root.id, 0]]);
+    const q = [root.id];
+    let h = 0;
+    while (h < q.length) {
+      const id = q[h++];
+      const d = depth.get(id);
+      for (const n of adj.get(id) || []) {
+        if (!depth.has(n)) { depth.set(n, d + 1); q.push(n); }
+      }
+    }
+    for (const s of page.shapes) if (!depth.has(s.id)) depth.set(s.id, 1);
+    const cx = page.w / 2, cy = page.h / 2;
+    const rings = new Map();
+    for (const s of page.shapes) {
+      const d = depth.get(s.id);
+      if (!rings.has(d)) rings.set(d, []);
+      rings.get(d).push(s);
+    }
+    const ringStep = 130;
+    for (const [d, shapes] of rings.entries()) {
+      if (d === 0) {
+        shapes.forEach((s) => { s.x = cx - s.w / 2; s.y = cy - s.h / 2; });
+        continue;
+      }
+      const r = d * ringStep;
       shapes.forEach((s, i) => {
-        s.x = startX + i * xSpacing;
-        s.y = rowY;
+        const angle = (i / shapes.length) * 2 * Math.PI - Math.PI / 2;
+        s.x = Math.round(cx + r * Math.cos(angle) - s.w / 2);
+        s.y = Math.round(cy + r * Math.sin(angle) - s.h / 2);
       });
     }
   }
