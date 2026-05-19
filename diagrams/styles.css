@@ -710,6 +710,19 @@ body {
   font-size: 12px;
 }
 .status-bar .status-spacer { flex: 1; }
+.status-bar .status-zoom-fit {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.status-bar .status-zoom-fit:hover { background: rgba(255, 255, 255, 0.18); }
+.status-bar .status-zoom-fit:active { background: rgba(255, 255, 255, 0.28); }
 
 /* Save dialog -------------------------------------------------------------- */
 dialog.save-dialog {
