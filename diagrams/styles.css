@@ -35,9 +35,27 @@ html, body {
 
 body {
   display: grid;
+  /* `minmax(0, 1fr)` (not the implicit `auto`) pins the single
+     grid column to viewport width. Without it, any row whose
+     content is wider than 100vw (Insert/Home ribbon-panel on
+     mobile) inflates the implicit column, which then makes the
+     title-bar's right-aligned content scroll off-screen and
+     defeats the ribbon-panel's own `overflow-x: auto`. */
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto auto auto 1fr auto;
   height: 100vh;
+  width: 100vw;
+  overflow: hidden;
 }
+/* All direct grid children must be allowed to shrink below their
+   content's natural width — otherwise a fat ribbon row's
+   intrinsic min-width climbs back up the grid and re-inflates
+   the parent. */
+body > .title-bar,
+body > .tabs,
+body > .ribbon,
+body > .workspace,
+body > .status-bar { min-width: 0; }
 
 /* Title bar ----------------------------------------------------------------- */
 .title-bar {
@@ -1173,10 +1191,11 @@ body.format-painter-active .canvas-svg { cursor: crosshair; }
   }
   .app-subtitle,
   .save-indicator { display: none; }
-  /* Hide only the Help icon — the stencils (▦) and properties (⚙)
-     toggles are the only way to open those panes on mobile, so they
-     must stay. Help lives in the Help ribbon tab anyway. */
-  .title-bar #helpBtn { display: none; }
+  /* Hide ALL title-bar icon buttons on mobile — they ate the
+     horizontal space that title-actions needs to keep Ask Claude
+     visible. Stencils + Properties are reachable via the View
+     ribbon tab; matches the Slides pattern. */
+  .title-bar .title-actions .icon-btn { display: none; }
   .doc-title {
     width: min(120px, 32vw);
     max-width: 32vw;
