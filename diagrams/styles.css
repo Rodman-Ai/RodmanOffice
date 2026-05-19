@@ -780,6 +780,7 @@ body[data-tool="stamp"] .canvas-svg { cursor: copy; }
 }
 
 /* Wave 4: presentation, reviewer, bookmarks --------------------------- */
+#presentationOverlay[hidden] { display: none !important; }
 #presentationOverlay {
   position: fixed; inset: 0; background: #000; z-index: 9999;
   display: flex; flex-direction: column;
