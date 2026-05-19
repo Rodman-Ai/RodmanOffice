@@ -46,9 +46,10 @@
     isEditingText: false,
     paintMode: null,        // { fill, stroke, strokeWidth, opacity, textStyle } | null
     smartGuides: [],        // active guide lines during drag: { x1, y1, x2, y2 }
-    tool: 'select',         // 'select' | 'pan' | 'eyedropper' | 'lasso' | 'stamp'
+    tool: 'select',         // 'select' | 'pan' | 'eyedropper' | 'lasso' | 'stamp' | 'connect'
     stampStencil: null,     // last-dropped stencil id; click drops more in 'stamp' mode
     lassoPath: [],          // [{ x, y }] page-coord points; populated during lasso drag
+    connectSource: null,    // shape id chosen as the "from" end while in 'connect' tool
   };
 
   // ---------- Undo / Redo history ----------
@@ -649,6 +650,37 @@
         state.lassoPath = [{ x: pt.x, y: pt.y }];
         drag = { mode: 'lasso', startX: pt.x, startY: pt.y, x: pt.x, y: pt.y };
         renderSelectionOverlays(overlayHost);
+        return;
+      }
+      // Connect tool: tap shape A then shape B to create a
+      // connector. Tap again to chain (B becomes the new source).
+      // Tap empty canvas to exit the tool.
+      if (state.tool === 'connect') {
+        if (target?.classList.contains('shape')) {
+          const id = target.getAttribute('data-shape-id');
+          if (!state.connectSource) {
+            state.connectSource = id;
+            state.selectedShapeIds = new Set([id]);
+            state.selectedConnectorIds.clear();
+            renderSelectionOverlays(overlayHost);
+            renderPropertiesPanel();
+          } else if (id !== state.connectSource) {
+            connectShapes(state.connectSource, id);
+            // Chain mode: the just-clicked shape becomes the new
+            // source so tap-tap-tap creates 1→2→3.
+            state.connectSource = id;
+            state.selectedShapeIds = new Set([id]);
+            renderSelectionOverlays(overlayHost);
+          }
+        } else {
+          // Tap on empty canvas exits the connect tool.
+          state.connectSource = null;
+          state.tool = 'select';
+          document.body.dataset.tool = 'select';
+          $$('.tool-btn').forEach((b) =>
+            b.classList.toggle('active', b.dataset.tool === 'select'));
+          clearSelection();
+        }
         return;
       }
 
@@ -1702,7 +1734,25 @@
     // ---------- Wave 1: Editing power tools ----------
     setTool(btn) {
       const t = btn?.dataset?.tool || 'select';
+      // Connector tool: if the user already has 2+ shapes selected
+      // when switching to 'connect', auto-chain them in selection
+      // order (1→2, 2→3, ...) and revert to select. Otherwise
+      // enter point-and-click connect mode.
+      if (t === 'connect' && state.selectedShapeIds.size >= 2) {
+        const ids = [...state.selectedShapeIds];
+        for (let i = 0; i < ids.length - 1; i++) {
+          connectShapes(ids[i], ids[i + 1]);
+        }
+        // Stay in select mode — the chain is done.
+        state.tool = 'select';
+        state.connectSource = null;
+        document.body.dataset.tool = 'select';
+        $$('.tool-btn').forEach((b) =>
+          b.classList.toggle('active', b.dataset.tool === 'select'));
+        return;
+      }
       state.tool = t;
+      state.connectSource = null;
       state.stampStencil = t === 'stamp' ? (state.stampStencil || 'rectangle') : state.stampStencil;
       document.body.dataset.tool = t;
       $$('.tool-btn').forEach((b) => b.classList.toggle('active', b.dataset.tool === t));
@@ -2452,6 +2502,44 @@
       if (intersect) inside = !inside;
     }
     return inside;
+  }
+
+  // Connect tool (Wave 5): pick the two facing cardinal ports
+  // for shapes a and b based on which axis dominates the
+  // centers' delta. Result is [fromPort, toPort], each one of
+  // 'top'|'right'|'bottom'|'left' as understood by
+  // render.js:portPoint.
+  function bestPortPair(a, b) {
+    const acx = a.x + a.w / 2, acy = a.y + a.h / 2;
+    const bcx = b.x + b.w / 2, bcy = b.y + b.h / 2;
+    const dx = bcx - acx, dy = bcy - acy;
+    if (Math.abs(dx) >= Math.abs(dy)) {
+      return dx >= 0 ? ['right', 'left'] : ['left', 'right'];
+    }
+    return dy >= 0 ? ['bottom', 'top'] : ['top', 'bottom'];
+  }
+
+  // Create an auto-routed connector between two shapes on the
+  // active page. Reuses D.newConnector + the renderer's
+  // orthogonal routing.
+  function connectShapes(fromId, toId) {
+    const page = activePage();
+    const a = D.findShape(page, fromId);
+    const b = D.findShape(page, toId);
+    if (!a || !b) return null;
+    const [fromPort, toPort] = bestPortPair(a, b);
+    const conn = D.newConnector({
+      fromShapeId: fromId,
+      toShapeId: toId,
+      fromPort,
+      toPort,
+      endEnd: 'arrow',
+      layerId: activeLayer().id,
+    });
+    page.connectors.push(conn);
+    scheduleSave();
+    renderCanvas();
+    return conn;
   }
 
   function flipSelection(axis) {
@@ -3552,6 +3640,18 @@
       if (state.isEditingText) return;
       const target = e.target;
       const inField = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+
+      // Esc exits non-select tools (connect, lasso, eyedropper,
+      // stamp, pan) and clears any connect-tool source.
+      if (e.key === 'Escape' && !inField && state.tool !== 'select') {
+        state.tool = 'select';
+        state.connectSource = null;
+        document.body.dataset.tool = 'select';
+        $$('.tool-btn').forEach((b) =>
+          b.classList.toggle('active', b.dataset.tool === 'select'));
+        renderSelectionOverlays(overlayHost);
+        return;
+      }
 
       // Save dialog: Ctrl/Cmd+S
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {

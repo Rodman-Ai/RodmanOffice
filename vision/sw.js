@@ -3,7 +3,7 @@
 // shell, so this SW owns /vision/ scope (renamed from /diagrams/).
 // The shared engine at /lib/diagrams/ lives outside this SW's scope (./),
 // so it's fetched from the network on first save/export and HTTP-cached.
-const VERSION = 'rodman-vision-v11';
+const VERSION = 'rodman-vision-v12';
 const CACHE_PREFIX = 'rodman-vision-';
 const APP_SHELL = [
   './',
