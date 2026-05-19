@@ -468,6 +468,17 @@ body > .status-bar { min-width: 0; }
   /* Two-finger gestures are handled by lib/ui/gestures.js, which
      pans the parent .canvas-scroll and pinches state.zoom. */
   touch-action: none;
+  /* PR #73 pinned the body grid column to viewport width, which
+     cascaded down to .canvas-scroll. Without this, the
+     flex-centered shadow shrinks below its inline `style.width =
+     page.w * zoom` to fit the constrained parent, so the SVG
+     inside renders at a different scale than the overlay-layer
+     (which is `position: absolute` and immune to flex layout) —
+     selection handles drift away from their shapes at any zoom
+     above fit. flex-shrink: 0 keeps the shadow at its specified
+     pixel size; .canvas-scroll's `overflow: auto` then provides
+     horizontal scroll when zoomed past fit. */
+  flex-shrink: 0;
 }
 .canvas-svg { display: block; width: 100%; height: 100%; }
 
