@@ -1321,6 +1321,10 @@
       $('#diagramTitle').value = diagram.title;
       scheduleSave();
       renderAll();
+      // Default zoom on every new document: fit page to viewport.
+      // Double-rAF so renderAll's layout settles before measuring
+      // canvas-scroll's clientWidth.
+      requestAnimationFrame(() => requestAnimationFrame(() => commands.zoomFit()));
     },
     openDiagram() { $('#openFileInput').click(); },
     showSaveDialog() {
@@ -2754,6 +2758,9 @@
           $('#diagramTitle').value = diagram.title;
           scheduleSave();
           renderAll();
+          // Default zoom on every opened document: fit page to viewport.
+          // Double-rAF so layout completes before clientWidth is read.
+          requestAnimationFrame(() => requestAnimationFrame(() => commands.zoomFit()));
         } else if (ext === 'svg') {
           // Wrap the imported SVG as a single shape on a new page so the
           // user can keep editing in our format.
