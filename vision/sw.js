@@ -1,9 +1,9 @@
 // RodmanVision service worker — network-first with offline cache fallback.
 // Pattern lifted from slides/sw.js. The launcher SW only handles its own
-// shell, so this SW owns /diagrams/ scope.
+// shell, so this SW owns /vision/ scope (renamed from /diagrams/).
 // The shared engine at /lib/diagrams/ lives outside this SW's scope (./),
 // so it's fetched from the network on first save/export and HTTP-cached.
-const VERSION = 'rodman-vision-v10';
+const VERSION = 'rodman-vision-v11';
 const CACHE_PREFIX = 'rodman-vision-';
 const APP_SHELL = [
   './',

@@ -1,6 +1,6 @@
 # lib/diagrams — VSDX read/write + stencil library
 
-Shared engine powering `/diagrams/` (RodmanVision). Pure JS with JSDoc types; no
+Shared engine powering `/vision/` (RodmanVision). Pure JS with JSDoc types; no
 vendor blobs, no npm packages — only `lib/docs/docx.js` is reused
 for its hand-rolled `buildZip` / `readZip` (the same primitives the
 PPTX engine builds on).
