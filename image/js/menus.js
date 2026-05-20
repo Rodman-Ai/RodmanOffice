@@ -129,6 +129,7 @@
       SEP,
       { label: 'Copy Merged',                               run: () => rp('copyMerged') },
       { label: 'Define Pattern',                            run: () => rp('definePattern') },
+      { label: 'Set History Brush Source',                  run: () => rp('setHistorySource') },
       SEP,
       { label: 'Free Transform', shortcut: 'K',             run: () => rp('freeTransform') },
       { label: 'Content-Aware Fill…',                       run: () => rp('contentAwareFill') },
@@ -246,12 +247,16 @@
       { label: 'New Guide…',                                run: () => rp('newGuide') },
       { label: 'Show / Hide Guides',                        run: () => rp('toggleGuides') },
       { label: 'Snap to Guides',                            run: () => rp('toggleSnapGuides') },
-      { label: 'Clear Guides',                              run: () => rp('clearGuides') }
+      { label: 'Clear Guides',                              run: () => rp('clearGuides') },
+      SEP,
+      { label: 'Smart Guides',                              run: () => rp('toggleSmartGuides') },
+      { label: 'Clear Notes',                               run: () => rp('clearNotes') }
     ],
     window: [
       { label: 'History Panel…',                            run: () => rp('openHistoryPanel') },
       { label: 'Snapshots…',                                run: () => rp('openSnapshots') },
       { label: 'Channels Panel',                            run: () => rp('openChannelsPanel') },
+      { label: 'Info Panel',                                run: () => rp('openInfoPanel') },
       { label: 'Histogram Panel',                           run: () => rp('openHistogramPanel') },
       SEP,
       { label: 'Mute / Unmute Sound', shortcut: 'M',        run: () => clickButton('btn-mute') }
