@@ -33,12 +33,14 @@ const EXT_TABLE = {
   pptx: { family: 'slides', mime: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', ext: 'pptx' },
   ppt:  { family: 'slides', mime: 'application/vnd.ms-powerpoint', ext: 'ppt' },
 
-  // Diagrams (Visio)
+  // Diagrams (Visio) — only the modern OOXML drawing formats the
+  // lib/diagrams loadVsdx reader actually understands. Legacy
+  // binary .vsd (OLE compound) and the .vssx stencil / .vstx
+  // template variants have a different internal structure and
+  // are deliberately NOT advertised — claiming support produced
+  // a cryptic "Not a valid ZIP file" on drop.
   vsdx: { family: 'diagram', mime: 'application/vnd.ms-visio.drawing',  ext: 'vsdx' },
   vsdm: { family: 'diagram', mime: 'application/vnd.ms-visio.drawing.macroEnabled', ext: 'vsdm' },
-  vssx: { family: 'diagram', mime: 'application/vnd.ms-visio.stencil',  ext: 'vssx' },
-  vstx: { family: 'diagram', mime: 'application/vnd.ms-visio.template', ext: 'vstx' },
-  vsd:  { family: 'diagram', mime: 'application/vnd.visio',             ext: 'vsd' },
 
   // Video
   mp4:  { family: 'video', mime: 'video/mp4',         ext: 'mp4' },
