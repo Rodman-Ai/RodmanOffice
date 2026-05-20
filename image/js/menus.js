@@ -130,6 +130,9 @@
       { label: 'Copy Merged',                               run: () => rp('copyMerged') },
       { label: 'Define Pattern',                            run: () => rp('definePattern') },
       SEP,
+      { label: 'Free Transform', shortcut: 'K',             run: () => rp('freeTransform') },
+      { label: 'Content-Aware Fill…',                       run: () => rp('contentAwareFill') },
+      SEP,
       { label: 'Custom Shapes — 50 shapes…',                run: () => rp('openShapePicker') },
       { label: 'Gradient Library — 50 gradients…',          run: () => rp('openGradientPicker') },
       SEP,
@@ -156,6 +159,7 @@
       { label: 'Duplicate Image',                           run: () => rp('duplicateImage') },
       SEP,
       { label: 'Adjustments — Levels…',                     run: () => rp('openLevels') },
+      { label: 'Adjustments — Curves…',                     run: () => rp('openCurves') },
       { label: 'Adjustments — HSL…',                        run: () => rp('openHSL') },
       { label: 'Adjustments — Color Balance…',              run: () => rp('openColorBalance') },
       { label: 'Adjustments — Threshold…',                  run: () => rp('openThreshold') },
@@ -232,7 +236,13 @@
       SEP,
       { label: 'Toggle Pixel Grid', shortcut: 'G',          run: () => clickButton('btn-grid') },
       { label: 'Toggle Mirror / Symmetry', shortcut: 'Y',   run: () => clickButton('btn-symmetry') },
-      { label: 'Cycle Background Pattern', shortcut: 'V',   run: () => rp('nextBgPattern') }
+      { label: 'Cycle Background Pattern', shortcut: 'V',   run: () => rp('nextBgPattern') },
+      SEP,
+      { label: 'Toggle Rulers',                             run: () => rp('toggleRulers') },
+      { label: 'New Guide…',                                run: () => rp('newGuide') },
+      { label: 'Show / Hide Guides',                        run: () => rp('toggleGuides') },
+      { label: 'Snap to Guides',                            run: () => rp('toggleSnapGuides') },
+      { label: 'Clear Guides',                              run: () => rp('clearGuides') }
     ],
     window: [
       { label: 'History Panel…',                            run: () => rp('openHistoryPanel') },

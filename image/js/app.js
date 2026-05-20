@@ -222,7 +222,12 @@
     clipboard: null,        // ImageData
     floating: null,         // { imageData, x, y } for paste preview
     wandTolerance: 32,
-    lassoPoints: null       // active lasso polyline during drag
+    lassoPoints: null,      // active lasso polyline during drag
+    transform: null,        // active Free Transform session
+    guides: [],             // [{ axis:'h'|'v', pos }]
+    showGuides: true,
+    snapGuides: true,
+    guideDrag: null         // guide being dragged
   };
 
   const MAX_UNDO = 16;
@@ -1890,6 +1895,16 @@
       canvas.setPointerCapture(e.pointerId);
       return;
     }
+    // Guide drag — grab an existing guide or pull a new one from a ruler edge.
+    if (state.showGuides && !state.transform) {
+      const g = guidePick(getPos(e));
+      if (g) {
+        e.preventDefault();
+        canvas.setPointerCapture(e.pointerId);
+        state.guideDrag = g;
+        return;
+      }
+    }
     e.preventDefault();
     Sounds.init();
     canvas.setPointerCapture(e.pointerId);
@@ -1903,7 +1918,7 @@
     const p = getPos(e);
     state.startX = state.lastX = p.x;
     state.startY = state.lastY = p.y;
-    pushUndo();
+    if (state.tool !== 'transform') pushUndo();
     recordStrokeStart(p);
     dispatchTool('down', p);
     if (shouldMirror()) {
@@ -1924,6 +1939,13 @@
       applyZoomTransform();
       return;
     }
+    if (state.guideDrag) {
+      const gp = getPos(e);
+      const g = state.guideDrag;
+      g.pos = g.axis === 'h' ? snapG(gp.y, 'h') : snapG(gp.x, 'v');
+      composite();
+      return;
+    }
     const p = getPos(e);
     updateStatusPos(p);
     updateBrushCursor(e);
@@ -1942,6 +1964,15 @@
   });
   function endStroke(e) {
     if (state.panning) { state.panning = false; }
+    if (state.guideDrag) {
+      const g = state.guideDrag;
+      state.guideDrag = null;
+      if (g.pos < 0 || (g.axis === 'h' && g.pos > H) || (g.axis === 'v' && g.pos > W)) {
+        state.guides = state.guides.filter(x => x !== g);
+      }
+      composite();
+      return;
+    }
     if (!state.drawing) return;
     state.drawing = false;
     state.snapshot = null;
@@ -2073,6 +2104,7 @@
     $('secondary-swatch').style.background = c;
   }
   function setTool(id, def) {
+    if (state.transform && id !== 'transform') commitTransform();
     state.tool = id;
     if (id.startsWith('stamp:')) {
       state.activeStamp = (def && def.stamp) || id.split(':')[1];
@@ -2088,6 +2120,7 @@
     const labelMap = {};
     PaintModes.tools[state.mode].forEach(t => labelMap[t.id] = t.label);
     $('status-tool').textContent = labelMap[id] || id;
+    if (id === 'transform' && !state.transform) startTransform();
   }
 
   function setMode(mode) {
@@ -2487,6 +2520,8 @@
     if (mod && k === 'd') { e.preventDefault(); state.selection = null; state.floating = null; composite(); return; }
     if (mod && k === 'i') { e.preventDefault(); selectInvert(); return; }
     if (mod) return;
+    if (e.key === 'Enter' && state.transform) { e.preventDefault(); commitTransform(); return; }
+    if (e.key === 'Escape' && state.transform) { e.preventDefault(); cancelTransform(); return; }
     if (e.key === 'Enter' && state.floating) { commitFloating(); return; }
     if (e.key === 'Escape') { state.floating = null; state.selection = null; composite(); return; }
     if (e.key >= '1' && e.key <= '9') {
@@ -4801,6 +4836,326 @@
   window.addEventListener('keydown', (e) => { if (e.altKey) state.altKey = true; });
   window.addEventListener('keyup', (e) => { if (!e.altKey) state.altKey = false; });
 
+  /* =====================================================================
+     Round 6 — 5 unique Photoshop features:
+     Free Transform · Guides & Snapping · Healing Brush ·
+     interactive Curves · Content-Aware Fill
+     ===================================================================== */
+
+  // ---- 1. Free Transform — interactive move / scale / rotate of a layer ----
+  // The active layer's pixels are snapshotted, the layer cleared, and a live
+  // preview drawn on the display canvas until the user commits (Enter / tool
+  // switch) or cancels (Esc).
+  function startTransform() {
+    if (state.transform) return;
+    const L = activeLayer(); if (!L) return;
+    pushUndo();
+    const oc = window.document.createElement('canvas');
+    oc.width = W; oc.height = H;
+    oc.getContext('2d').drawImage(L.canvas, 0, 0);
+    state.transform = { oc, sx: 1, sy: 1, rot: 0, tx: 0, ty: 0, drag: null };
+    ctx.clearRect(0, 0, W, H);
+    composite();
+  }
+  function commitTransform() {
+    const t = state.transform; if (!t) return;
+    state.transform = null;
+    const cx = W / 2, cy = H / 2;
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.clearRect(0, 0, W, H);
+    ctx.translate(cx + t.tx, cy + t.ty);
+    ctx.rotate(t.rot);
+    ctx.scale(t.sx, t.sy);
+    ctx.translate(-cx, -cy);
+    ctx.drawImage(t.oc, 0, 0);
+    ctx.restore();
+    composite();
+    scheduleAutosave();
+  }
+  function cancelTransform() {
+    const t = state.transform; if (!t) return;
+    state.transform = null;
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    ctx.drawImage(t.oc, 0, 0);
+    ctx.restore();
+    const d = activeDoc();           // discard the snapshot startTransform pushed
+    if (d && d.undoStack.length) { d.undoStack.pop(); updateUndoButtons(); }
+    composite();
+  }
+  function freeTransform() { setTool('transform'); }
+  // Curves is a gimp-mode tool; expose it for the photoshop menu bar too.
+  function openCurves() { Tools.adjCurves.down(); }
+  // Forward / inverse of the transform matrix (about the canvas centre).
+  function tApply(lx, ly) {
+    const t = state.transform, cx = W / 2, cy = H / 2;
+    const x = (lx - cx) * t.sx, y = (ly - cy) * t.sy;
+    const c = Math.cos(t.rot), s = Math.sin(t.rot);
+    return { x: x * c - y * s + cx + t.tx, y: x * s + y * c + cy + t.ty };
+  }
+  function tInvert(px, py) {
+    const t = state.transform, cx = W / 2, cy = H / 2;
+    const x = px - cx - t.tx, y = py - cy - t.ty;
+    const c = Math.cos(-t.rot), s = Math.sin(-t.rot);
+    return { x: (x * c - y * s) / t.sx + cx, y: (x * s + y * c) / t.sy + cy };
+  }
+  function transformHandles() {
+    const A = [
+      { lx: 0, ly: 0, ax: 'both' },   { lx: W / 2, ly: 0, ax: 'y' },
+      { lx: W, ly: 0, ax: 'both' },   { lx: W, ly: H / 2, ax: 'x' },
+      { lx: W, ly: H, ax: 'both' },   { lx: W / 2, ly: H, ax: 'y' },
+      { lx: 0, ly: H, ax: 'both' },   { lx: 0, ly: H / 2, ax: 'x' }
+    ];
+    return A.map(h => { const p = tApply(h.lx, h.ly); return { x: p.x, y: p.y, lx: h.lx, ly: h.ly, ax: h.ax }; });
+  }
+  function transformRotateHandle() {
+    const topMid = tApply(W / 2, 0), c = tApply(W / 2, H / 2);
+    let dx = topMid.x - c.x, dy = topMid.y - c.y;
+    const len = Math.hypot(dx, dy) || 1, ext = 26 / state.zoom;
+    return { x: topMid.x + dx / len * ext, y: topMid.y + dy / len * ext };
+  }
+  function drawTransformOverlay() {
+    const t = state.transform; if (!t) return;
+    const cx = W / 2, cy = H / 2;
+    displayCtx.save();
+    displayCtx.globalAlpha = 1;
+    displayCtx.globalCompositeOperation = 'source-over';
+    displayCtx.translate(cx + t.tx, cy + t.ty);
+    displayCtx.rotate(t.rot);
+    displayCtx.scale(t.sx, t.sy);
+    displayCtx.translate(-cx, -cy);
+    displayCtx.drawImage(t.oc, 0, 0);
+    displayCtx.restore();
+    const corners = [tApply(0, 0), tApply(W, 0), tApply(W, H), tApply(0, H)];
+    displayCtx.save();
+    displayCtx.lineWidth = 1.5 / state.zoom;
+    displayCtx.strokeStyle = '#0a84ff';
+    displayCtx.beginPath();
+    displayCtx.moveTo(corners[0].x, corners[0].y);
+    for (let i = 1; i < 4; i++) displayCtx.lineTo(corners[i].x, corners[i].y);
+    displayCtx.closePath();
+    displayCtx.stroke();
+    const topMid = tApply(W / 2, 0), rotH = transformRotateHandle();
+    displayCtx.beginPath();
+    displayCtx.moveTo(topMid.x, topMid.y);
+    displayCtx.lineTo(rotH.x, rotH.y);
+    displayCtx.stroke();
+    const hs = 4 / state.zoom;
+    displayCtx.fillStyle = '#ffffff';
+    for (const h of transformHandles()) {
+      displayCtx.fillRect(h.x - hs, h.y - hs, hs * 2, hs * 2);
+      displayCtx.strokeRect(h.x - hs, h.y - hs, hs * 2, hs * 2);
+    }
+    displayCtx.beginPath();
+    displayCtx.arc(rotH.x, rotH.y, hs, 0, Math.PI * 2);
+    displayCtx.fill(); displayCtx.stroke();
+    displayCtx.restore();
+  }
+  Tools.transform = {
+    down(p) {
+      const t = state.transform; if (!t) return;
+      const hr = 11 / state.zoom, cx = W / 2, cy = H / 2;
+      const rh = transformRotateHandle();
+      if (Math.hypot(p.x - rh.x, p.y - rh.y) <= hr) {
+        t.drag = { mode: 'rotate', startA: Math.atan2(p.y - (cy + t.ty), p.x - (cx + t.tx)), startRot: t.rot };
+        return;
+      }
+      for (const h of transformHandles()) {
+        if (Math.hypot(p.x - h.x, p.y - h.y) <= hr) {
+          t.drag = { mode: 'scale', lx: h.lx, ly: h.ly, ax: h.ax };
+          return;
+        }
+      }
+      const loc = tInvert(p.x, p.y);
+      if (loc.x >= 0 && loc.x <= W && loc.y >= 0 && loc.y <= H) {
+        t.drag = { mode: 'move', startP: p, startTx: t.tx, startTy: t.ty };
+        return;
+      }
+      t.drag = null;
+    },
+    move(p) {
+      const t = state.transform; if (!t || !t.drag) return;
+      const cx = W / 2, cy = H / 2;
+      if (t.drag.mode === 'move') {
+        t.tx = t.drag.startTx + (p.x - t.drag.startP.x);
+        t.ty = t.drag.startTy + (p.y - t.drag.startP.y);
+        t.tx = snapG(cx + t.tx, 'v') - cx;
+        t.ty = snapG(cy + t.ty, 'h') - cy;
+      } else if (t.drag.mode === 'rotate') {
+        const a = Math.atan2(p.y - (cy + t.ty), p.x - (cx + t.tx));
+        t.rot = t.drag.startRot + (a - t.drag.startA);
+      } else if (t.drag.mode === 'scale') {
+        const c = Math.cos(-t.rot), s = Math.sin(-t.rot);
+        const dxp = p.x - (cx + t.tx), dyp = p.y - (cy + t.ty);
+        const qx = dxp * c - dyp * s, qy = dxp * s + dyp * c;
+        const dlx = t.drag.lx - cx, dly = t.drag.ly - cy;
+        let nsx = t.sx, nsy = t.sy;
+        if (t.drag.ax !== 'y' && Math.abs(dlx) > 0.001) nsx = Math.max(0.05, Math.abs(qx / dlx));
+        if (t.drag.ax !== 'x' && Math.abs(dly) > 0.001) nsy = Math.max(0.05, Math.abs(qy / dly));
+        if (state.shift && t.drag.ax === 'both') { const m = Math.max(nsx, nsy); nsx = nsy = m; }
+        t.sx = nsx; t.sy = nsy;
+      }
+    },
+    up() { const t = state.transform; if (t) t.drag = null; }
+  };
+
+  // ---- 2. Guides & Snapping ----
+  // Cyan guide lines stored in state.guides, drawn in composite() (so they
+  // track zoom/pan for free). Created via the New Guide dialog or by dragging
+  // in from a canvas edge (when rulers are on); snapped to other guides and
+  // canvas thirds/centre/edges.
+  function guidePick(p) {
+    const T = 5;
+    for (const g of state.guides) {
+      if (g.axis === 'h' && Math.abs(p.y - g.pos) <= T) return g;
+      if (g.axis === 'v' && Math.abs(p.x - g.pos) <= T) return g;
+    }
+    if (window.document.body.classList.contains('rulers-on')) {
+      if (p.y <= 6) { const g = { axis: 'h', pos: p.y }; state.guides.push(g); return g; }
+      if (p.x <= 6) { const g = { axis: 'v', pos: p.x }; state.guides.push(g); return g; }
+    }
+    return null;
+  }
+  function snapG(v, axis) {
+    if (!state.snapGuides) return v;
+    const T = 6, max = axis === 'h' ? H : W;
+    const targets = [0, max / 3, max / 2, 2 * max / 3, max];
+    for (const g of state.guides) {
+      if (g.axis === axis && g !== state.guideDrag) targets.push(g.pos);
+    }
+    for (const t of targets) if (Math.abs(v - t) <= T) return t;
+    return v;
+  }
+  function drawGuides() {
+    if (!state.showGuides || !state.guides.length) return;
+    displayCtx.save();
+    displayCtx.globalAlpha = 1;
+    displayCtx.globalCompositeOperation = 'source-over';
+    displayCtx.lineWidth = 1;
+    displayCtx.strokeStyle = '#00b3d6';
+    for (const g of state.guides) {
+      displayCtx.beginPath();
+      if (g.axis === 'h') { displayCtx.moveTo(0, g.pos + 0.5); displayCtx.lineTo(W, g.pos + 0.5); }
+      else { displayCtx.moveTo(g.pos + 0.5, 0); displayCtx.lineTo(g.pos + 0.5, H); }
+      displayCtx.stroke();
+    }
+    displayCtx.restore();
+  }
+  async function newGuide() {
+    const html = `
+      <label>Orientation:
+        <select id="ng-axis"><option value="h">Horizontal</option><option value="v">Vertical</option></select>
+      </label><br>
+      <label>Position (px): <input id="ng-pos" type="number" value="100" min="0" style="width:80px"></label>`;
+    const ok = await showModal('New Guide', html);
+    if (!ok) return;
+    const axis = $('ng-axis').value === 'v' ? 'v' : 'h';
+    const pos = Math.max(0, Math.round(+$('ng-pos').value || 0));
+    state.guides.push({ axis, pos });
+    state.showGuides = true;
+    composite();
+  }
+  function clearGuides() { state.guides = []; composite(); }
+  function toggleGuides() { state.showGuides = !state.showGuides; composite(); }
+  function toggleSnapGuides() {
+    state.snapGuides = !state.snapGuides;
+    alert('Snap to guides: ' + (state.snapGuides ? 'ON' : 'OFF'));
+  }
+
+  // ---- 3. Healing Brush — texture from a source, colour from the target ----
+  // Like Clone, but each stamp copies the source patch's detail while shifting
+  // it to the destination's local mean colour, feathered for a seamless blend.
+  let healSource = null;
+  Tools.heal = {
+    down(p) {
+      if (state.altKey || state.shift) { healSource = { x: p.x, y: p.y, ox: undefined }; return; }
+      if (healSource && healSource.ox === undefined) {
+        healSource.ox = p.x - healSource.x;
+        healSource.oy = p.y - healSource.y;
+      }
+      healStamp(p);
+    },
+    move(p) { healStamp(p); }
+  };
+  function healStamp(p) {
+    const r = Math.max(3, state.size);
+    let scx, scy;
+    if (healSource && healSource.ox !== undefined) {
+      scx = p.x - healSource.ox; scy = p.y - healSource.oy;
+    } else {
+      let found = null;
+      for (const [dx, dy] of [[-3 * r, 0], [3 * r, 0], [0, -3 * r], [0, 3 * r]]) {
+        const cx = p.x + dx, cy = p.y + dy;
+        if (cx - r >= 0 && cy - r >= 0 && cx + r <= W && cy + r <= H) { found = [cx, cy]; break; }
+      }
+      if (!found) return;
+      scx = found[0]; scy = found[1];
+    }
+    if (p.x - r < 0 || p.y - r < 0 || p.x + r > W || p.y + r > H) return;
+    if (scx - r < 0 || scy - r < 0 || scx + r > W || scy + r > H) return;
+    const D = r * 2;
+    const dst = ctx.getImageData(p.x - r, p.y - r, D, D);
+    const srcImg = activeLayer().ctx.getImageData(scx - r, scy - r, D, D);
+    const dd = dst.data, sd = srcImg.data;
+    let sr = 0, sg = 0, sb = 0, dr = 0, dg = 0, db = 0, n = 0;
+    for (let y = 0; y < D; y++) for (let x = 0; x < D; x++) {
+      const ex = x - r, ey = y - r;
+      if (ex * ex + ey * ey > r * r) continue;
+      const i = (y * D + x) * 4;
+      sr += sd[i]; sg += sd[i + 1]; sb += sd[i + 2];
+      dr += dd[i]; dg += dd[i + 1]; db += dd[i + 2];
+      n++;
+    }
+    if (!n) return;
+    sr /= n; sg /= n; sb /= n; dr /= n; dg /= n; db /= n;
+    for (let y = 0; y < D; y++) for (let x = 0; x < D; x++) {
+      const ex = x - r, ey = y - r;
+      const dist2 = ex * ex + ey * ey;
+      if (dist2 > r * r) continue;
+      const i = (y * D + x) * 4;
+      const a = 1 - Math.sqrt(dist2) / r;
+      dd[i]     = dd[i]     * (1 - a) + (sd[i]     - sr + dr) * a;
+      dd[i + 1] = dd[i + 1] * (1 - a) + (sd[i + 1] - sg + dg) * a;
+      dd[i + 2] = dd[i + 2] * (1 - a) + (sd[i + 2] - sb + db) * a;
+    }
+    ctx.putImageData(dst, p.x - r, p.y - r);
+  }
+
+  // ---- 5. Content-Aware Fill — synthesise a selection from its surroundings ----
+  // Reflects the pixels around the selection inward, blending the four
+  // reflections so a marquee'd object dissolves into its background.
+  function contentAwareFill() {
+    const r = selectionRect();
+    if (!r || r.w < 2 || r.h < 2) { alert('Make a selection over the area to remove first.'); return; }
+    pushUndo();
+    const img = ctx.getImageData(0, 0, W, H);
+    const d = img.data;
+    const src = new Uint8ClampedArray(d);
+    const at = (x, y) => { const i = (y * W + x) * 4; return [src[i], src[i + 1], src[i + 2]]; };
+    const mix = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+    const x0 = r.x, y0 = r.y, x1 = r.x + r.w, y1 = r.y + r.h;
+    for (let y = y0; y < y1; y++) {
+      for (let x = x0; x < x1; x++) {
+        const dl = x - x0 + 1, dr2 = x1 - x, dt = y - y0 + 1, dbm = y1 - y;
+        const lx = Math.max(0, x0 - dl), rx = Math.min(W - 1, x1 - 1 + dr2);
+        const ty = Math.max(0, y0 - dt), by = Math.min(H - 1, y1 - 1 + dbm);
+        const ch = mix(at(lx, y), at(rx, y), dl / (dl + dr2));
+        const cv = mix(at(x, ty), at(x, by), dt / (dt + dbm));
+        const minH = Math.min(dl, dr2), minV = Math.min(dt, dbm);
+        const out = mix(ch, cv, minH / (minH + minV));
+        const i = (y * W + x) * 4;
+        d[i] = out[0]; d[i + 1] = out[1]; d[i + 2] = out[2]; d[i + 3] = 255;
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+    composite();
+    scheduleAutosave();
+  }
+
   // ---- GIF export from animation flipbook (via tiny encoder) ----
   // Minimal GIF89a encoder for 256-color frames using neuquant-like
   // simple median-cut; we use 64-color quantization for speed.
@@ -5835,6 +6190,8 @@
       displayCtx.drawImage(tmp, f.x, f.y);
       drawAnts(displayCtx, f.x, f.y, f.imageData.width, f.imageData.height);
     }
+    drawGuides();
+    if (state.transform) drawTransformOverlay();
     displayCtx.restore();
     if (modeHasLayers(state.mode)) refreshLayersPanelSoon();
   };
@@ -5932,23 +6289,98 @@
   };
 
   // ---- Color & adjustment dialogs (proper Bezier curves, gradient maps, etc.) ----
+  // ---- 4. Interactive Curves — a real draggable tone-curve editor ----
   Tools.adjCurves = {
     async down() {
-      const html = `<canvas id="cv-edit" width="240" height="240" style="background:#fff;border:1px solid #000;cursor:crosshair"></canvas>
-        <div>Drag points. OK to apply.</div>`;
-      const points = [{x:0,y:240},{x:60,y:180},{x:120,y:120},{x:180,y:60},{x:240,y:0}];
-      const ok = await showModal('Curves', html);
+      const SZ = 256;
+      const html = `<canvas id="cv-edit" width="${SZ}" height="${SZ}" ` +
+        `style="background:#fff;border:1px solid #000;cursor:crosshair;` +
+        `touch-action:none;width:256px;height:256px"></canvas>` +
+        `<div style="font-size:11px;opacity:0.75;margin-top:4px">` +
+        `Drag points · click empty space to add a point · drag a point off the box to remove it</div>`;
+      let points = [{ x: 0, y: SZ }, { x: SZ / 2, y: SZ / 2 }, { x: SZ, y: 0 }];
+      const pr = showModal('Curves', html);
+      const cv = $('cv-edit');
+      const cc = cv.getContext('2d');
+      const evPos = (e) => {
+        const rc = cv.getBoundingClientRect();
+        return { x: (e.clientX - rc.left) * (SZ / rc.width),
+                 y: (e.clientY - rc.top) * (SZ / rc.height) };
+      };
+      const draw = () => {
+        cc.fillStyle = '#fff'; cc.fillRect(0, 0, SZ, SZ);
+        cc.strokeStyle = '#e2e2e2'; cc.lineWidth = 1;
+        for (let g = 1; g < 4; g++) {
+          const t = g / 4 * SZ;
+          cc.beginPath(); cc.moveTo(t, 0); cc.lineTo(t, SZ); cc.stroke();
+          cc.beginPath(); cc.moveTo(0, t); cc.lineTo(SZ, t); cc.stroke();
+        }
+        cc.strokeStyle = '#cfcfcf';
+        cc.beginPath(); cc.moveTo(0, SZ); cc.lineTo(SZ, 0); cc.stroke();
+        const sorted = points.slice().sort((a, b) => a.x - b.x);
+        cc.strokeStyle = '#0a84ff'; cc.lineWidth = 2;
+        cc.beginPath();
+        sorted.forEach((p, i) => { i ? cc.lineTo(p.x, p.y) : cc.moveTo(p.x, p.y); });
+        cc.stroke();
+        cc.fillStyle = '#0a84ff';
+        for (const p of sorted) { cc.beginPath(); cc.arc(p.x, p.y, 4, 0, Math.PI * 2); cc.fill(); }
+      };
+      let dragIdx = -1;
+      cv.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        cv.setPointerCapture(e.pointerId);
+        const m = evPos(e);
+        let best = -1, bd = 13 * 13;
+        points.forEach((p, i) => {
+          const dd = (p.x - m.x) ** 2 + (p.y - m.y) ** 2;
+          if (dd < bd) { bd = dd; best = i; }
+        });
+        if (best < 0) {
+          points.push({ x: Math.max(1, Math.min(SZ - 1, m.x)), y: Math.max(0, Math.min(SZ, m.y)) });
+          best = points.length - 1;
+        }
+        dragIdx = best;
+        draw();
+      });
+      cv.addEventListener('pointermove', (e) => {
+        if (dragIdx < 0) return;
+        const m = evPos(e), p = points[dragIdx];
+        const sorted = points.slice().sort((a, b) => a.x - b.x);
+        if (p === sorted[0]) p.x = 0;
+        else if (p === sorted[sorted.length - 1]) p.x = SZ;
+        else p.x = Math.max(1, Math.min(SZ - 1, m.x));
+        p.y = m.y;
+        draw();
+      });
+      const release = () => {
+        if (dragIdx < 0) return;
+        const p = points[dragIdx];
+        dragIdx = -1;
+        const sorted = points.slice().sort((a, b) => a.x - b.x);
+        const isEnd = p === sorted[0] || p === sorted[sorted.length - 1];
+        if (!isEnd && points.length > 2 && (p.y < -4 || p.y > SZ + 4)) {
+          points = points.filter(q => q !== p);
+        } else {
+          p.y = Math.max(0, Math.min(SZ, p.y));
+        }
+        draw();
+      };
+      cv.addEventListener('pointerup', release);
+      cv.addEventListener('pointercancel', release);
+      draw();
+      const ok = await pr;
       if (!ok) return;
-      // Build LUT from points (linear interp).
-      points.sort((a,b)=>a.x-b.x);
+      const sorted = points.slice().sort((a, b) => a.x - b.x);
       const lut = new Uint8ClampedArray(256);
       for (let i = 0; i < 256; i++) {
-        const px = (i / 255) * 240;
-        let pa = points[0], pb = points[points.length-1];
-        for (let k = 0; k < points.length - 1; k++) if (points[k].x <= px && points[k+1].x >= px) { pa = points[k]; pb = points[k+1]; break; }
+        const px = i / 255 * SZ;
+        let pa = sorted[0], pb = sorted[sorted.length - 1];
+        for (let k = 0; k < sorted.length - 1; k++) {
+          if (sorted[k].x <= px && sorted[k + 1].x >= px) { pa = sorted[k]; pb = sorted[k + 1]; break; }
+        }
         const t = (px - pa.x) / Math.max(1, pb.x - pa.x);
         const yPx = pa.y + (pb.y - pa.y) * t;
-        lut[i] = Math.round(255 - (yPx / 240) * 255);
+        lut[i] = Math.round(255 - (yPx / SZ) * 255);
       }
       applyLUT(lut, lut, lut);
     }
@@ -7487,6 +7919,9 @@
     // Custom shapes
     openShapePicker,
     // Gradients
-    openGradientPicker
+    openGradientPicker,
+    // Round 6 — Free Transform, Guides, Content-Aware Fill, Curves
+    freeTransform, contentAwareFill, openCurves,
+    newGuide, clearGuides, toggleGuides, toggleSnapGuides, toggleRulers
   };
 })();
