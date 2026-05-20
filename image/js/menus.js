@@ -146,6 +146,10 @@
       { label: 'Canvas Size…',                              run: () => rp('canvasSizeDialog') },
       { label: 'Scale 50%',                                 run: () => rp('scaleHalf') },
       { label: 'Scale 200%',                                run: () => rp('scaleDouble') },
+      { label: 'Content-Aware Scale…',                      run: () => rp('contentAwareScaleDialog') },
+      SEP,
+      { label: 'Crop Aspect Ratio…',                        run: () => rp('cropRatioDialog') },
+      { label: 'Straighten by Measure Line',                run: () => rp('straightenByMeasure') },
       SEP,
       { label: 'Rotate 90° CW',                             run: () => rp('rotate90cw') },
       { label: 'Rotate 90° CCW',                            run: () => rp('rotate90ccw') },
@@ -247,6 +251,8 @@
     window: [
       { label: 'History Panel…',                            run: () => rp('openHistoryPanel') },
       { label: 'Snapshots…',                                run: () => rp('openSnapshots') },
+      { label: 'Channels Panel',                            run: () => rp('openChannelsPanel') },
+      { label: 'Histogram Panel',                           run: () => rp('openHistogramPanel') },
       SEP,
       { label: 'Mute / Unmute Sound', shortcut: 'M',        run: () => clickButton('btn-mute') }
     ]
