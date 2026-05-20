@@ -23,6 +23,7 @@
     const open = menu.classList.contains('is-open');
     closeAll();
     if (!open) {
+      if (typeof populateMenu === 'function') populateMenu(menu.dataset.menu);
       menu.classList.add('is-open');
       if (trigger) trigger.setAttribute('aria-expanded', 'true');
       if (drop) drop.hidden = false;
@@ -145,29 +146,33 @@
     image: [
       { label: 'Image Size…',                               run: () => rp('imageSizeDialog') },
       { label: 'Canvas Size…',                              run: () => rp('canvasSizeDialog') },
-      { label: 'Scale 50%',                                 run: () => rp('scaleHalf') },
-      { label: 'Scale 200%',                                run: () => rp('scaleDouble') },
       { label: 'Content-Aware Scale…',                      run: () => rp('contentAwareScaleDialog') },
       SEP,
-      { label: 'Crop Aspect Ratio…',                        run: () => rp('cropRatioDialog') },
-      { label: 'Straighten by Measure Line',                run: () => rp('straightenByMeasure') },
-      SEP,
-      { label: 'Rotate 90° CW',                             run: () => rp('rotate90cw') },
-      { label: 'Rotate 90° CCW',                            run: () => rp('rotate90ccw') },
-      { label: 'Rotate 180°',                               run: () => rp('rotate180') },
-      { label: 'Rotate Arbitrary…',                         run: () => rp('rotateArbitrary') },
-      { label: 'Flip Canvas Horizontal',                    run: () => rp('flipCanvasH') },
-      { label: 'Flip Canvas Vertical',                      run: () => rp('flipCanvasV') },
+      { label: 'Adjustments', children: [
+        { label: 'Levels…',                                 run: () => rp('openLevels') },
+        { label: 'Curves…',                                 run: () => rp('openCurves') },
+        { label: 'Hue / Saturation…',                       run: () => rp('openHSL') },
+        { label: 'Color Balance…',                          run: () => rp('openColorBalance') },
+        { label: 'Threshold…',                              run: () => rp('openThreshold') }
+      ] },
+      { label: 'Rotate & Flip', children: [
+        { label: 'Rotate 90° CW',                           run: () => rp('rotate90cw') },
+        { label: 'Rotate 90° CCW',                          run: () => rp('rotate90ccw') },
+        { label: 'Rotate 180°',                             run: () => rp('rotate180') },
+        { label: 'Rotate Arbitrary…',                       run: () => rp('rotateArbitrary') },
+        { label: 'Flip Horizontal',                         run: () => rp('flipCanvasH') },
+        { label: 'Flip Vertical',                           run: () => rp('flipCanvasV') }
+      ] },
+      { label: 'Scale', children: [
+        { label: 'Scale 50%',                               run: () => rp('scaleHalf') },
+        { label: 'Scale 200%',                              run: () => rp('scaleDouble') }
+      ] },
       SEP,
       { label: 'Crop to Selection',                         run: () => rp('cropToSelection') },
+      { label: 'Crop Aspect Ratio…',                        run: () => rp('cropRatioDialog') },
+      { label: 'Straighten by Measure Line',                run: () => rp('straightenByMeasure') },
       { label: 'Trim',                                      run: () => rp('trimImage') },
       { label: 'Duplicate Image',                           run: () => rp('duplicateImage') },
-      SEP,
-      { label: 'Adjustments — Levels…',                     run: () => rp('openLevels') },
-      { label: 'Adjustments — Curves…',                     run: () => rp('openCurves') },
-      { label: 'Adjustments — HSL…',                        run: () => rp('openHSL') },
-      { label: 'Adjustments — Color Balance…',              run: () => rp('openColorBalance') },
-      { label: 'Adjustments — Threshold…',                  run: () => rp('openThreshold') },
       SEP,
       { label: 'Replay Last Drawing',                       run: () => clickButton('btn-replay') }
     ],
@@ -232,84 +237,108 @@
       { label: 'Grayscale',                                 run: () => rp('applyFilter', 'grayscale') }
     ],
     view: [
-      { label: 'Zoom In',          shortcut: '+',           run: () => clickButton('btn-zoom-in') },
-      { label: 'Zoom Out',         shortcut: '−',           run: () => clickButton('btn-zoom-out') },
-      { label: 'Fit on Screen',                             run: () => rp('zoomFit') },
+      { label: 'Zoom', children: [
+        { label: 'Zoom In',      shortcut: '+',             run: () => clickButton('btn-zoom-in') },
+        { label: 'Zoom Out',     shortcut: '−',             run: () => clickButton('btn-zoom-out') },
+        { label: 'Fit on Screen',                           run: () => rp('zoomFit') },
+        { label: 'Zoom 50%',                                run: () => rp('zoom50') },
+        { label: 'Zoom 100%',    shortcut: '0',             run: () => rp('zoom100') },
+        { label: 'Zoom 200%',                               run: () => rp('zoom200') },
+        { label: 'Zoom 400%',                               run: () => rp('zoom400') },
+        { label: 'Zoom 800%',                               run: () => rp('zoom800') }
+      ] },
       { label: 'Center View',                               run: () => rp('centerView') },
       SEP,
-      { label: 'Zoom 50%',                                  run: () => rp('zoom50') },
-      { label: 'Zoom 100% (Actual Pixels)', shortcut: '0',  run: () => rp('zoom100') },
-      { label: 'Zoom 200%',                                 run: () => rp('zoom200') },
-      { label: 'Zoom 400%',                                 run: () => rp('zoom400') },
-      { label: 'Zoom 800%',                                 run: () => rp('zoom800') },
+      { label: 'Guides & Rulers', children: [
+        { label: 'Toggle Rulers',                           run: () => rp('toggleRulers') },
+        { label: 'New Guide…',                              run: () => rp('newGuide') },
+        { label: 'New Guide Layout…',                       run: () => rp('newGuideLayout') },
+        { label: 'Show / Hide Guides',                      run: () => rp('toggleGuides') },
+        { label: 'Snap to Guides',                          run: () => rp('toggleSnapGuides') },
+        { label: 'Smart Guides',                            run: () => rp('toggleSmartGuides') },
+        { label: 'Clear Guides',                            run: () => rp('clearGuides') }
+      ] },
+      { label: 'Rotate View', children: [
+        { label: 'Rotate 15° CW',                           run: () => rp('rotateViewCW') },
+        { label: 'Rotate 15° CCW',                          run: () => rp('rotateViewCCW') },
+        { label: 'Reset Rotation',                          run: () => rp('resetViewRotation') }
+      ] },
+      { label: 'Slices', children: [
+        { label: 'Export Slices',                           run: () => rp('exportSlices') },
+        { label: 'Clear Slices',                            run: () => rp('clearSlices') }
+      ] },
       SEP,
       { label: 'Toggle Pixel Grid', shortcut: 'G',          run: () => clickButton('btn-grid') },
       { label: 'Toggle Mirror / Symmetry', shortcut: 'Y',   run: () => clickButton('btn-symmetry') },
       { label: 'Cycle Background Pattern', shortcut: 'V',   run: () => rp('nextBgPattern') },
-      SEP,
-      { label: 'Toggle Rulers',                             run: () => rp('toggleRulers') },
-      { label: 'New Guide…',                                run: () => rp('newGuide') },
-      { label: 'Show / Hide Guides',                        run: () => rp('toggleGuides') },
-      { label: 'Snap to Guides',                            run: () => rp('toggleSnapGuides') },
-      { label: 'Clear Guides',                              run: () => rp('clearGuides') },
-      { label: 'New Guide Layout…',                         run: () => rp('newGuideLayout') },
-      SEP,
-      { label: 'Smart Guides',                              run: () => rp('toggleSmartGuides') },
-      { label: 'Clear Notes',                               run: () => rp('clearNotes') },
-      SEP,
-      { label: 'Rotate View 15° CW',                        run: () => rp('rotateViewCW') },
-      { label: 'Rotate View 15° CCW',                       run: () => rp('rotateViewCCW') },
-      { label: 'Reset View Rotation',                       run: () => rp('resetViewRotation') },
-      SEP,
-      { label: 'Export Slices',                             run: () => rp('exportSlices') },
-      { label: 'Clear Slices',                              run: () => rp('clearSlices') }
+      { label: 'Clear Notes',                               run: () => rp('clearNotes') }
     ],
     window: [
       { label: 'History Panel…',                            run: () => rp('openHistoryPanel') },
       { label: 'Snapshots…',                                run: () => rp('openSnapshots') },
-      { label: 'Channels Panel',                            run: () => rp('openChannelsPanel') },
-      { label: 'Info Panel',                                run: () => rp('openInfoPanel') },
-      { label: 'Histogram Panel',                           run: () => rp('openHistogramPanel') },
+      SEP,
+      { label: 'Channels Panel',  checked: () => !!document.querySelector('.channels-panel'),  run: () => rp('openChannelsPanel') },
+      { label: 'Info Panel',      checked: () => !!document.querySelector('.info-panel'),       run: () => rp('openInfoPanel') },
+      { label: 'Histogram Panel', checked: () => !!document.querySelector('.histogram-panel'),  run: () => rp('openHistogramPanel') },
       SEP,
       { label: 'Mute / Unmute Sound', shortcut: 'M',        run: () => clickButton('btn-mute') }
     ]
   };
 
-  // ---- Populate dropdowns from MENUS ----
-  Object.keys(MENUS).forEach((key) => {
+  // ---- Populate dropdowns from MENUS (submenus + live checkmarks) ----
+  function buildMenuItem(item) {
+    if (item.sep) {
+      const hr = document.createElement('div');
+      hr.className = 'menu-sep';
+      return hr;
+    }
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'menu-item';
+    btn.setAttribute('role', 'menuitem');
+    if (item.disabled) btn.disabled = true;
+    const main = document.createElement('span');
+    main.className = 'menu-item-label';
+    const mark = item.checked ? (item.checked() ? '✓ ' : ' ') : '';
+    main.textContent = mark + item.label;
+    btn.appendChild(main);
+    if (item.children) {
+      btn.classList.add('has-submenu');
+      const arrow = document.createElement('span');
+      arrow.className = 'menu-item-shortcut';
+      arrow.textContent = '▸';
+      btn.appendChild(arrow);
+      const wrap = document.createElement('div');
+      wrap.className = 'menu-sub-wrap';
+      wrap.appendChild(btn);
+      const sub = document.createElement('div');
+      sub.className = 'submenu';
+      item.children.forEach(ch => sub.appendChild(buildMenuItem(ch)));
+      wrap.appendChild(sub);
+      return wrap;
+    }
+    if (item.shortcut) {
+      const sc = document.createElement('span');
+      sc.className = 'menu-item-shortcut';
+      sc.textContent = item.shortcut;
+      btn.appendChild(sc);
+    }
+    btn.addEventListener('click', () => {
+      try { item.run(); } catch (e) { /* ignore */ }
+    });
+    return btn;
+  }
+  function populateMenu(key) {
     const menu = menubar.querySelector(`.menu[data-menu="${key}"]`);
     if (!menu) return;
     const drop = menu.querySelector('.menu-dropdown');
-    if (!drop) return;
+    if (!drop || !MENUS[key]) return;
     drop.innerHTML = '';
-    MENUS[key].forEach((item) => {
-      if (item.sep) {
-        const hr = document.createElement('div');
-        hr.className = 'menu-sep';
-        drop.appendChild(hr);
-        return;
-      }
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'menu-item';
-      btn.setAttribute('role', 'menuitem');
-      if (item.disabled) btn.disabled = true;
-      const main = document.createElement('span');
-      main.className = 'menu-item-label';
-      main.textContent = item.label;
-      btn.appendChild(main);
-      if (item.shortcut) {
-        const sc = document.createElement('span');
-        sc.className = 'menu-item-shortcut';
-        sc.textContent = item.shortcut;
-        btn.appendChild(sc);
-      }
-      btn.addEventListener('click', () => {
-        try { item.run(); } catch (e) { /* ignore */ }
-      });
-      drop.appendChild(btn);
-    });
-  });
+    MENUS[key].forEach(item => drop.appendChild(buildMenuItem(item)));
+  }
+  Object.keys(MENUS).forEach(populateMenu);
+  // Re-render a menu each time it opens so checkmarks reflect live state.
+  window.RPpopulateMenu = populateMenu;
 
   // ---- Help / About items (kept HTML-defined) ----
   menubar.addEventListener('click', (e) => {

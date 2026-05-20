@@ -17,7 +17,7 @@ button { font: inherit; cursor: pointer; }
 /* ---- App skeleton ---- */
 .app {
   display: grid;
-  grid-template-rows: auto 1fr;
+  grid-template-rows: auto auto 1fr;
   height: 100dvh;
   width: 100vw;
 }
@@ -1840,3 +1840,89 @@ body.mode-photoshop2026 .modal-actions button:hover {
   border-color: var(--p26-accent);
   color: #fff;
 }
+
+/* ===================================================================
+   Round 10 — Photoshop-2026 UX/UI overhaul
+   =================================================================== */
+.options-bar {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  padding: 4px 10px; min-height: 30px;
+  background: var(--p26-panel, #2d2d2d);
+  border-bottom: 1px solid var(--p26-border, #000);
+  color: var(--p26-text, #e6e6e6); font-size: 11px;
+}
+.options-bar .opt-tool-name { font-weight: 700; min-width: 72px; }
+.options-bar .opt-group { display: flex; align-items: center; gap: 5px; }
+.options-bar .opt-group[hidden] { display: none; }
+.options-bar .opt-group label { opacity: 0.8; }
+.options-bar input[type="range"] { width: 92px; }
+.options-bar select { font-size: 11px; }
+.options-bar .opt-hint { margin-left: auto; opacity: 0.6; font-style: italic; }
+
+.tool-group { position: relative; display: flex; }
+.tool-group > .tool-group-face { flex: 1; }
+.tool-group-face .flyout-tri {
+  position: absolute; right: 1px; bottom: 0;
+  font-size: 7px; line-height: 1; opacity: 0.6; pointer-events: none;
+}
+.tool-flyout {
+  position: absolute; left: 100%; top: 0; z-index: 70;
+  display: none; flex-wrap: wrap; width: 136px; gap: 2px; padding: 3px;
+  background: var(--p26-panel-2, #393939);
+  border: 1px solid var(--p26-border, #000);
+  box-shadow: 2px 3px 10px rgba(0, 0, 0, 0.5);
+}
+.tool-group:hover .tool-flyout { display: flex; }
+.tool-flyout .tool-btn { width: 62px; }
+
+.panel-titlebar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 1px 2px 1px 6px; cursor: move; user-select: none;
+  background: rgba(255, 255, 255, 0.14);
+  font-size: 10px; font-weight: 700; color: #fff;
+}
+.panel-close {
+  width: 16px; height: 15px; line-height: 1; font-size: 13px;
+  background: transparent; border: 0; color: #fff; cursor: pointer;
+}
+.panel-close:hover { background: #c0392b; }
+
+.menu-sub-wrap { position: relative; }
+.menu-sub-wrap .submenu {
+  position: absolute; left: 100%; top: 0; min-width: 184px;
+  display: none; z-index: 80; padding: 3px 0;
+  background: var(--p26-panel-2, #393939);
+  border: 1px solid var(--p26-border, #000);
+  box-shadow: 2px 3px 12px rgba(0, 0, 0, 0.5);
+}
+.menu-sub-wrap:hover .submenu { display: block; }
+
+.context-menu {
+  position: fixed; z-index: 200; min-width: 172px; padding: 3px 0;
+  background: var(--p26-panel-2, #393939);
+  border: 1px solid var(--p26-border, #000);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6);
+  color: var(--p26-text, #e6e6e6);
+}
+.context-menu[hidden] { display: none; }
+.context-menu .ctx-item {
+  display: block; width: 100%; text-align: left; padding: 4px 14px;
+  background: transparent; border: 0; color: inherit;
+  font-size: 12px; cursor: pointer;
+}
+.context-menu .ctx-item:hover { background: var(--p26-accent, #3b82f6); color: #fff; }
+.context-menu .ctx-sep { height: 1px; margin: 3px 0; background: rgba(255, 255, 255, 0.15); }
+
+.newdoc-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
+.newdoc-cell {
+  display: flex; flex-direction: column; gap: 2px; padding: 8px;
+  cursor: pointer; text-align: left; color: inherit;
+  background: var(--p26-panel, #2d2d2d);
+  border: 1px solid var(--p26-border, #555);
+}
+.newdoc-cell.sel {
+  border-color: var(--p26-accent, #3b82f6);
+  outline: 1px solid var(--p26-accent, #3b82f6);
+}
+.newdoc-cell span { font-size: 10px; opacity: 0.7; }
+.newdoc-custom { margin-top: 8px; font-size: 12px; }
