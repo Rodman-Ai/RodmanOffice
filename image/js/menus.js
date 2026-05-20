@@ -192,7 +192,11 @@
       SEP,
       { label: 'Merge Down',                                run: () => rp('mergeDown') },
       { label: 'Merge Visible',                             run: () => rp('mergeVisible') },
-      { label: 'Flatten Image',                             run: () => rp('flattenImage') }
+      { label: 'Stamp Visible',                             run: () => rp('stampVisible') },
+      { label: 'Flatten Image',                             run: () => rp('flattenImage') },
+      SEP,
+      { label: 'New Fill Layer…',                           run: () => rp('addFillLayer') },
+      { label: 'Edit Fill Layer Color…',                    run: () => rp('editFillLayer') }
     ],
     select: [
       { label: 'Select All',       shortcut: 'Ctrl+A',      run: () => rp('selectAll') },
@@ -248,9 +252,17 @@
       { label: 'Show / Hide Guides',                        run: () => rp('toggleGuides') },
       { label: 'Snap to Guides',                            run: () => rp('toggleSnapGuides') },
       { label: 'Clear Guides',                              run: () => rp('clearGuides') },
+      { label: 'New Guide Layout…',                         run: () => rp('newGuideLayout') },
       SEP,
       { label: 'Smart Guides',                              run: () => rp('toggleSmartGuides') },
-      { label: 'Clear Notes',                               run: () => rp('clearNotes') }
+      { label: 'Clear Notes',                               run: () => rp('clearNotes') },
+      SEP,
+      { label: 'Rotate View 15° CW',                        run: () => rp('rotateViewCW') },
+      { label: 'Rotate View 15° CCW',                       run: () => rp('rotateViewCCW') },
+      { label: 'Reset View Rotation',                       run: () => rp('resetViewRotation') },
+      SEP,
+      { label: 'Export Slices',                             run: () => rp('exportSlices') },
+      { label: 'Clear Slices',                              run: () => rp('clearSlices') }
     ],
     window: [
       { label: 'History Panel…',                            run: () => rp('openHistoryPanel') },

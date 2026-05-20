@@ -236,7 +236,13 @@
     historySource: null,    // canvas snapshot for the History Brush
     notes: [],              // [{ x, y, text }] annotation notes
     smartGuides: [],         // active dynamic alignment guides
-    smartGuidesOn: true
+    smartGuidesOn: true,
+    distort: null,          // active Distort session
+    viewRotation: 0,        // canvas-display rotation (degrees)
+    slices: [],             // [{ x, y, w, h }] export slices
+    sliceDrag: null,        // slice being dragged
+    mixLoad: null,          // Mixer Brush carried colour [r,g,b]
+    customSwatches: []      // user-saved colour swatches
   };
 
   const MAX_UNDO = 16;
@@ -293,9 +299,21 @@
   // ---- Coordinate translation ----
   function getPos(ev) {
     const rect = canvas.getBoundingClientRect();
+    if (!state.viewRotation) {
+      return {
+        x: Math.round((ev.clientX - rect.left) * (W / rect.width)),
+        y: Math.round((ev.clientY - rect.top) * (H / rect.height))
+      };
+    }
+    // Rotated view: un-rotate about the canvas centre, then unscale.
+    const cx = rect.left + rect.width / 2, cy = rect.top + rect.height / 2;
+    const a = -state.viewRotation * Math.PI / 180;
+    const dx = ev.clientX - cx, dy = ev.clientY - cy;
+    const rx = dx * Math.cos(a) - dy * Math.sin(a);
+    const ry = dx * Math.sin(a) + dy * Math.cos(a);
     return {
-      x: Math.round((ev.clientX - rect.left) * (W / rect.width)),
-      y: Math.round((ev.clientY - rect.top) * (H / rect.height))
+      x: Math.round(rx / state.zoom + W / 2),
+      y: Math.round(ry / state.zoom + H / 2)
     };
   }
 
@@ -1672,12 +1690,21 @@
     const s = state.selection;
     ctx.save();
     ctx.setLineDash([4, 4]);
-    ctx.strokeStyle = '#000';
     ctx.lineWidth = 1;
-    ctx.strokeRect(s.x + 0.5, s.y + 0.5, s.w, s.h);
-    ctx.strokeStyle = '#fff';
-    ctx.lineDashOffset = 4;
-    ctx.strokeRect(s.x + 0.5, s.y + 0.5, s.w, s.h);
+    if (s.kind === 'ellipse') {
+      const x = Math.min(s.x, s.x + s.w), y = Math.min(s.y, s.y + s.h);
+      const w = Math.abs(s.w), h = Math.abs(s.h);
+      ctx.strokeStyle = '#000';
+      ctx.beginPath(); ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = '#fff'; ctx.lineDashOffset = 4;
+      ctx.beginPath(); ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2); ctx.stroke();
+    } else {
+      ctx.strokeStyle = '#000';
+      ctx.strokeRect(s.x + 0.5, s.y + 0.5, s.w, s.h);
+      ctx.strokeStyle = '#fff';
+      ctx.lineDashOffset = 4;
+      ctx.strokeRect(s.x + 0.5, s.y + 0.5, s.w, s.h);
+    }
     ctx.restore();
   }
 
@@ -1883,8 +1910,9 @@
     if (!fn) return;
     ctx.save();
     ctx.globalAlpha = state.opacity;
-    // Clip to active selection (rect or lasso path) so drawing only lands inside it.
-    if (state.selection && state.selection.kind === 'lasso' && state.selection.path) {
+    // Clip to active selection (lasso / ellipse path) so drawing only lands inside it.
+    if (state.selection && state.selection.path &&
+        (state.selection.kind === 'lasso' || state.selection.kind === 'ellipse')) {
       ctx.clip(state.selection.path);
     }
     fn(p);
@@ -1923,7 +1951,7 @@
     const p = getPos(e);
     state.startX = state.lastX = p.x;
     state.startY = state.lastY = p.y;
-    if (state.tool !== 'transform') pushUndo();
+    if (state.tool !== 'transform' && state.tool !== 'distort') pushUndo();
     recordStrokeStart(p);
     dispatchTool('down', p);
     if (shouldMirror()) {
@@ -2110,6 +2138,7 @@
   }
   function setTool(id, def) {
     if (state.transform && id !== 'transform') commitTransform();
+    if (state.distort && id !== 'distort') commitDistort();
     state.tool = id;
     if (id.startsWith('stamp:')) {
       state.activeStamp = (def && def.stamp) || id.split(':')[1];
@@ -2126,6 +2155,7 @@
     PaintModes.tools[state.mode].forEach(t => labelMap[t.id] = t.label);
     $('status-tool').textContent = labelMap[id] || id;
     if (id === 'transform' && !state.transform) startTransform();
+    if (id === 'distort' && !state.distort) startDistort();
   }
 
   function setMode(mode) {
@@ -2527,6 +2557,8 @@
     if (mod) return;
     if (e.key === 'Enter' && state.transform) { e.preventDefault(); commitTransform(); return; }
     if (e.key === 'Escape' && state.transform) { e.preventDefault(); cancelTransform(); return; }
+    if (e.key === 'Enter' && state.distort) { e.preventDefault(); commitDistort(); return; }
+    if (e.key === 'Escape' && state.distort) { e.preventDefault(); cancelDistort(); return; }
     if (e.key === 'Enter' && state.floating) { commitFloating(); return; }
     if (e.key === 'Escape') { state.floating = null; state.selection = null; composite(); return; }
     if (e.key >= '1' && e.key <= '9') {
@@ -4247,7 +4279,7 @@
   function applyZoomTransform() {
     const stage = canvas.parentElement;
     if (!stage) return;
-    canvas.style.transform = `translate(${state.panX}px, ${state.panY}px) scale(${state.zoom})`;
+    canvas.style.transform = `translate(${state.panX}px, ${state.panY}px) scale(${state.zoom}) rotate(${state.viewRotation}deg)`;
     canvas.style.transformOrigin = 'center';
     $('btn-zoom-reset').textContent = Math.round(state.zoom * 100) + '%';
     renderGrid();
@@ -5896,6 +5928,360 @@
   }
   function clearNotes() { state.notes = []; composite(); }
 
+  /* =====================================================================
+     Round 9 — 10 unique Photoshop features:
+     Distort transform · Rotate View · New Guide Layout · Slice tool ·
+     Mixer Brush · Fill Layers · Stamp Visible · Color Swatches ·
+     Elliptical Marquee · Single-row/column Marquee
+     ===================================================================== */
+
+  // ---- 1. Distort transform — free-corner perspective warp ----
+  function affineFromTriangles(s0, s1, s2, d0, d1, d2) {
+    const x0 = s0.x, y0 = s0.y, x1 = s1.x, y1 = s1.y, x2 = s2.x, y2 = s2.y;
+    const det = x0 * (y1 - y2) - x1 * (y0 - y2) + x2 * (y0 - y1);
+    if (!det) return null;
+    return [
+      (d0.x * (y1 - y2) - d1.x * (y0 - y2) + d2.x * (y0 - y1)) / det,
+      (d0.y * (y1 - y2) - d1.y * (y0 - y2) + d2.y * (y0 - y1)) / det,
+      (x0 * (d1.x - d2.x) - x1 * (d0.x - d2.x) + x2 * (d0.x - d1.x)) / det,
+      (x0 * (d1.y - d2.y) - x1 * (d0.y - d2.y) + x2 * (d0.y - d1.y)) / det,
+      (x0 * (y1 * d2.x - y2 * d1.x) - x1 * (y0 * d2.x - y2 * d0.x) + x2 * (y0 * d1.x - y1 * d0.x)) / det,
+      (x0 * (y1 * d2.y - y2 * d1.y) - x1 * (y0 * d2.y - y2 * d0.y) + x2 * (y0 * d1.y - y1 * d0.y)) / det
+    ];
+  }
+  function drawTri(src, dctx, s0, s1, s2, d0, d1, d2) {
+    const m = affineFromTriangles(s0, s1, s2, d0, d1, d2);
+    if (!m) return;
+    dctx.save();
+    dctx.beginPath();
+    dctx.moveTo(d0.x, d0.y); dctx.lineTo(d1.x, d1.y); dctx.lineTo(d2.x, d2.y); dctx.closePath();
+    dctx.clip();
+    dctx.setTransform(m[0], m[1], m[2], m[3], m[4], m[5]);
+    dctx.drawImage(src, 0, 0);
+    dctx.restore();
+  }
+  // Warp src canvas through a destination quad cn=[TL,TR,BR,BL] via an N×N mesh.
+  function warpQuad(src, dctx, cn) {
+    const N = 16;
+    const lerp = (p, q, t) => ({ x: p.x + (q.x - p.x) * t, y: p.y + (q.y - p.y) * t });
+    const destAt = (u, v) => lerp(lerp(cn[0], cn[1], u), lerp(cn[3], cn[2], u), v);
+    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+      const u0 = i / N, u1 = (i + 1) / N, v0 = j / N, v1 = (j + 1) / N;
+      const s00 = { x: u0 * W, y: v0 * H }, s10 = { x: u1 * W, y: v0 * H };
+      const s11 = { x: u1 * W, y: v1 * H }, s01 = { x: u0 * W, y: v1 * H };
+      const d00 = destAt(u0, v0), d10 = destAt(u1, v0), d11 = destAt(u1, v1), d01 = destAt(u0, v1);
+      drawTri(src, dctx, s00, s10, s11, d00, d10, d11);
+      drawTri(src, dctx, s00, s11, s01, d00, d11, d01);
+    }
+  }
+  function startDistort() {
+    if (state.distort) return;
+    const L = activeLayer(); if (!L) return;
+    pushUndo();
+    const oc = window.document.createElement('canvas');
+    oc.width = W; oc.height = H;
+    oc.getContext('2d').drawImage(L.canvas, 0, 0);
+    state.distort = { oc, corners: [{ x: 0, y: 0 }, { x: W, y: 0 }, { x: W, y: H }, { x: 0, y: H }], drag: -1 };
+    ctx.clearRect(0, 0, W, H);
+    composite();
+  }
+  function commitDistort() {
+    const t = state.distort; if (!t) return;
+    state.distort = null;
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.clearRect(0, 0, W, H);
+    warpQuad(t.oc, ctx, t.corners);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.restore();
+    composite();
+    scheduleAutosave();
+  }
+  function cancelDistort() {
+    const t = state.distort; if (!t) return;
+    state.distort = null;
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    ctx.drawImage(t.oc, 0, 0);
+    ctx.restore();
+    const d = activeDoc();
+    if (d && d.undoStack.length) { d.undoStack.pop(); updateUndoButtons(); }
+    composite();
+  }
+  function distortTool() { setTool('distort'); }
+  function drawDistortOverlay() {
+    const t = state.distort; if (!t) return;
+    warpQuad(t.oc, displayCtx, t.corners);
+    displayCtx.save();
+    displayCtx.setTransform(1, 0, 0, 1, 0, 0);
+    displayCtx.globalAlpha = 1;
+    displayCtx.globalCompositeOperation = 'source-over';
+    displayCtx.strokeStyle = '#0a84ff';
+    displayCtx.lineWidth = 1.5 / state.zoom;
+    displayCtx.beginPath();
+    displayCtx.moveTo(t.corners[0].x, t.corners[0].y);
+    for (let i = 1; i < 4; i++) displayCtx.lineTo(t.corners[i].x, t.corners[i].y);
+    displayCtx.closePath();
+    displayCtx.stroke();
+    const hs = 4.5 / state.zoom;
+    displayCtx.fillStyle = '#ffffff';
+    for (const c of t.corners) {
+      displayCtx.fillRect(c.x - hs, c.y - hs, hs * 2, hs * 2);
+      displayCtx.strokeRect(c.x - hs, c.y - hs, hs * 2, hs * 2);
+    }
+    displayCtx.restore();
+  }
+  Tools.distort = {
+    down(p) {
+      const t = state.distort; if (!t) return;
+      const hr = 12 / state.zoom;
+      let best = -1, bd = hr * hr;
+      t.corners.forEach((c, i) => {
+        const dd = (c.x - p.x) ** 2 + (c.y - p.y) ** 2;
+        if (dd <= bd) { bd = dd; best = i; }
+      });
+      t.drag = best;
+    },
+    move(p) {
+      const t = state.distort; if (!t || t.drag < 0) return;
+      t.corners[t.drag] = { x: p.x, y: p.y };
+    },
+    up() { const t = state.distort; if (t) t.drag = -1; }
+  };
+
+  // ---- 2. Rotate View — rotate the canvas display ----
+  function rotateView(delta) {
+    state.viewRotation = ((state.viewRotation + delta) % 360 + 360) % 360;
+    applyZoomTransform();
+  }
+  function rotateViewCW() { rotateView(15); }
+  function rotateViewCCW() { rotateView(-15); }
+  function resetViewRotation() { state.viewRotation = 0; applyZoomTransform(); }
+
+  // ---- 3. New Guide Layout — a grid of evenly-spaced guides ----
+  async function newGuideLayout() {
+    const html = `
+      <label>Columns: <input id="ngl-c" type="number" value="3" min="0" max="50" style="width:60px"></label><br>
+      <label>Rows: <input id="ngl-r" type="number" value="3" min="0" max="50" style="width:60px"></label>`;
+    const ok = await showModal('New Guide Layout', html);
+    if (!ok) return;
+    const cols = Math.max(0, Math.min(50, +$('ngl-c').value | 0));
+    const rows = Math.max(0, Math.min(50, +$('ngl-r').value | 0));
+    for (let i = 1; i < cols; i++) state.guides.push({ axis: 'v', pos: Math.round(i / cols * W) });
+    for (let i = 1; i < rows; i++) state.guides.push({ axis: 'h', pos: Math.round(i / rows * H) });
+    state.showGuides = true;
+    composite();
+  }
+
+  // ---- 4. Slice tool — define + export rectangular slices ----
+  Tools.slice = {
+    down(p) { state.sliceDrag = { x0: p.x, y0: p.y, x1: p.x, y1: p.y }; },
+    move(p) { if (state.sliceDrag) { state.sliceDrag.x1 = p.x; state.sliceDrag.y1 = p.y; } },
+    up(p) {
+      const s = state.sliceDrag;
+      state.sliceDrag = null;
+      if (!s) return;
+      const x = Math.min(s.x0, p.x), y = Math.min(s.y0, p.y);
+      const w = Math.abs(p.x - s.x0), h = Math.abs(p.y - s.y0);
+      if (w >= 3 && h >= 3) state.slices.push({ x, y, w, h });
+      composite();
+    }
+  };
+  function drawSlices() {
+    if (!state.slices.length && !state.sliceDrag) return;
+    displayCtx.save();
+    displayCtx.globalAlpha = 1;
+    displayCtx.globalCompositeOperation = 'source-over';
+    displayCtx.lineWidth = 1;
+    displayCtx.font = '10px sans-serif';
+    state.slices.forEach((s, i) => {
+      displayCtx.strokeStyle = '#00c2ff';
+      displayCtx.strokeRect(s.x + 0.5, s.y + 0.5, s.w, s.h);
+      displayCtx.fillStyle = '#00c2ff';
+      displayCtx.fillRect(s.x, s.y, 16, 12);
+      displayCtx.fillStyle = '#000';
+      displayCtx.fillText(String(i + 1), s.x + 3, s.y + 10);
+    });
+    if (state.sliceDrag) {
+      const s = state.sliceDrag;
+      displayCtx.strokeStyle = '#00c2ff';
+      displayCtx.setLineDash([4, 4]);
+      displayCtx.strokeRect(Math.min(s.x0, s.x1) + 0.5, Math.min(s.y0, s.y1) + 0.5,
+        Math.abs(s.x1 - s.x0), Math.abs(s.y1 - s.y0));
+      displayCtx.setLineDash([]);
+    }
+    displayCtx.restore();
+  }
+  function clearSlices() { state.slices = []; composite(); }
+  function exportSlices() {
+    if (!state.slices.length) { alert('Draw slices with the Slice tool first.'); return; }
+    const flat = flattenLayers(activeDoc().layers);
+    state.slices.forEach((s, i) => {
+      const c = window.document.createElement('canvas');
+      c.width = Math.max(1, s.w); c.height = Math.max(1, s.h);
+      c.getContext('2d').drawImage(flat, -s.x, -s.y);
+      c.toBlob((blob) => { if (blob) IO.triggerDownload(blob, `slice-${i + 1}.png`); }, 'image/png');
+    });
+  }
+
+  // ---- 5. Mixer Brush — blends the carried colour with the canvas ----
+  function mixerDab(p) {
+    const r = Math.max(3, state.size);
+    const x0 = Math.max(0, p.x - r | 0), y0 = Math.max(0, p.y - r | 0);
+    const w = Math.min(W - x0, r * 2 | 0), h = Math.min(H - y0, r * 2 | 0);
+    if (w <= 0 || h <= 0) return;
+    const d = ctx.getImageData(x0, y0, w, h).data;
+    let sr = 0, sg = 0, sb = 0, n = 0;
+    for (let i = 0; i < d.length; i += 4) { sr += d[i]; sg += d[i + 1]; sb += d[i + 2]; n++; }
+    sr /= n; sg /= n; sb /= n;
+    const load = state.mixLoad || parseColor(state.primary);
+    const pr = load[0] * 0.5 + sr * 0.5, pg = load[1] * 0.5 + sg * 0.5, pb = load[2] * 0.5 + sb * 0.5;
+    state.mixLoad = [load[0] * 0.7 + sr * 0.3, load[1] * 0.7 + sg * 0.3, load[2] * 0.7 + sb * 0.3];
+    ctx.save();
+    ctx.globalAlpha = 0.6 * state.opacity;
+    ctx.fillStyle = `rgb(${pr | 0},${pg | 0},${pb | 0})`;
+    ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+  Tools.mixerBrush = {
+    down(p) { state.mixLoad = parseColor(state.primary); mixerDab(p); },
+    move(p) {
+      const lx = state.lastX, ly = state.lastY;
+      const dx = p.x - lx, dy = p.y - ly, dist = Math.hypot(dx, dy);
+      const n = Math.max(1, Math.ceil(dist / Math.max(2, state.size * 0.5)));
+      for (let i = 1; i <= n; i++) { const f = i / n; mixerDab({ x: lx + dx * f, y: ly + dy * f }); }
+    }
+  };
+
+  // ---- 6. Fill Layers — re-editable solid-colour layers ----
+  async function addFillLayer() {
+    const html = `<label>Fill colour: <input id="fl-new" type="color" value="${state.primary}"></label>`;
+    const ok = await showModal('New Fill Layer', html);
+    if (!ok) return;
+    const doc = activeDoc(); if (!doc) return;
+    const L = createLayer('Colour Fill', W, H);
+    L.kind = 'fill';
+    L.fillColor = $('fl-new').value;
+    L.ctx.fillStyle = L.fillColor;
+    L.ctx.fillRect(0, 0, W, H);
+    doc.layers.push(L);
+    doc.activeIdx = doc.layers.length - 1;
+    setActiveLayer(doc.activeIdx);
+    refreshLayers();
+    composite();
+  }
+  async function editFillLayer() {
+    const L = activeLayer();
+    if (!L || L.kind !== 'fill') { alert('Select a Fill Layer first.'); return; }
+    const html = `<label>Fill colour: <input id="fl-ed" type="color" value="${L.fillColor || '#000000'}"></label>`;
+    const ok = await showModal('Edit Fill Layer', html);
+    if (!ok) return;
+    L.fillColor = $('fl-ed').value;
+    L.ctx.clearRect(0, 0, W, H);
+    L.ctx.fillStyle = L.fillColor;
+    L.ctx.fillRect(0, 0, W, H);
+    composite();
+  }
+
+  // ---- 7. Stamp Visible — merge visible layers into a NEW layer ----
+  function stampVisible() {
+    const doc = activeDoc(); if (!doc) return;
+    const vis = doc.layers.filter(l => l.visible);
+    if (!vis.length) return;
+    const flat = flattenLayers(vis);
+    const L = createLayer('Stamp', W, H);
+    L.ctx.drawImage(flat, 0, 0);
+    doc.layers.push(L);
+    doc.activeIdx = doc.layers.length - 1;
+    setActiveLayer(doc.activeIdx);
+    refreshLayers();
+    composite();
+  }
+
+  // ---- 8. Color Swatches — user-saved colour swatches ----
+  function saveSwatches() {
+    try { localStorage.setItem('retropaint:swatches', JSON.stringify(state.customSwatches)); }
+    catch (e) { /* ignore */ }
+  }
+  function renderSwatches() {
+    const box = $('custom-swatches'); if (!box) return;
+    box.innerHTML = '';
+    state.customSwatches.forEach((col, i) => {
+      const sw = window.document.createElement('div');
+      sw.className = 'swatch-cell';
+      sw.style.background = col;
+      sw.title = col + ' (right-click to remove)';
+      sw.addEventListener('click', () => setPrimary(col));
+      sw.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        state.customSwatches.splice(i, 1);
+        saveSwatches(); renderSwatches();
+      });
+      box.appendChild(sw);
+    });
+  }
+  function addSwatch() {
+    if (state.customSwatches.includes(state.primary)) return;
+    state.customSwatches.push(state.primary);
+    saveSwatches();
+    renderSwatches();
+  }
+  function loadSwatches() {
+    try { state.customSwatches = JSON.parse(localStorage.getItem('retropaint:swatches') || '[]'); }
+    catch (e) { state.customSwatches = []; }
+    renderSwatches();
+  }
+
+  // ---- 9. Elliptical Marquee ----
+  Tools.ellipseSelect = {
+    down(p) {
+      state.selection = { kind: 'ellipse', x: p.x, y: p.y, w: 0, h: 0 };
+      saveSnapshot();
+    },
+    move(p) {
+      const s = state.selection;
+      if (!s || s.kind !== 'ellipse') return;
+      s.w = p.x - s.x; s.h = p.y - s.y;
+      restoreSnapshot();
+      drawSelectionMarquee();
+    },
+    up(p) {
+      const s = state.selection;
+      if (!s || s.kind !== 'ellipse') return;
+      restoreSnapshot();
+      if (Math.abs(s.w) < 2 || Math.abs(s.h) < 2) { state.selection = null; return; }
+      const x = Math.min(s.x, s.x + s.w), y = Math.min(s.y, s.y + s.h);
+      const w = Math.abs(s.w), h = Math.abs(s.h);
+      const path = new Path2D();
+      path.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
+      state.selection = { kind: 'ellipse', x, y, w, h, path, bounds: { x, y, w, h } };
+      composite();
+    }
+  };
+
+  // ---- 10. Single-row / single-column Marquee ----
+  Tools.rowMarquee = {
+    down(p) {
+      state.selection = { x: 0, y: Math.max(0, Math.min(H - 1, p.y)), w: W, h: 1 };
+      composite();
+    }
+  };
+  Tools.colMarquee = {
+    down(p) {
+      state.selection = { x: Math.max(0, Math.min(W - 1, p.x)), y: 0, w: 1, h: H };
+      composite();
+    }
+  };
+
+  (function initSwatches() {
+    const btn = $('add-swatch');
+    if (btn) btn.addEventListener('click', addSwatch);
+    loadSwatches();
+  })();
+
   // ---- GIF export from animation flipbook (via tiny encoder) ----
   // Minimal GIF89a encoder for 256-color frames using neuquant-like
   // simple median-cut; we use 64-color quantization for speed.
@@ -6933,12 +7319,14 @@
     applyChannelView();
     drawGuides();
     if (state.transform) drawTransformOverlay();
+    if (state.distort) drawDistortOverlay();
     drawMeasureLine();
     drawPatchOverlay();
     drawCamOverlay();
     drawColorSamplers();
     drawSmartGuides();
     drawNotes();
+    drawSlices();
     displayCtx.restore();
     if (modeHasLayers(state.mode)) refreshLayersPanelSoon();
   };
@@ -8694,6 +9082,10 @@
     contentAwareScaleDialog, cropRatioDialog, straightenByMeasure,
     openChannelsPanel, openHistogramPanel,
     // Round 8 — Info panel, History Brush source, Smart Guides, Notes
-    openInfoPanel, setHistorySource, toggleSmartGuides, clearNotes
+    openInfoPanel, setHistorySource, toggleSmartGuides, clearNotes,
+    // Round 9 — Distort, Rotate View, Guide Layout, Slices, Fill Layers, Stamp
+    distortTool, rotateViewCW, rotateViewCCW, resetViewRotation,
+    newGuideLayout, exportSlices, clearSlices,
+    addFillLayer, editFillLayer, stampVisible
   };
 })();
