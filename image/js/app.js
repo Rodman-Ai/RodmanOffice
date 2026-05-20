@@ -230,7 +230,13 @@
     guideDrag: null,        // guide being dragged
     cropAspect: 0,          // crop aspect ratio (0 = free)
     channelView: null,      // 'r'|'g'|'b'|'a' channel isolation, or null
-    measureLine: null       // { x0, y0, x1, y1 } measure tool line
+    measureLine: null,      // { x0, y0, x1, y1 } measure tool line
+    gradientStyle: 'linear', // linear|radial|angle|reflected|diamond
+    colorSamples: [],       // [{ x, y }] persistent colour samplers
+    historySource: null,    // canvas snapshot for the History Brush
+    notes: [],              // [{ x, y, text }] annotation notes
+    smartGuides: [],         // active dynamic alignment guides
+    smartGuidesOn: true
   };
 
   const MAX_UNDO = 16;
@@ -1073,12 +1079,8 @@
       move(p) {
         restoreSnapshot();
         const e = state.shift ? snapTo45(state.startX, state.startY, p.x, p.y) : p;
-        const g = ctx.createLinearGradient(state.startX, state.startY, e.x, e.y);
-        for (const [pos, color] of gradientStops(state.activeGradient)) {
-          g.addColorStop(pos, color);
-        }
-        ctx.fillStyle = g;
-        ctx.fillRect(0, 0, W, H);
+        paintGradient(ctx, state.startX, state.startY, e.x, e.y,
+          state.gradientStyle, gradientStops(state.activeGradient));
       }
     },
     smudge: {
@@ -5041,6 +5043,8 @@
         t.ty = t.drag.startTy + (p.y - t.drag.startP.y);
         t.tx = snapG(cx + t.tx, 'v') - cx;
         t.ty = snapG(cy + t.ty, 'h') - cy;
+        const snap = computeSmartGuides(transformBBox(), true);
+        t.tx += snap.dx; t.ty += snap.dy;
       } else if (t.drag.mode === 'rotate') {
         const a = Math.atan2(p.y - (cy + t.ty), p.x - (cx + t.tx));
         t.rot = t.drag.startRot + (a - t.drag.startA);
@@ -5055,8 +5059,13 @@
         if (state.shift && t.drag.ax === 'both') { const m = Math.max(nsx, nsy); nsx = nsy = m; }
         t.sx = nsx; t.sy = nsy;
       }
+      if (t.drag.mode !== 'move') computeSmartGuides(transformBBox(), false);
     },
-    up() { const t = state.transform; if (t) t.drag = null; }
+    up() {
+      const t = state.transform;
+      if (t) t.drag = null;
+      state.smartGuides = [];
+    }
   };
 
   // ---- 2. Guides & Snapping ----
@@ -5568,6 +5577,324 @@
     state.measureLine = null;
     rotateArbitrary(-ang);
   }
+
+  /* =====================================================================
+     Round 8 — 7 unique Photoshop features:
+     Gradient styles · Content-Aware Move · Color Sampler + Info panel ·
+     History Brush · Pattern Stamp · Smart Guides · Notes
+     ===================================================================== */
+
+  // ---- 1. Gradient styles — linear / radial / angle / reflected / diamond ----
+  function lutFromStops(stops) {
+    const s = stops.slice().sort((a, b) => a[0] - b[0]);
+    const lut = new Array(256);
+    for (let i = 0; i < 256; i++) {
+      const t = i / 255;
+      let a = s[0], b = s[s.length - 1];
+      for (let k = 0; k < s.length - 1; k++) {
+        if (s[k][0] <= t && s[k + 1][0] >= t) { a = s[k]; b = s[k + 1]; break; }
+      }
+      const span = (b[0] - a[0]) || 1, f = (t - a[0]) / span;
+      const ca = parseColor(a[1]), cb = parseColor(b[1]);
+      lut[i] = [ca[0] + (cb[0] - ca[0]) * f, ca[1] + (cb[1] - ca[1]) * f,
+        ca[2] + (cb[2] - ca[2]) * f];
+    }
+    return lut;
+  }
+  function paintGradient(c, x0, y0, x1, y1, style, stops) {
+    const dist = Math.hypot(x1 - x0, y1 - y0) || 1;
+    if (style === 'radial') {
+      const g = c.createRadialGradient(x0, y0, 0, x0, y0, dist);
+      for (const [pos, col] of stops) g.addColorStop(pos, col);
+      c.fillStyle = g; c.fillRect(0, 0, W, H);
+    } else if (style === 'angle' && c.createConicGradient) {
+      const g = c.createConicGradient(Math.atan2(y1 - y0, x1 - x0), x0, y0);
+      for (const [pos, col] of stops) g.addColorStop(pos, col);
+      c.fillStyle = g; c.fillRect(0, 0, W, H);
+    } else if (style === 'reflected') {
+      const g = c.createLinearGradient(x0, y0, x1, y1);
+      for (const [pos, col] of stops) {
+        g.addColorStop(0.5 + pos / 2, col);
+        g.addColorStop(Math.max(0, 0.5 - pos / 2), col);
+      }
+      c.fillStyle = g; c.fillRect(0, 0, W, H);
+    } else if (style === 'diamond') {
+      const lut = lutFromStops(stops);
+      const img = c.getImageData(0, 0, W, H), d = img.data;
+      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+        const t = Math.min(1, (Math.abs(x - x0) + Math.abs(y - y0)) / dist);
+        const col = lut[Math.round(t * 255)];
+        const i = (y * W + x) * 4;
+        d[i] = col[0]; d[i + 1] = col[1]; d[i + 2] = col[2]; d[i + 3] = 255;
+      }
+      c.putImageData(img, 0, 0);
+    } else {
+      const g = c.createLinearGradient(x0, y0, x1, y1);
+      for (const [pos, col] of stops) g.addColorStop(pos, col);
+      c.fillStyle = g; c.fillRect(0, 0, W, H);
+    }
+  }
+
+  // ---- 2. Content-Aware Move — relocate a selection, fill the hole ----
+  let camDrag = null;
+  Tools.contentAwareMove = {
+    down(p) {
+      const r = selectionRect();
+      if (!r) { alert('Make a selection to move first.'); return; }
+      if (p.x < r.x || p.x >= r.x + r.w || p.y < r.y || p.y >= r.y + r.h) return;
+      camDrag = { sx: p.x, sy: p.y, dx: 0, dy: 0, rect: r };
+    },
+    move(p) {
+      if (!camDrag) return;
+      camDrag.dx = p.x - camDrag.sx;
+      camDrag.dy = p.y - camDrag.sy;
+    },
+    up(p) {
+      if (!camDrag) return;
+      const cd = camDrag;
+      camDrag = null;
+      if (Math.abs(cd.dx) < 2 && Math.abs(cd.dy) < 2) { composite(); return; }
+      const grabbed = ctx.getImageData(cd.rect.x, cd.rect.y, cd.rect.w, cd.rect.h);
+      contentAwareFill();                       // fills the original rect (pushUndo inside)
+      const nx = Math.max(0, Math.min(W - cd.rect.w, cd.rect.x + cd.dx));
+      const ny = Math.max(0, Math.min(H - cd.rect.h, cd.rect.y + cd.dy));
+      const tmp = window.document.createElement('canvas');
+      tmp.width = cd.rect.w; tmp.height = cd.rect.h;
+      tmp.getContext('2d').putImageData(grabbed, 0, 0);
+      ctx.drawImage(tmp, nx, ny);
+      state.selection = { x: nx, y: ny, w: cd.rect.w, h: cd.rect.h };
+      composite();
+      scheduleAutosave();
+    }
+  };
+  function drawCamOverlay() {
+    if (!camDrag) return;
+    const r = camDrag.rect;
+    displayCtx.save();
+    displayCtx.globalAlpha = 1;
+    displayCtx.globalCompositeOperation = 'source-over';
+    displayCtx.setLineDash([4, 4]);
+    displayCtx.strokeStyle = '#34c759';
+    displayCtx.lineWidth = 1;
+    displayCtx.strokeRect(r.x + camDrag.dx + 0.5, r.y + camDrag.dy + 0.5, r.w, r.h);
+    displayCtx.restore();
+  }
+
+  // ---- 3. Color Sampler tool + Info panel ----
+  Tools.colorSampler = {
+    down(p) {
+      const hit = state.colorSamples.findIndex(s =>
+        Math.abs(s.x - p.x) <= 6 && Math.abs(s.y - p.y) <= 6);
+      if (hit >= 0) { state.colorSamples.splice(hit, 1); composite(); return; }
+      if (state.colorSamples.length >= 8) { alert('Maximum 8 colour samplers.'); return; }
+      state.colorSamples.push({ x: p.x, y: p.y });
+      composite();
+    }
+  };
+  function drawColorSamplers() {
+    if (!state.colorSamples.length) return;
+    displayCtx.save();
+    displayCtx.globalAlpha = 1;
+    displayCtx.globalCompositeOperation = 'source-over';
+    displayCtx.lineWidth = 1;
+    displayCtx.font = '9px sans-serif';
+    state.colorSamples.forEach((s, i) => {
+      displayCtx.strokeStyle = '#000';
+      displayCtx.beginPath();
+      displayCtx.moveTo(s.x - 6, s.y + 0.5); displayCtx.lineTo(s.x + 7, s.y + 0.5);
+      displayCtx.moveTo(s.x + 0.5, s.y - 6); displayCtx.lineTo(s.x + 0.5, s.y + 7);
+      displayCtx.stroke();
+      displayCtx.strokeStyle = '#fff';
+      displayCtx.strokeRect(s.x - 4.5, s.y - 4.5, 9, 9);
+      displayCtx.fillStyle = '#fff';
+      displayCtx.fillText(String(i + 1), s.x + 6, s.y - 4);
+    });
+    displayCtx.restore();
+  }
+  function fmtSample(d) {
+    if (!d) return '—';
+    const hex = '#' + [d[0], d[1], d[2]].map(v => v.toString(16).padStart(2, '0')).join('');
+    return `R ${d[0]}  G ${d[1]}  B ${d[2]}  ${hex}`;
+  }
+  let infoPanel_ = null;
+  function openInfoPanel() {
+    if (infoPanel_) { infoPanel_.remove(); infoPanel_ = null; return; }
+    infoPanel_ = window.document.createElement('div');
+    infoPanel_.className = 'info-panel';
+    window.document.body.appendChild(infoPanel_);
+    const sample = (x, y) => {
+      if (x < 0 || y < 0 || x >= W || y >= H) return null;
+      try { return displayCtx.getImageData(x, y, 1, 1).data; } catch (e) { return null; }
+    };
+    function paint() {
+      if (!infoPanel_) return;
+      let html = `<div class="info-row"><b>Cursor</b> ${fmtSample(sample(state.lastX, state.lastY))}</div>`;
+      state.colorSamples.forEach((s, i) => {
+        html += `<div class="info-row"><b>#${i + 1}</b> ${fmtSample(sample(s.x, s.y))}</div>`;
+      });
+      if (!state.colorSamples.length) {
+        html += `<div class="info-row" style="opacity:.6">Click with the Color Sampler tool to add points.</div>`;
+      }
+      infoPanel_.innerHTML = html;
+      setTimeout(paint, 200);
+    }
+    paint();
+  }
+
+  // ---- 4. History Brush — paint pixels back from a captured state ----
+  function setHistorySource() {
+    const c = window.document.createElement('canvas');
+    c.width = W; c.height = H;
+    c.getContext('2d').drawImage(activeLayer().canvas, 0, 0);
+    state.historySource = c;
+    alert(`History Brush source captured (${W}×${H}).`);
+  }
+  function historyStamp(p) {
+    const src = state.historySource;
+    if (!src || src.width !== W || src.height !== H) return;
+    const r = Math.max(3, state.size);
+    ctx.save();
+    ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.clip();
+    ctx.drawImage(src, 0, 0);
+    ctx.restore();
+  }
+  Tools.historyBrush = {
+    down(p) {
+      if (!state.historySource) { alert('Edit ▸ Set History Brush Source first.'); return; }
+      if (state.historySource.width !== W || state.historySource.height !== H) {
+        alert('The History Brush source was captured at a different size.'); return;
+      }
+      historyStamp(p);
+    },
+    move(p) { if (state.historySource) historyStamp(p); }
+  };
+
+  // ---- 5. Pattern Stamp — paint the defined pattern along a stroke ----
+  function patternStamp(p) {
+    const r = Math.max(3, state.size);
+    const pat = ctx.createPattern(state.definedPattern, 'repeat');
+    if (!pat) return;
+    ctx.save();
+    ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.clip();
+    ctx.fillStyle = pat;
+    ctx.fillRect(p.x - r, p.y - r, r * 2, r * 2);
+    ctx.restore();
+  }
+  Tools.patternStamp = {
+    down(p) {
+      if (!state.definedPattern) {
+        alert('Edit ▸ Define Pattern first (select a region, then Define Pattern).'); return;
+      }
+      patternStamp(p);
+    },
+    move(p) { if (state.definedPattern) patternStamp(p); }
+  };
+
+  // ---- 6. Smart Guides — dynamic alignment guides while transforming ----
+  function transformBBox() {
+    if (!state.transform) return null;
+    const c = [tApply(0, 0), tApply(W, 0), tApply(W, H), tApply(0, H)];
+    let minx = Infinity, miny = Infinity, maxx = -Infinity, maxy = -Infinity;
+    for (const q of c) {
+      if (q.x < minx) minx = q.x;
+      if (q.y < miny) miny = q.y;
+      if (q.x > maxx) maxx = q.x;
+      if (q.y > maxy) maxy = q.y;
+    }
+    return { x: minx, y: miny, w: maxx - minx, h: maxy - miny };
+  }
+  function smartGuideTargets(axis) {
+    const max = axis === 'v' ? W : H;
+    const t = [0, max / 3, max / 2, 2 * max / 3, max];
+    for (const g of state.guides) if (g.axis === axis) t.push(g.pos);
+    return t;
+  }
+  function computeSmartGuides(bbox, snap) {
+    state.smartGuides = [];
+    if (!state.smartGuidesOn || !bbox) return { dx: 0, dy: 0 };
+    const T = 4;
+    const vx = [bbox.x, bbox.x + bbox.w / 2, bbox.x + bbox.w];
+    const hy = [bbox.y, bbox.y + bbox.h / 2, bbox.y + bbox.h];
+    let dx = 0, bvx = T + 1;
+    for (const cand of vx) for (const tg of smartGuideTargets('v')) {
+      const d = tg - cand;
+      if (Math.abs(d) <= T && Math.abs(d) < Math.abs(bvx)) bvx = d;
+    }
+    if (Math.abs(bvx) <= T) dx = bvx;
+    let dy = 0, bhy = T + 1;
+    for (const cand of hy) for (const tg of smartGuideTargets('h')) {
+      const d = tg - cand;
+      if (Math.abs(d) <= T && Math.abs(d) < Math.abs(bhy)) bhy = d;
+    }
+    if (Math.abs(bhy) <= T) dy = bhy;
+    const ox = snap ? dx : 0, oy = snap ? dy : 0;
+    for (const cand of vx) for (const tg of smartGuideTargets('v')) {
+      if (Math.abs(tg - (cand + ox)) < 0.75) state.smartGuides.push({ axis: 'v', pos: tg });
+    }
+    for (const cand of hy) for (const tg of smartGuideTargets('h')) {
+      if (Math.abs(tg - (cand + oy)) < 0.75) state.smartGuides.push({ axis: 'h', pos: tg });
+    }
+    return { dx, dy };
+  }
+  function drawSmartGuides() {
+    if (!state.smartGuides || !state.smartGuides.length) return;
+    displayCtx.save();
+    displayCtx.globalAlpha = 1;
+    displayCtx.globalCompositeOperation = 'source-over';
+    displayCtx.strokeStyle = '#ff2bd6';
+    displayCtx.lineWidth = 1;
+    for (const g of state.smartGuides) {
+      displayCtx.beginPath();
+      if (g.axis === 'v') { displayCtx.moveTo(g.pos + 0.5, 0); displayCtx.lineTo(g.pos + 0.5, H); }
+      else { displayCtx.moveTo(0, g.pos + 0.5); displayCtx.lineTo(W, g.pos + 0.5); }
+      displayCtx.stroke();
+    }
+    displayCtx.restore();
+  }
+  function toggleSmartGuides() {
+    state.smartGuidesOn = !state.smartGuidesOn;
+    if (!state.smartGuidesOn) state.smartGuides = [];
+    composite();
+    alert('Smart Guides: ' + (state.smartGuidesOn ? 'ON' : 'OFF'));
+  }
+
+  // ---- 7. Notes — annotation markers (overlay only, not exported) ----
+  Tools.notes = {
+    down(p) {
+      const hit = state.notes.findIndex(n =>
+        p.x >= n.x && p.x <= n.x + 16 && p.y >= n.y - 13 && p.y <= n.y + 3);
+      if (hit >= 0) {
+        const t = prompt('Edit note (empty to delete):', state.notes[hit].text);
+        if (t === null) return;
+        if (t.trim() === '') state.notes.splice(hit, 1);
+        else state.notes[hit].text = t;
+        composite();
+        return;
+      }
+      const t = prompt('Note text:');
+      if (t === null || t.trim() === '') return;
+      state.notes.push({ x: p.x, y: p.y, text: t });
+      composite();
+    }
+  };
+  function drawNotes() {
+    if (!state.notes.length) return;
+    displayCtx.save();
+    displayCtx.globalAlpha = 1;
+    displayCtx.globalCompositeOperation = 'source-over';
+    displayCtx.font = '9px sans-serif';
+    state.notes.forEach((n, i) => {
+      displayCtx.fillStyle = '#ffd60a';
+      displayCtx.fillRect(n.x, n.y - 12, 15, 13);
+      displayCtx.strokeStyle = '#000';
+      displayCtx.lineWidth = 1;
+      displayCtx.strokeRect(n.x + 0.5, n.y - 11.5, 15, 13);
+      displayCtx.fillStyle = '#000';
+      displayCtx.fillText(String(i + 1), n.x + 4, n.y - 2);
+    });
+    displayCtx.restore();
+  }
+  function clearNotes() { state.notes = []; composite(); }
 
   // ---- GIF export from animation flipbook (via tiny encoder) ----
   // Minimal GIF89a encoder for 256-color frames using neuquant-like
@@ -6608,6 +6935,10 @@
     if (state.transform) drawTransformOverlay();
     drawMeasureLine();
     drawPatchOverlay();
+    drawCamOverlay();
+    drawColorSamplers();
+    drawSmartGuides();
+    drawNotes();
     displayCtx.restore();
     if (modeHasLayers(state.mode)) refreshLayersPanelSoon();
   };
@@ -8277,7 +8608,15 @@
   // A categorised gallery of all 50 gradient presets; clicking a cell
   // sets the active gradient, activates the gradient tool, closes the modal.
   function openGradientPicker() {
-    let html = '<div style="max-height:60vh;overflow:auto">';
+    let html = '<div style="display:flex;gap:4px;margin-bottom:6px">';
+    for (const [id, label] of [['linear', 'Linear'], ['radial', 'Radial'],
+      ['angle', 'Angle'], ['reflected', 'Reflected'], ['diamond', 'Diamond']]) {
+      const on = id === state.gradientStyle;
+      html += `<button type="button" class="gstyle-btn" data-gstyle="${id}" ` +
+        `style="flex:1;padding:4px 2px;font-size:10px;cursor:pointer;border:1px solid #999;` +
+        `border-radius:3px;background:${on ? '#2b6cb0' : '#fff'};color:${on ? '#fff' : '#000'}">${label}</button>`;
+    }
+    html += '</div><div style="max-height:54vh;overflow:auto">';
     for (const cat of GRADIENT_CATS) {
       html += `<div style="font-weight:bold;margin:8px 2px 4px;opacity:0.8">${cat}</div>`;
       html += '<div style="display:flex;flex-wrap:wrap;gap:6px">';
@@ -8299,6 +8638,16 @@
     body.querySelectorAll('canvas[data-gthumb]').forEach((cv) => {
       const tctx = cv.getContext('2d');
       drawGradientToCtx(tctx, cv.dataset.gthumb, { x: 0, y: 0, w: cv.width, h: cv.height });
+    });
+    body.querySelectorAll('.gstyle-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        state.gradientStyle = btn.dataset.gstyle;
+        body.querySelectorAll('.gstyle-btn').forEach((b) => {
+          const on = b.dataset.gstyle === state.gradientStyle;
+          b.style.background = on ? '#2b6cb0' : '#fff';
+          b.style.color = on ? '#fff' : '#000';
+        });
+      });
     });
     body.querySelectorAll('.gradient-cell').forEach((cell) => {
       cell.addEventListener('click', () => {
@@ -8343,6 +8692,8 @@
     newGuide, clearGuides, toggleGuides, toggleSnapGuides, toggleRulers,
     // Round 7 — Content-Aware Scale, Crop ratio, Channels, Histogram, Measure
     contentAwareScaleDialog, cropRatioDialog, straightenByMeasure,
-    openChannelsPanel, openHistogramPanel
+    openChannelsPanel, openHistogramPanel,
+    // Round 8 — Info panel, History Brush source, Smart Guides, Notes
+    openInfoPanel, setHistorySource, toggleSmartGuides, clearNotes
   };
 })();
