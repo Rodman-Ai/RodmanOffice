@@ -22,7 +22,7 @@ implemented from scratch under `/lib/`.
   /lib/docs/      DOCX, PDF, RTF, ODT, EPUB, MD, HTML, …
   /lib/sheets/    CSV, TSV, XLSX, JSON, NDJSON, YAML, vCard, iCal …
   /lib/slides/    PPTX read/write + the deckToHtml ↔ htmlToDeck bridge
-  /lib/diagrams/  VSDX read/write + 52-shape stencil library + SVG/PNG/PDF export
+  /lib/diagrams/  VSDX read/write + 132-shape stencil library + SVG/PNG/PDF export
   /lib/images/    Canvas encoders for ~25 image formats + PDF + PSD
   /lib/video/     FFmpeg.wasm wrapper for video / audio transcoding
   /lib/claude/    Anthropic API client used by every "Ask Claude" panel
