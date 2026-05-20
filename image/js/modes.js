@@ -548,6 +548,8 @@
       { id: 'smudge', label: 'Smudge',  icon: '👆' },
       { id: 'clone',  label: 'Clone',   icon: '🖼️', shortcut: 's' },
       { id: 'heal',   label: 'Heal',    icon: '🩹', shortcut: 'j' },
+      { id: 'patch',  label: 'Patch',   icon: '◳' },
+      { id: 'redEye', label: 'Red Eye', icon: '👁' },
       { id: 'dodge',  label: 'Dodge',   icon: '☼', shortcut: 'o' },
       { id: 'burn',   label: 'Burn',    icon: '☾' },
       { id: 'penTool', label: 'Pen',    icon: '✒️', shortcut: 'p' },
@@ -558,7 +560,8 @@
       { id: 'ellipse', label: 'Oval',   icon: '◯' },
       { id: 'ellipseFill', label: 'Oval•', icon: '⬤' },
       { id: 'customShape', label: 'Shape', icon: '⬟' },
-      { id: 'transform', label: 'Transform', icon: '⤢', shortcut: 'k' }
+      { id: 'transform', label: 'Transform', icon: '⤢', shortcut: 'k' },
+      { id: 'measure', label: 'Measure', icon: '📏' }
     ],
     mspaint: [
       { id: 'pencil', label: 'Pencil', icon: '✏️', shortcut: 'p' },

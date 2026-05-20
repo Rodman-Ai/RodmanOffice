@@ -227,7 +227,10 @@
     guides: [],             // [{ axis:'h'|'v', pos }]
     showGuides: true,
     snapGuides: true,
-    guideDrag: null         // guide being dragged
+    guideDrag: null,        // guide being dragged
+    cropAspect: 0,          // crop aspect ratio (0 = free)
+    channelView: null,      // 'r'|'g'|'b'|'a' channel isolation, or null
+    measureLine: null       // { x0, y0, x1, y1 } measure tool line
   };
 
   const MAX_UNDO = 16;
@@ -4613,12 +4616,23 @@
     return lut;
   }
   async function openLevels() {
+    const hist = computeHistogram();
     const html = `
+      <canvas id="lv-hist" width="256" height="80" style="background:#111;border:1px solid #000;display:block;margin-bottom:6px"></canvas>
       <label>Input black: <input id="lv-ib" type="range" min="0" max="255" value="0"></label><br>
       <label>Input white: <input id="lv-iw" type="range" min="0" max="255" value="255"></label><br>
       <label>Output black: <input id="lv-ob" type="range" min="0" max="255" value="0"></label><br>
       <label>Output white: <input id="lv-ow" type="range" min="0" max="255" value="255"></label>`;
-    const ok = await showModal('Levels', html);
+    const pr = showModal('Levels', html);
+    setTimeout(() => {
+      const hc = $('lv-hist');
+      if (hc) {
+        const cc = hc.getContext('2d');
+        cc.fillStyle = '#111'; cc.fillRect(0, 0, 256, 80);
+        drawHistogram(cc, 0, 0, 256, 80, hist);
+      }
+    }, 50);
+    const ok = await pr;
     if (!ok) return;
     const lut = levelsLUT(+$('lv-ib').value, +$('lv-iw').value, +$('lv-ob').value, +$('lv-ow').value);
     applyLUT(lut, lut, lut);
@@ -4803,34 +4817,76 @@
     }
   };
   // Crop tool — drag rect; on up, trim canvas to rect.
+  // Crop tool — drag a rect; aspect-ratio constraint, rule-of-thirds
+  // grid + darken-outside preview; on up, trim every layer to the rect.
+  function cropRect(ex, ey) {
+    let cex = ex, cey = ey;
+    if (state.cropAspect > 0) {
+      const w = Math.abs(ex - state.startX);
+      const h = w / state.cropAspect;
+      cey = state.startY + (ey >= state.startY ? h : -h);
+    }
+    return {
+      x: Math.round(Math.min(state.startX, cex)),
+      y: Math.round(Math.min(state.startY, cey)),
+      w: Math.round(Math.abs(cex - state.startX)),
+      h: Math.round(Math.abs(cey - state.startY))
+    };
+  }
   Tools.crop = {
     down(p) { saveSnapshot(); state.startX = p.x; state.startY = p.y; },
     move(p) {
       restoreSnapshot();
-      ctx.save(); ctx.strokeStyle = '#000'; ctx.setLineDash([4,4]);
-      ctx.strokeRect(state.startX + 0.5, state.startY + 0.5, p.x - state.startX, p.y - state.startY);
+      const r = cropRect(p.x, p.y);
+      ctx.save();
+      ctx.fillStyle = 'rgba(0,0,0,0.45)';
+      ctx.fillRect(0, 0, W, r.y);
+      ctx.fillRect(0, r.y + r.h, W, H - r.y - r.h);
+      ctx.fillRect(0, r.y, r.x, r.h);
+      ctx.fillRect(r.x + r.w, r.y, W - r.x - r.w, r.h);
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.setLineDash([4, 4]);
+      ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w, r.h);
+      ctx.setLineDash([]);
+      ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+      ctx.beginPath();
+      ctx.moveTo(r.x + r.w / 3, r.y); ctx.lineTo(r.x + r.w / 3, r.y + r.h);
+      ctx.moveTo(r.x + 2 * r.w / 3, r.y); ctx.lineTo(r.x + 2 * r.w / 3, r.y + r.h);
+      ctx.moveTo(r.x, r.y + r.h / 3); ctx.lineTo(r.x + r.w, r.y + r.h / 3);
+      ctx.moveTo(r.x, r.y + 2 * r.h / 3); ctx.lineTo(r.x + r.w, r.y + 2 * r.h / 3);
+      ctx.stroke();
       ctx.restore();
     },
     up(p) {
       restoreSnapshot();
-      const x = Math.min(state.startX, p.x), y = Math.min(state.startY, p.y);
-      const w = Math.abs(p.x - state.startX), h = Math.abs(p.y - state.startY);
-      if (w < 2 || h < 2) return;
+      const r = cropRect(p.x, p.y);
+      if (r.w < 2 || r.h < 2) return;
       pushUndo();
       const d = activeDoc();
-      // Crop every layer.
       for (const L of d.layers) {
-        const data = L.ctx.getImageData(x, y, w, h);
-        L.canvas.width = w; L.canvas.height = h;
+        const data = L.ctx.getImageData(r.x, r.y, r.w, r.h);
+        L.canvas.width = r.w; L.canvas.height = r.h;
         L.ctx.putImageData(data, 0, 0);
       }
-      d.width = w; d.height = h;
-      canvas.width = w; canvas.height = h;
-      W = w; H = h;
+      d.width = r.w; d.height = r.h;
+      canvas.width = r.w; canvas.height = r.h;
+      W = r.w; H = r.h;
       setActiveLayer(d.activeIdx);
       composite();
     }
   };
+  async function cropRatioDialog() {
+    const opts = [['Free', 0], ['1:1', 1], ['4:3', 4 / 3], ['3:2', 3 / 2],
+      ['16:9', 16 / 9], ['3:4', 3 / 4], ['9:16', 9 / 16]];
+    const html = opts.map(([label, v]) =>
+      `<label style="display:block;padding:3px"><input type="radio" name="car" value="${v}" ` +
+      `${Math.abs(v - state.cropAspect) < 1e-6 ? 'checked' : ''}> ${label}</label>`
+    ).join('');
+    const ok = await showModal('Crop Aspect Ratio', html);
+    if (!ok) return;
+    const sel = window.document.querySelector('input[name="car"]:checked');
+    state.cropAspect = sel ? +sel.value : 0;
+    setTool('crop');
+  }
 
   // Capture Alt key for clone-source mode.
   window.addEventListener('keydown', (e) => { if (e.altKey) state.altKey = true; });
@@ -5154,6 +5210,363 @@
     ctx.putImageData(img, 0, 0);
     composite();
     scheduleAutosave();
+  }
+
+  /* =====================================================================
+     Round 7 — 7 unique Photoshop features:
+     Patch tool · Red Eye · Content-Aware Scale · Crop overhaul ·
+     Channels panel · Histogram everywhere · Measure tool
+     ===================================================================== */
+
+  // ---- 1. Patch tool — drag a selection onto clean pixels to repair it ----
+  let patchDrag = null;
+  Tools.patch = {
+    down(p) {
+      const r = selectionRect();
+      if (!r) { alert('Make a selection (marquee or lasso) over the flaw first.'); return; }
+      if (p.x < r.x || p.x >= r.x + r.w || p.y < r.y || p.y >= r.y + r.h) return;
+      patchDrag = { sx: p.x, sy: p.y, dx: 0, dy: 0, rect: r };
+    },
+    move(p) {
+      if (!patchDrag) return;
+      patchDrag.dx = p.x - patchDrag.sx;
+      patchDrag.dy = p.y - patchDrag.sy;
+    },
+    up(p) {
+      if (!patchDrag) return;
+      const pd = patchDrag;
+      patchDrag = null;
+      if (Math.abs(pd.dx) < 2 && Math.abs(pd.dy) < 2) { composite(); return; }
+      applyPatch(pd.rect, pd.dx, pd.dy);
+    }
+  };
+  function applyPatch(rect, dx, dy) {
+    const w = rect.w, h = rect.h, sx = rect.x, sy = rect.y;
+    const dxx = Math.max(0, Math.min(W - w, sx + dx));
+    const dyy = Math.max(0, Math.min(H - h, sy + dy));
+    const dest = ctx.getImageData(dxx, dyy, w, h).data;
+    const out = ctx.getImageData(sx, sy, w, h);
+    const od = out.data;
+    let dr = 0, dg = 0, db = 0, sr = 0, sg = 0, sb = 0, n = 0;
+    for (let i = 0; i < od.length; i += 4) {
+      dr += dest[i]; dg += dest[i + 1]; db += dest[i + 2];
+      sr += od[i]; sg += od[i + 1]; sb += od[i + 2];
+      n++;
+    }
+    dr /= n; dg /= n; db /= n; sr /= n; sg /= n; sb /= n;
+    const feather = Math.max(1, Math.min(w, h) * 0.14);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      const e = Math.min(x, y, w - 1 - x, h - 1 - y);
+      const a = Math.min(1, e / feather);
+      od[i]     = od[i]     * (1 - a) + (dest[i]     - dr + sr) * a;
+      od[i + 1] = od[i + 1] * (1 - a) + (dest[i + 1] - dg + sg) * a;
+      od[i + 2] = od[i + 2] * (1 - a) + (dest[i + 2] - db + sb) * a;
+    }
+    ctx.putImageData(out, sx, sy);
+    composite();
+    scheduleAutosave();
+  }
+  function drawPatchOverlay() {
+    if (!patchDrag) return;
+    const r = patchDrag.rect;
+    displayCtx.save();
+    displayCtx.globalAlpha = 1;
+    displayCtx.globalCompositeOperation = 'source-over';
+    displayCtx.setLineDash([4, 4]);
+    displayCtx.strokeStyle = '#0a84ff';
+    displayCtx.lineWidth = 1;
+    displayCtx.strokeRect(r.x + patchDrag.dx + 0.5, r.y + patchDrag.dy + 0.5, r.w, r.h);
+    displayCtx.restore();
+  }
+
+  // ---- 2. Red Eye removal — click a red pupil to desaturate it ----
+  Tools.redEye = {
+    down(p) {
+      const r = Math.max(10, state.size * 3);
+      const x0 = Math.max(0, p.x - r), y0 = Math.max(0, p.y - r);
+      const w = Math.min(W - x0, r * 2), h = Math.min(H - y0, r * 2);
+      if (w <= 0 || h <= 0) return;
+      const img = ctx.getImageData(x0, y0, w, h);
+      const d = img.data;
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const ex = x0 + x - p.x, ey = y0 + y - p.y;
+        if (ex * ex + ey * ey > r * r) continue;
+        const i = (y * w + x) * 4;
+        const rr = d[i], gg = d[i + 1], bb = d[i + 2];
+        if (rr > gg * 1.4 && rr > bb * 1.4 && rr > 60) {
+          const v = (gg + bb) / 2 * 0.6;
+          d[i] = v;
+          d[i + 1] = Math.min(gg, v * 1.1);
+          d[i + 2] = Math.min(bb, v * 1.1);
+        }
+      }
+      ctx.putImageData(img, x0, y0);
+      composite();
+    }
+  };
+
+  // ---- 3. Content-Aware Scale — seam carving (shrink only) ----
+  async function contentAwareScaleDialog() {
+    const html = `
+      <label>New width: <input id="cas-w" type="number" value="${W}" min="16" max="${W}" style="width:70px"></label><br>
+      <label>New height: <input id="cas-h" type="number" value="${H}" min="16" max="${H}" style="width:70px"></label>
+      <div style="font-size:11px;opacity:0.72;margin-top:5px">Seam carving removes the lowest-detail seams, so important content keeps its proportions. Shrink only.</div>`;
+    const ok = await showModal('Content-Aware Scale', html);
+    if (!ok) return;
+    const nw = Math.max(16, Math.min(W, Math.round(+$('cas-w').value || W)));
+    const nh = Math.max(16, Math.min(H, Math.round(+$('cas-h').value || H)));
+    if (nw === W && nh === H) return;
+    contentAwareScale(nw, nh);
+  }
+  function casEnergy(w, h, layers) {
+    const luma = new Float32Array(w * h);
+    for (const L of layers) {
+      const d = L.data;
+      for (let i = 0, p = 0; i < d.length; i += 4, p++) {
+        const a = d[i + 3] / 255;
+        const y = d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114;
+        luma[p] = luma[p] * (1 - a) + y * a;
+      }
+    }
+    const energy = new Float32Array(w * h);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const xl = x > 0 ? x - 1 : x, xr = x < w - 1 ? x + 1 : x;
+      const yt = y > 0 ? y - 1 : y, yb = y < h - 1 ? y + 1 : y;
+      energy[y * w + x] = Math.abs(luma[y * w + xr] - luma[y * w + xl]) +
+                          Math.abs(luma[yb * w + x] - luma[yt * w + x]);
+    }
+    return energy;
+  }
+  function casTranspose(data, w, h) {
+    const out = new Uint8ClampedArray(data.length);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const si = (y * w + x) * 4, di = (x * h + y) * 4;
+      out[di] = data[si]; out[di + 1] = data[si + 1];
+      out[di + 2] = data[si + 2]; out[di + 3] = data[si + 3];
+    }
+    return out;
+  }
+  function contentAwareScale(nw, nh) {
+    const doc = activeDoc(); if (!doc) return;
+    let curW = W, curH = H;
+    let layers = doc.layers.map(L => ({ data: new Uint8ClampedArray(L.ctx.getImageData(0, 0, W, H).data) }));
+    function carveWidthTo(target) {
+      while (curW > target) {
+        const energy = casEnergy(curW, curH, layers);
+        const cost = new Float32Array(curW * curH);
+        for (let x = 0; x < curW; x++) cost[x] = energy[x];
+        for (let y = 1; y < curH; y++) {
+          for (let x = 0; x < curW; x++) {
+            let m = cost[(y - 1) * curW + x];
+            if (x > 0) m = Math.min(m, cost[(y - 1) * curW + x - 1]);
+            if (x < curW - 1) m = Math.min(m, cost[(y - 1) * curW + x + 1]);
+            cost[y * curW + x] = energy[y * curW + x] + m;
+          }
+        }
+        let minX = 0, minC = Infinity;
+        for (let x = 0; x < curW; x++) {
+          const c = cost[(curH - 1) * curW + x];
+          if (c < minC) { minC = c; minX = x; }
+        }
+        const seam = new Int32Array(curH);
+        seam[curH - 1] = minX;
+        for (let y = curH - 2; y >= 0; y--) {
+          let x = seam[y + 1], best = x, bc = cost[y * curW + x];
+          if (x > 0 && cost[y * curW + x - 1] < bc) { bc = cost[y * curW + x - 1]; best = x - 1; }
+          if (x < curW - 1 && cost[y * curW + x + 1] < bc) { best = x + 1; }
+          seam[y] = best;
+        }
+        for (const L of layers) {
+          const nd = new Uint8ClampedArray((curW - 1) * curH * 4);
+          for (let y = 0; y < curH; y++) {
+            let w = 0;
+            for (let x = 0; x < curW; x++) {
+              if (x === seam[y]) continue;
+              const si = (y * curW + x) * 4, di = (y * (curW - 1) + w) * 4;
+              nd[di] = L.data[si]; nd[di + 1] = L.data[si + 1];
+              nd[di + 2] = L.data[si + 2]; nd[di + 3] = L.data[si + 3];
+              w++;
+            }
+          }
+          L.data = nd;
+        }
+        curW--;
+      }
+    }
+    carveWidthTo(nw);
+    if (curH > nh) {
+      for (const L of layers) L.data = casTranspose(L.data, curW, curH);
+      const t = curW; curW = curH; curH = t;
+      carveWidthTo(nh);
+      for (const L of layers) L.data = casTranspose(L.data, curW, curH);
+      const t2 = curW; curW = curH; curH = t2;
+    }
+    for (let li = 0; li < doc.layers.length; li++) {
+      const L = doc.layers[li];
+      L.canvas.width = curW; L.canvas.height = curH;
+      L.ctx.putImageData(new ImageData(layers[li].data, curW, curH), 0, 0);
+    }
+    W = curW; H = curH;
+    doc.width = curW; doc.height = curH;
+    canvas.width = curW; canvas.height = curH;
+    doc.undoStack.length = 0; doc.redoStack.length = 0;
+    setActiveLayer(doc.activeIdx);
+    composite();
+    if (typeof applyZoomTransform === 'function') applyZoomTransform();
+    updateUndoButtons();
+    scheduleAutosave();
+  }
+
+  // ---- 5. Channels panel — view / isolate R G B A ----
+  let channelsPanel_ = null;
+  function openChannelsPanel() {
+    if (channelsPanel_) {
+      channelsPanel_.remove(); channelsPanel_ = null;
+      state.channelView = null; composite(); return;
+    }
+    const chans = [['rgb', 'RGB'], ['r', 'Red'], ['g', 'Green'], ['b', 'Blue'], ['a', 'Alpha']];
+    channelsPanel_ = window.document.createElement('div');
+    channelsPanel_.className = 'channels-panel';
+    channelsPanel_.innerHTML = chans.map(([k, label]) =>
+      `<button class="chan-row" data-chan="${k}" data-active="${k === 'rgb' ? 'true' : 'false'}">` +
+      `<canvas width="48" height="32" data-cv="${k}"></canvas><span>${label}</span></button>`
+    ).join('');
+    window.document.body.appendChild(channelsPanel_);
+    channelsPanel_.querySelectorAll('.chan-row').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const k = btn.dataset.chan;
+        state.channelView = (k === 'rgb') ? null : k;
+        channelsPanel_.querySelectorAll('.chan-row').forEach(b => {
+          b.dataset.active = (b.dataset.chan === k) ? 'true' : 'false';
+        });
+        composite();
+      });
+    });
+    function paintThumbs() {
+      if (!channelsPanel_) return;
+      const flat = flattenLayers(activeDoc().layers);
+      const fd = flat.getContext('2d').getImageData(0, 0, W, H).data;
+      for (const [k] of chans) {
+        const cv = channelsPanel_.querySelector(`canvas[data-cv="${k}"]`);
+        if (!cv) continue;
+        const tw = cv.width, th = cv.height;
+        const tctx = cv.getContext('2d');
+        const out = tctx.createImageData(tw, th);
+        for (let y = 0; y < th; y++) for (let x = 0; x < tw; x++) {
+          const sx = Math.min(W - 1, Math.floor(x / tw * W));
+          const sy = Math.min(H - 1, Math.floor(y / th * H));
+          const si = (sy * W + sx) * 4, di = (y * tw + x) * 4;
+          if (k === 'rgb') {
+            out.data[di] = fd[si]; out.data[di + 1] = fd[si + 1]; out.data[di + 2] = fd[si + 2];
+          } else {
+            const ch = k === 'r' ? fd[si] : k === 'g' ? fd[si + 1] : k === 'b' ? fd[si + 2] : fd[si + 3];
+            out.data[di] = out.data[di + 1] = out.data[di + 2] = ch;
+          }
+          out.data[di + 3] = 255;
+        }
+        tctx.putImageData(out, 0, 0);
+      }
+      setTimeout(paintThumbs, 700);
+    }
+    paintThumbs();
+  }
+  function applyChannelView() {
+    if (!state.channelView) return;
+    const k = state.channelView;
+    const img = displayCtx.getImageData(0, 0, W, H);
+    const d = img.data;
+    for (let i = 0; i < d.length; i += 4) {
+      const v = k === 'r' ? d[i] : k === 'g' ? d[i + 1] : k === 'b' ? d[i + 2] : d[i + 3];
+      d[i] = d[i + 1] = d[i + 2] = v;
+      d[i + 3] = 255;
+    }
+    displayCtx.putImageData(img, 0, 0);
+  }
+
+  // ---- 6. Histogram — shared helpers + a live panel ----
+  function computeHistogram() {
+    const d = displayCtx.getImageData(0, 0, W, H).data;
+    const r = new Uint32Array(256), g = new Uint32Array(256), b = new Uint32Array(256);
+    for (let i = 0; i < d.length; i += 4) { r[d[i]]++; g[d[i + 1]]++; b[d[i + 2]]++; }
+    return { r, g, b };
+  }
+  function drawHistogram(c, x, y, w, h, hist) {
+    const H_ = hist || computeHistogram();
+    let mx = 1;
+    for (let i = 0; i < 256; i++) {
+      if (H_.r[i] > mx) mx = H_.r[i];
+      if (H_.g[i] > mx) mx = H_.g[i];
+      if (H_.b[i] > mx) mx = H_.b[i];
+    }
+    c.save();
+    c.globalCompositeOperation = 'lighter';
+    const bw = w / 256;
+    for (let i = 0; i < 256; i++) {
+      const bx = x + i * bw;
+      c.fillStyle = '#e2453c';
+      c.fillRect(bx, y + h - (H_.r[i] / mx) * h, Math.max(1, bw), (H_.r[i] / mx) * h);
+      c.fillStyle = '#3fbf52';
+      c.fillRect(bx, y + h - (H_.g[i] / mx) * h, Math.max(1, bw), (H_.g[i] / mx) * h);
+      c.fillStyle = '#3f7fe0';
+      c.fillRect(bx, y + h - (H_.b[i] / mx) * h, Math.max(1, bw), (H_.b[i] / mx) * h);
+    }
+    c.restore();
+  }
+  let histogramPanel_ = null;
+  function openHistogramPanel() {
+    if (histogramPanel_) { histogramPanel_.remove(); histogramPanel_ = null; return; }
+    histogramPanel_ = window.document.createElement('div');
+    histogramPanel_.className = 'histogram-panel';
+    histogramPanel_.innerHTML = `<canvas width="160" height="100"></canvas>`;
+    window.document.body.appendChild(histogramPanel_);
+    function paint() {
+      if (!histogramPanel_) return;
+      const c = histogramPanel_.querySelector('canvas').getContext('2d');
+      c.fillStyle = '#111';
+      c.fillRect(0, 0, 160, 100);
+      drawHistogram(c, 0, 0, 160, 100);
+      setTimeout(paint, 350);
+    }
+    paint();
+  }
+
+  // ---- 7. Measure tool — distance + angle readout, straighten ----
+  Tools.measure = {
+    down(p) { state.measureLine = { x0: p.x, y0: p.y, x1: p.x, y1: p.y }; updateMeasureReadout(); },
+    move(p) { if (state.measureLine) { state.measureLine.x1 = p.x; state.measureLine.y1 = p.y; updateMeasureReadout(); } },
+    up(p) { if (state.measureLine) { state.measureLine.x1 = p.x; state.measureLine.y1 = p.y; updateMeasureReadout(); } }
+  };
+  function updateMeasureReadout() {
+    const m = state.measureLine; if (!m) return;
+    const dx = m.x1 - m.x0, dy = m.y1 - m.y0;
+    const len = Math.hypot(dx, dy);
+    const ang = Math.atan2(dy, dx) * 180 / Math.PI;
+    const el = $('status-tool');
+    if (el) el.textContent = `Measure: ${len.toFixed(1)} px  ${ang.toFixed(1)}°`;
+  }
+  function drawMeasureLine() {
+    const m = state.measureLine; if (!m) return;
+    displayCtx.save();
+    displayCtx.globalAlpha = 1;
+    displayCtx.globalCompositeOperation = 'source-over';
+    displayCtx.strokeStyle = '#ff3b30';
+    displayCtx.lineWidth = 1;
+    displayCtx.beginPath();
+    displayCtx.moveTo(m.x0 + 0.5, m.y0 + 0.5);
+    displayCtx.lineTo(m.x1 + 0.5, m.y1 + 0.5);
+    displayCtx.stroke();
+    displayCtx.fillStyle = '#ff3b30';
+    displayCtx.fillRect(m.x0 - 2, m.y0 - 2, 5, 5);
+    displayCtx.fillRect(m.x1 - 2, m.y1 - 2, 5, 5);
+    displayCtx.restore();
+  }
+  function straightenByMeasure() {
+    const m = state.measureLine;
+    if (!m) { alert('Draw a line with the Measure tool first.'); return; }
+    const ang = Math.atan2(m.y1 - m.y0, m.x1 - m.x0) * 180 / Math.PI;
+    state.measureLine = null;
+    rotateArbitrary(-ang);
   }
 
   // ---- GIF export from animation flipbook (via tiny encoder) ----
@@ -6190,8 +6603,11 @@
       displayCtx.drawImage(tmp, f.x, f.y);
       drawAnts(displayCtx, f.x, f.y, f.imageData.width, f.imageData.height);
     }
+    applyChannelView();
     drawGuides();
     if (state.transform) drawTransformOverlay();
+    drawMeasureLine();
+    drawPatchOverlay();
     displayCtx.restore();
     if (modeHasLayers(state.mode)) refreshLayersPanelSoon();
   };
@@ -6293,6 +6709,7 @@
   Tools.adjCurves = {
     async down() {
       const SZ = 256;
+      const hist = computeHistogram();
       const html = `<canvas id="cv-edit" width="${SZ}" height="${SZ}" ` +
         `style="background:#fff;border:1px solid #000;cursor:crosshair;` +
         `touch-action:none;width:256px;height:256px"></canvas>` +
@@ -6309,6 +6726,7 @@
       };
       const draw = () => {
         cc.fillStyle = '#fff'; cc.fillRect(0, 0, SZ, SZ);
+        cc.save(); cc.globalAlpha = 0.32; drawHistogram(cc, 0, 0, SZ, SZ, hist); cc.restore();
         cc.strokeStyle = '#e2e2e2'; cc.lineWidth = 1;
         for (let g = 1; g < 4; g++) {
           const t = g / 4 * SZ;
@@ -7922,6 +8340,9 @@
     openGradientPicker,
     // Round 6 — Free Transform, Guides, Content-Aware Fill, Curves
     freeTransform, contentAwareFill, openCurves,
-    newGuide, clearGuides, toggleGuides, toggleSnapGuides, toggleRulers
+    newGuide, clearGuides, toggleGuides, toggleSnapGuides, toggleRulers,
+    // Round 7 — Content-Aware Scale, Crop ratio, Channels, Histogram, Measure
+    contentAwareScaleDialog, cropRatioDialog, straightenByMeasure,
+    openChannelsPanel, openHistogramPanel
   };
 })();
