@@ -130,6 +130,8 @@
       { label: 'Copy Merged',                               run: () => rp('copyMerged') },
       { label: 'Define Pattern',                            run: () => rp('definePattern') },
       SEP,
+      { label: 'Custom Shapes — 50 shapes…',                run: () => rp('openShapePicker') },
+      SEP,
       { label: 'Keyboard Shortcuts…',                       run: () => rp('shortcutsModal') },
       { label: 'History…',                                  run: () => rp('openHistoryPanel') },
       { label: 'Snapshots…',                                run: () => rp('openSnapshots') },

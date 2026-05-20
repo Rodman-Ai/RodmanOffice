@@ -555,7 +555,8 @@
       { id: 'rect',   label: 'Rect',    icon: '▭', shortcut: 'u' },
       { id: 'rectFill', label: 'Rect•', icon: '▬' },
       { id: 'ellipse', label: 'Oval',   icon: '◯' },
-      { id: 'ellipseFill', label: 'Oval•', icon: '⬤' }
+      { id: 'ellipseFill', label: 'Oval•', icon: '⬤' },
+      { id: 'customShape', label: 'Shape', icon: '⬟' }
     ],
     mspaint: [
       { id: 'pencil', label: 'Pencil', icon: '✏️', shortcut: 'p' },
