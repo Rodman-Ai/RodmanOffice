@@ -535,6 +535,9 @@
     // exhaustive list for now.
     photoshop: [
       { id: 'select', label: 'Marquee', icon: '⬚', shortcut: 'm' },
+      { id: 'ellipseSelect', label: 'Oval Sel', icon: '⬭' },
+      { id: 'rowMarquee', label: 'Row', icon: '▭' },
+      { id: 'colMarquee', label: 'Column', icon: '▯' },
       { id: 'lasso',  label: 'Lasso',   icon: '◌', shortcut: 'l' },
       { id: 'wand',   label: 'Wand',    icon: '🪄', shortcut: 'w' },
       { id: 'crop',   label: 'Crop',    icon: '⛶', shortcut: 'c' },
@@ -566,6 +569,9 @@
       { id: 'ellipseFill', label: 'Oval•', icon: '⬤' },
       { id: 'customShape', label: 'Shape', icon: '⬟' },
       { id: 'transform', label: 'Transform', icon: '⤢', shortcut: 'k' },
+      { id: 'distort', label: 'Distort', icon: '◣' },
+      { id: 'mixerBrush', label: 'Mixer', icon: '💧' },
+      { id: 'slice',  label: 'Slice',   icon: '⧉' },
       { id: 'measure', label: 'Measure', icon: '📏' }
     ],
     mspaint: [
