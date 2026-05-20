@@ -131,6 +131,7 @@
       { label: 'Define Pattern',                            run: () => rp('definePattern') },
       SEP,
       { label: 'Custom Shapes — 50 shapes…',                run: () => rp('openShapePicker') },
+      { label: 'Gradient Library — 50 gradients…',          run: () => rp('openGradientPicker') },
       SEP,
       { label: 'Keyboard Shortcuts…',                       run: () => rp('shortcutsModal') },
       { label: 'History…',                                  run: () => rp('openHistoryPanel') },

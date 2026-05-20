@@ -199,6 +199,7 @@
     activeWacky: null,
     activeStamp: null,
     activeStampSet: null,
+    activeGradient: null,
     colorIndex: 0,
     shift: false,
     mirror: 'off',
@@ -744,6 +745,146 @@
     c.restore();
   }
 
+  // ---- Gradient preset library (round 5) ----
+  // 50 named gradients; each `stops` is [[pos, '#rrggbb'], …] (pos 0..1).
+  // Photoshop's Gradient picker; applied through the existing gradient tool.
+  const GRADIENTS = [
+    // ---- Neutral & Mono ----
+    { id: 'blackWhite', name: 'Black → White', cat: 'Neutral & Mono',
+      stops: [[0, '#000000'], [1, '#ffffff']] },
+    { id: 'whiteBlack', name: 'White → Black', cat: 'Neutral & Mono',
+      stops: [[0, '#ffffff'], [1, '#000000']] },
+    { id: 'silverFade', name: 'Silver Fade', cat: 'Neutral & Mono',
+      stops: [[0, '#e8e8ec'], [0.5, '#a9adb6'], [1, '#5b606b']] },
+    { id: 'charcoal', name: 'Charcoal', cat: 'Neutral & Mono',
+      stops: [[0, '#3a3d44'], [0.5, '#22242a'], [1, '#0c0d10']] },
+    { id: 'cream', name: 'Cream', cat: 'Neutral & Mono',
+      stops: [[0, '#fffaf0'], [1, '#e7d8b8']] },
+    // ---- Warm ----
+    { id: 'sunrise', name: 'Sunrise', cat: 'Warm',
+      stops: [[0, '#ffe29a'], [0.5, '#ff955c'], [1, '#e8484f']] },
+    { id: 'ember', name: 'Ember', cat: 'Warm',
+      stops: [[0, '#fff1a8'], [0.4, '#ff7b00'], [1, '#7a1500']] },
+    { id: 'peachGlow', name: 'Peach Glow', cat: 'Warm',
+      stops: [[0, '#ffe0c2'], [1, '#ff9a76']] },
+    { id: 'goldenHour', name: 'Golden Hour', cat: 'Warm',
+      stops: [[0, '#ffd97d'], [0.5, '#ff9e4f'], [1, '#c75c2e']] },
+    { id: 'terracotta', name: 'Terracotta', cat: 'Warm',
+      stops: [[0, '#e98a5a'], [1, '#9c4221']] },
+    // ---- Cool ----
+    { id: 'ocean', name: 'Ocean', cat: 'Cool',
+      stops: [[0, '#2e8bc0'], [0.5, '#145da0'], [1, '#0c2d48']] },
+    { id: 'arctic', name: 'Arctic', cat: 'Cool',
+      stops: [[0, '#eaf6ff'], [0.5, '#bcdff1'], [1, '#7aa9c9']] },
+    { id: 'twilight', name: 'Twilight', cat: 'Cool',
+      stops: [[0, '#5b6e9c'], [0.5, '#3a3f6b'], [1, '#1a1a35']] },
+    { id: 'mintFresh', name: 'Mint Fresh', cat: 'Cool',
+      stops: [[0, '#d8fff0'], [0.5, '#7fe6c6'], [1, '#2faf8c']] },
+    { id: 'deepSea', name: 'Deep Sea', cat: 'Cool',
+      stops: [[0, '#1f6f8b'], [0.5, '#0d3b4c'], [1, '#04161e']] },
+    // ---- Spectrum & Rainbow ----
+    { id: 'rainbow', name: 'Rainbow', cat: 'Spectrum & Rainbow',
+      stops: [[0, '#ff0000'], [0.17, '#ff9900'], [0.33, '#ffee00'],
+        [0.5, '#33cc33'], [0.67, '#0099ff'], [0.83, '#6633cc'], [1, '#cc33aa']] },
+    { id: 'spectrum', name: 'Spectrum', cat: 'Spectrum & Rainbow',
+      stops: [[0, '#ff004c'], [0.25, '#ffb300'], [0.5, '#23d18b'],
+        [0.75, '#1f8bff'], [1, '#9b4dff']] },
+    { id: 'prism', name: 'Prism', cat: 'Spectrum & Rainbow',
+      stops: [[0, '#ff5e7e'], [0.33, '#ffd166'], [0.66, '#6bd3ff'], [1, '#a78bfa']] },
+    { id: 'hueWheel', name: 'Hue Wheel', cat: 'Spectrum & Rainbow',
+      stops: [[0, '#e60049'], [0.2, '#f9a825'], [0.4, '#aacc00'],
+        [0.6, '#0bb4ff'], [0.8, '#5e35b1'], [1, '#e60049']] },
+    { id: 'vapor', name: 'Vapor', cat: 'Spectrum & Rainbow',
+      stops: [[0, '#ff71ce'], [0.5, '#b967ff'], [1, '#01cdfe']] },
+    // ---- Pastel ----
+    { id: 'cottonCandy', name: 'Cotton Candy', cat: 'Pastel',
+      stops: [[0, '#ffd1e8'], [0.5, '#e7c6ff'], [1, '#c6e4ff']] },
+    { id: 'babyBlue', name: 'Baby Blue', cat: 'Pastel',
+      stops: [[0, '#dff3ff'], [1, '#a9d6f5']] },
+    { id: 'lavenderMist', name: 'Lavender Mist', cat: 'Pastel',
+      stops: [[0, '#efe6ff'], [1, '#c3b1e8']] },
+    { id: 'sherbet', name: 'Sherbet', cat: 'Pastel',
+      stops: [[0, '#ffe5b4'], [0.5, '#ffc4c4'], [1, '#ffb3de']] },
+    { id: 'paleRose', name: 'Pale Rose', cat: 'Pastel',
+      stops: [[0, '#fff0f3'], [1, '#f4c2c2']] },
+    // ---- Metallic ----
+    { id: 'chrome', name: 'Chrome', cat: 'Metallic',
+      stops: [[0, '#f4f6f8'], [0.25, '#9aa3ad'], [0.5, '#dfe4e8'],
+        [0.75, '#6c757d'], [1, '#cfd5da']] },
+    { id: 'gold', name: 'Gold', cat: 'Metallic',
+      stops: [[0, '#fff3c4'], [0.4, '#e6b422'], [0.7, '#a8791b'], [1, '#f4d775']] },
+    { id: 'copper', name: 'Copper', cat: 'Metallic',
+      stops: [[0, '#f6c9a8'], [0.5, '#b87333'], [1, '#6e3b1c']] },
+    { id: 'steel', name: 'Steel', cat: 'Metallic',
+      stops: [[0, '#dfe6ec'], [0.5, '#8a96a3'], [1, '#3c454f']] },
+    { id: 'bronze', name: 'Bronze', cat: 'Metallic',
+      stops: [[0, '#e4c089'], [0.5, '#a9762f'], [1, '#5e3d16']] },
+    // ---- Sky & Sunset ----
+    { id: 'dawn', name: 'Dawn', cat: 'Sky & Sunset',
+      stops: [[0, '#fceabb'], [0.5, '#f6a6b2'], [1, '#8e6fb3']] },
+    { id: 'dusk', name: 'Dusk', cat: 'Sky & Sunset',
+      stops: [[0, '#ff9966'], [0.5, '#a64dab'], [1, '#2b1b53']] },
+    { id: 'daySky', name: 'Day Sky', cat: 'Sky & Sunset',
+      stops: [[0, '#87ceeb'], [1, '#e8f6ff']] },
+    { id: 'stormSky', name: 'Storm Sky', cat: 'Sky & Sunset',
+      stops: [[0, '#6b7280'], [0.5, '#3f4651'], [1, '#1d2027']] },
+    { id: 'auroraSky', name: 'Aurora Sky', cat: 'Sky & Sunset',
+      stops: [[0, '#1f2b3a'], [0.4, '#13c08b'], [0.7, '#3ad6c4'], [1, '#9b5de5']] },
+    // ---- Earth & Nature ----
+    { id: 'forest', name: 'Forest', cat: 'Earth & Nature',
+      stops: [[0, '#a7c957'], [0.5, '#5a8f3c'], [1, '#1e3a1e']] },
+    { id: 'desert', name: 'Desert', cat: 'Earth & Nature',
+      stops: [[0, '#f6e3b4'], [0.5, '#e0b06a'], [1, '#b07b3e']] },
+    { id: 'autumnLeaf', name: 'Autumn Leaf', cat: 'Earth & Nature',
+      stops: [[0, '#ffd166'], [0.5, '#ef8a3c'], [1, '#a63a1f']] },
+    { id: 'moss', name: 'Moss', cat: 'Earth & Nature',
+      stops: [[0, '#c2d6a4'], [0.5, '#7a9b53'], [1, '#3f5429']] },
+    { id: 'clay', name: 'Clay', cat: 'Earth & Nature',
+      stops: [[0, '#d9a679'], [0.5, '#a96f4c'], [1, '#6b3f2a']] },
+    // ---- Neon & Candy ----
+    { id: 'neonPink', name: 'Neon Pink', cat: 'Neon & Candy',
+      stops: [[0, '#ff6ec7'], [0.5, '#ff1493'], [1, '#c2185b']] },
+    { id: 'electricBlue', name: 'Electric Blue', cat: 'Neon & Candy',
+      stops: [[0, '#00f0ff'], [0.5, '#0091ff'], [1, '#2a00ff']] },
+    { id: 'limeGlow', name: 'Lime Glow', cat: 'Neon & Candy',
+      stops: [[0, '#eaffd0'], [0.5, '#9be600'], [1, '#3a8d00']] },
+    { id: 'magentaPop', name: 'Magenta Pop', cat: 'Neon & Candy',
+      stops: [[0, '#ff00cc'], [0.5, '#cc00ff'], [1, '#6600ff']] },
+    { id: 'cyberPunk', name: 'Cyber Punk', cat: 'Neon & Candy',
+      stops: [[0, '#f9f002'], [0.5, '#ff2079'], [1, '#06b6d4']] },
+    // ---- Duotone ----
+    { id: 'blueOrange', name: 'Blue / Orange', cat: 'Duotone',
+      stops: [[0, '#0353a4'], [1, '#ff9505']] },
+    { id: 'purpleTeal', name: 'Purple / Teal', cat: 'Duotone',
+      stops: [[0, '#6a0dad'], [1, '#06d6a0']] },
+    { id: 'redNavy', name: 'Red / Navy', cat: 'Duotone',
+      stops: [[0, '#d00000'], [1, '#03045e']] },
+    { id: 'greenPink', name: 'Green / Pink', cat: 'Duotone',
+      stops: [[0, '#2bb673'], [1, '#ed64a6']] },
+    { id: 'sepiaTone', name: 'Sepia Tone', cat: 'Duotone',
+      stops: [[0, '#f1e3c6'], [0.5, '#b08968'], [1, '#3e2f23']] },
+  ];
+  const GRADIENT_MAP = {};
+  GRADIENTS.forEach(g => { GRADIENT_MAP[g.id] = g; });
+  const GRADIENT_CATS = ['Neutral & Mono', 'Warm', 'Cool', 'Spectrum & Rainbow',
+    'Pastel', 'Metallic', 'Sky & Sunset', 'Earth & Nature', 'Neon & Candy', 'Duotone'];
+
+  // Stops for gradient `id`, or the legacy primary→secondary ramp when
+  // no preset is active — keeps the gradient tool's default behaviour.
+  function gradientStops(id) {
+    const g = GRADIENT_MAP[id];
+    if (g) return g.stops;
+    return [[0, state.primary], [1, state.secondary]];
+  }
+
+  // Fill gradient `id` left→right into bbox {x,y,w,h} on context `c`.
+  function drawGradientToCtx(c, id, bbox) {
+    const g = c.createLinearGradient(bbox.x, bbox.y, bbox.x + bbox.w, bbox.y);
+    for (const [pos, color] of gradientStops(id)) g.addColorStop(pos, color);
+    c.fillStyle = g;
+    c.fillRect(bbox.x, bbox.y, bbox.w, bbox.h);
+  }
+
   // ---- Tool handlers ----
   // Each handler returns { down, move, up }; receives world position {x,y}
   const Tools = {
@@ -925,8 +1066,9 @@
         restoreSnapshot();
         const e = state.shift ? snapTo45(state.startX, state.startY, p.x, p.y) : p;
         const g = ctx.createLinearGradient(state.startX, state.startY, e.x, e.y);
-        g.addColorStop(0, state.primary);
-        g.addColorStop(1, state.secondary);
+        for (const [pos, color] of gradientStops(state.activeGradient)) {
+          g.addColorStop(pos, color);
+        }
         ctx.fillStyle = g;
         ctx.fillRect(0, 0, W, H);
       }
@@ -7281,6 +7423,42 @@
     });
   }
 
+  // ---- Gradient picker ----
+  // A categorised gallery of all 50 gradient presets; clicking a cell
+  // sets the active gradient, activates the gradient tool, closes the modal.
+  function openGradientPicker() {
+    let html = '<div style="max-height:60vh;overflow:auto">';
+    for (const cat of GRADIENT_CATS) {
+      html += `<div style="font-weight:bold;margin:8px 2px 4px;opacity:0.8">${cat}</div>`;
+      html += '<div style="display:flex;flex-wrap:wrap;gap:6px">';
+      for (const g of GRADIENTS.filter(x => x.cat === cat)) {
+        html += `<button type="button" class="gradient-cell" data-gradient="${g.id}" title="${g.name}" ` +
+          `style="width:104px;height:58px;display:flex;flex-direction:column;align-items:center;` +
+          `gap:3px;cursor:pointer;background:#fff;border:1px solid #bbb;border-radius:4px;padding:3px">` +
+          `<canvas width="96" height="32" data-gthumb="${g.id}" ` +
+          `style="border-radius:2px"></canvas>` +
+          `<span style="font-size:9px;line-height:1;text-align:center;color:#333;overflow:hidden">${g.name}</span>` +
+          `</button>`;
+      }
+      html += '</div>';
+    }
+    html += '</div>';
+    showModal('Gradient Library — pick one, then drag on the canvas',
+      html, { okText: 'Close', hideCancel: true });
+    const body = $('modal-body');
+    body.querySelectorAll('canvas[data-gthumb]').forEach((cv) => {
+      const tctx = cv.getContext('2d');
+      drawGradientToCtx(tctx, cv.dataset.gthumb, { x: 0, y: 0, w: cv.width, h: cv.height });
+    });
+    body.querySelectorAll('.gradient-cell').forEach((cell) => {
+      cell.addEventListener('click', () => {
+        state.activeGradient = cell.dataset.gradient;
+        setTool('gradient');
+        $('modal-ok').click();
+      });
+    });
+  }
+
   window.RP = {
     applyFilter,
     openLevels, openHSL, openColorBalance, openThreshold,
@@ -7307,6 +7485,8 @@
     // View
     zoomFit, zoom50, zoom100, zoom200, zoom400, zoom800, centerView,
     // Custom shapes
-    openShapePicker
+    openShapePicker,
+    // Gradients
+    openGradientPicker
   };
 })();
