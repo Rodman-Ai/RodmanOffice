@@ -149,26 +149,25 @@
         disabled: true, run: () => {} }
     ],
     filter: [
-      { label: 'Filter Gallery — 57 effects…', shortcut: '', run: () => clickButton('btn-filter') },
+      { label: 'Filter Gallery — 107 effects…', shortcut: '', run: () => clickButton('btn-filter') },
       SEP,
       { label: 'Gaussian Blur',                             run: () => rp('applyFilter', 'gaussianBlur') },
       { label: 'Sharpen More',                              run: () => rp('applyFilter', 'sharpenMore') },
-      { label: 'Unsharp Mask',                              run: () => rp('applyFilter', 'unsharpMask') },
       { label: 'Find Edges',                                run: () => rp('applyFilter', 'findEdges') },
       { label: 'Emboss',                                    run: () => rp('applyFilter', 'emboss') },
       SEP,
       { label: 'Oil Painting',                              run: () => rp('applyFilter', 'oilPaint') },
       { label: 'Cartoon',                                   run: () => rp('applyFilter', 'cartoon') },
-      { label: 'Pencil Sketch',                             run: () => rp('applyFilter', 'pencilSketch') },
+      { label: 'Kaleidoscope',                              run: () => rp('applyFilter', 'kaleidoscope') },
+      { label: 'Clouds',                                    run: () => rp('applyFilter', 'clouds') },
       SEP,
       { label: 'Brightness / Contrast',                     run: () => rp('applyFilter', 'brightContrast') },
-      { label: 'Vibrance',                                  run: () => rp('applyFilter', 'vibrance') },
-      { label: 'Auto Levels',                               run: () => rp('applyFilter', 'autoLevels') },
+      { label: 'Cross Process',                             run: () => rp('applyFilter', 'crossProcess') },
+      { label: 'Teal & Orange',                             run: () => rp('applyFilter', 'tealOrange') },
       { label: 'Vignette',                                  run: () => rp('applyFilter', 'vignette') },
       SEP,
       { label: 'Invert',                                    run: () => rp('applyFilter', 'invert') },
-      { label: 'Grayscale',                                 run: () => rp('applyFilter', 'grayscale') },
-      { label: 'Sepia',                                     run: () => rp('applyFilter', 'sepia') }
+      { label: 'Grayscale',                                 run: () => rp('applyFilter', 'grayscale') }
     ],
     view: [
       { label: 'Zoom In',          shortcut: '+',           run: () => clickButton('btn-zoom-in') },
