@@ -103,6 +103,9 @@ const DIAGRAM_OUTPUTS = [
   { ext: 'svg',  mime: 'image/svg+xml', label: 'SVG (.svg)' },
   { ext: 'png',  mime: 'image/png', label: 'PNG (.png)' },
   { ext: 'pdf',  mime: 'application/pdf', label: 'PDF (.pdf)' },
+  { ext: 'html', mime: 'text/html', label: 'HTML (.html)' },
+  { ext: 'docx', mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', label: 'Word (.docx)' },
+  { ext: 'pptx', mime: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', label: 'PowerPoint (.pptx)' },
 ];
 
 const SLIDES_OUTPUTS = [

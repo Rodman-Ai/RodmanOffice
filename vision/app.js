@@ -2362,6 +2362,13 @@
       const idx = parseInt(btn?.dataset?.idx || '-1', 10);
       const bm = (state.bookmarks || [])[idx];
       if (!bm) return;
+      // The bookmarked page may have been deleted since. Don't
+      // point activePageId at a ghost — that desyncs the canvas
+      // and corrupts undo snapshots.
+      if (!D.findPage(diagram, bm.pageId)) {
+        alert('That bookmark’s page no longer exists.');
+        return;
+      }
       state.activePageId = bm.pageId;
       state.zoom = bm.zoom;
       renderCanvas();
@@ -4009,6 +4016,10 @@
       btn.dataset.cmd = 'jumpToBookmark';
       btn.dataset.idx = String(i);
       btn.textContent = bm.name;
+      // These buttons are created after the one-time [data-cmd]
+      // binding pass in bootstrap, so wire the click here —
+      // otherwise the bookmark is dead on arrival.
+      btn.addEventListener('click', () => commands.jumpToBookmark(btn));
       list.appendChild(btn);
     }
   }

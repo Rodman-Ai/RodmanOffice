@@ -529,6 +529,23 @@ async function runDiagram(source, target) {
       const bytes = await blobToBytes(blob);
       return { bytes: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), mime: target.mime };
     }
+    case 'html': {
+      const blob = diagrams.exportHtml(diagram);
+      const bytes = await blobToBytes(blob);
+      return { bytes: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), mime: target.mime };
+    }
+    case 'docx': {
+      // exportDocx bridges into the shared lib/docs OOXML packager.
+      const blob = await diagrams.exportDocx(diagram, docs);
+      const bytes = await blobToBytes(blob);
+      return { bytes: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), mime: target.mime };
+    }
+    case 'pptx': {
+      // exportPptx bridges into the shared lib/slides PPTX packager.
+      const blob = await diagrams.exportPptx(diagram, slides);
+      const bytes = await blobToBytes(blob);
+      return { bytes: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), mime: target.mime };
+    }
     default: throw new Error(`Unsupported diagram output: .${target.ext}`);
   }
 }
