@@ -418,6 +418,332 @@
     }
   };
 
+  // ===================================================================
+  // Custom Shape library — 50 drag-out vector shapes (Photoshop's
+  // Custom Shape Tool). Each draw(c, w, h) builds a path inside a
+  // 0..w × 0..h box and fills it; the caller sets fillStyle.
+  // ===================================================================
+  function _ng(c, cx, cy, rx, ry, n, rot) {
+    c.beginPath();
+    for (let i = 0; i < n; i++) {
+      const a = rot + i / n * Math.PI * 2;
+      const x = cx + Math.cos(a) * rx, y = cy + Math.sin(a) * ry;
+      i ? c.lineTo(x, y) : c.moveTo(x, y);
+    }
+    c.closePath();
+  }
+  function _star(c, cx, cy, rx, ry, pts, inner) {
+    c.beginPath();
+    for (let i = 0; i < pts * 2; i++) {
+      const a = -Math.PI / 2 + i / (pts * 2) * Math.PI * 2;
+      const r = (i % 2) ? inner : 1;
+      const x = cx + Math.cos(a) * rx * r, y = cy + Math.sin(a) * ry * r;
+      i ? c.lineTo(x, y) : c.moveTo(x, y);
+    }
+    c.closePath();
+  }
+  function _poly(c, pts) {
+    c.beginPath();
+    pts.forEach((p, i) => i ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1]));
+    c.closePath();
+  }
+  function _circ(c, cx, cy, r) { c.beginPath(); c.arc(cx, cy, r, 0, Math.PI * 2); }
+
+  const SHAPES = [
+    // ---- Geometric ----
+    { id: 'star5', name: 'Star (5)', cat: 'Geometric',
+      draw(c, w, h) { _star(c, w/2, h/2, w/2, h/2, 5, 0.42); c.fill(); } },
+    { id: 'star6', name: 'Star (6)', cat: 'Geometric',
+      draw(c, w, h) { _star(c, w/2, h/2, w/2, h/2, 6, 0.5); c.fill(); } },
+    { id: 'starburst12', name: 'Starburst', cat: 'Geometric',
+      draw(c, w, h) { _star(c, w/2, h/2, w/2, h/2, 12, 0.62); c.fill(); } },
+    { id: 'pentagon', name: 'Pentagon', cat: 'Geometric',
+      draw(c, w, h) { _ng(c, w/2, h/2, w/2, h/2, 5, -Math.PI/2); c.fill(); } },
+    { id: 'hexagon', name: 'Hexagon', cat: 'Geometric',
+      draw(c, w, h) { _ng(c, w/2, h/2, w/2, h/2, 6, 0); c.fill(); } },
+    { id: 'octagon', name: 'Octagon', cat: 'Geometric',
+      draw(c, w, h) { _ng(c, w/2, h/2, w/2, h/2, 8, Math.PI/8); c.fill(); } },
+    { id: 'triangle', name: 'Triangle', cat: 'Geometric',
+      draw(c, w, h) { _poly(c, [[w/2,0],[w,h],[0,h]]); c.fill(); } },
+    { id: 'diamond', name: 'Diamond', cat: 'Geometric',
+      draw(c, w, h) { _poly(c, [[w/2,0],[w,h/2],[w/2,h],[0,h/2]]); c.fill(); } },
+    { id: 'heart', name: 'Heart', cat: 'Geometric',
+      draw(c, w, h) {
+        c.beginPath();
+        c.moveTo(w/2, h*0.92);
+        c.bezierCurveTo(w*0.06, h*0.55, w*0.06, h*0.12, w/2, h*0.30);
+        c.bezierCurveTo(w*0.94, h*0.12, w*0.94, h*0.55, w/2, h*0.92);
+        c.closePath(); c.fill();
+      } },
+    { id: 'crescent', name: 'Crescent', cat: 'Geometric',
+      draw(c, w, h) {
+        c.beginPath();
+        c.arc(w*0.52, h/2, w*0.46, Math.PI*0.5, Math.PI*1.5);
+        c.arc(w*0.74, h/2, w*0.40, Math.PI*1.5, Math.PI*0.5, true);
+        c.closePath(); c.fill();
+      } },
+
+    // ---- Arrows ----
+    { id: 'arrowRight', name: 'Arrow Right', cat: 'Arrows',
+      draw(c, w, h) { _poly(c, [[0,h*0.3],[w*0.6,h*0.3],[w*0.6,h*0.08],[w,h/2],[w*0.6,h*0.92],[w*0.6,h*0.7],[0,h*0.7]]); c.fill(); } },
+    { id: 'arrowLeft', name: 'Arrow Left', cat: 'Arrows',
+      draw(c, w, h) { _poly(c, [[w,h*0.3],[w*0.4,h*0.3],[w*0.4,h*0.08],[0,h/2],[w*0.4,h*0.92],[w*0.4,h*0.7],[w,h*0.7]]); c.fill(); } },
+    { id: 'arrowUp', name: 'Arrow Up', cat: 'Arrows',
+      draw(c, w, h) { _poly(c, [[w*0.3,h],[w*0.3,h*0.4],[w*0.08,h*0.4],[w/2,0],[w*0.92,h*0.4],[w*0.7,h*0.4],[w*0.7,h]]); c.fill(); } },
+    { id: 'arrowDown', name: 'Arrow Down', cat: 'Arrows',
+      draw(c, w, h) { _poly(c, [[w*0.3,0],[w*0.3,h*0.6],[w*0.08,h*0.6],[w/2,h],[w*0.92,h*0.6],[w*0.7,h*0.6],[w*0.7,0]]); c.fill(); } },
+    { id: 'arrowDouble', name: 'Double Arrow', cat: 'Arrows',
+      draw(c, w, h) { _poly(c, [[0,h/2],[w*0.22,h*0.12],[w*0.22,h*0.34],[w*0.78,h*0.34],[w*0.78,h*0.12],[w,h/2],[w*0.78,h*0.88],[w*0.78,h*0.66],[w*0.22,h*0.66],[w*0.22,h*0.88]]); c.fill(); } },
+    { id: 'arrowCurved', name: 'Curved Arrow', cat: 'Arrows',
+      draw(c, w, h) {
+        c.beginPath();
+        c.moveTo(w*0.1, h*0.9);
+        c.quadraticCurveTo(w*0.1, h*0.2, w*0.7, h*0.2);
+        c.lineTo(w*0.7, h*0.02); c.lineTo(w, h*0.32); c.lineTo(w*0.7, h*0.6);
+        c.lineTo(w*0.7, h*0.42);
+        c.quadraticCurveTo(w*0.32, h*0.42, w*0.32, h*0.9);
+        c.closePath(); c.fill();
+      } },
+    { id: 'arrowBlock', name: 'Block Arrow', cat: 'Arrows',
+      draw(c, w, h) { _poly(c, [[0,h*0.15],[w*0.55,h*0.15],[w*0.55,0],[w,h/2],[w*0.55,h],[w*0.55,h*0.85],[0,h*0.85]]); c.fill(); } },
+    { id: 'chevron', name: 'Chevron', cat: 'Arrows',
+      draw(c, w, h) { _poly(c, [[0,h*0.08],[w*0.45,h*0.08],[w,h/2],[w*0.45,h*0.92],[0,h*0.92],[w*0.55,h/2]]); c.fill(); } },
+
+    // ---- Talk bubbles ----
+    { id: 'speechRound', name: 'Speech (Round)', cat: 'Talk bubbles',
+      draw(c, w, h) {
+        c.beginPath();
+        c.ellipse(w/2, h*0.42, w/2, h*0.4, 0, 0, Math.PI*2);
+        c.fill();
+        _poly(c, [[w*0.3,h*0.7],[w*0.2,h],[w*0.5,h*0.74]]); c.fill();
+      } },
+    { id: 'speechRect', name: 'Speech (Rect)', cat: 'Talk bubbles',
+      draw(c, w, h) {
+        const r = Math.min(w, h) * 0.16;
+        c.beginPath();
+        c.moveTo(r, 0); c.arcTo(w, 0, w, h*0.7, r); c.arcTo(w, h*0.7, 0, h*0.7, r);
+        c.arcTo(0, h*0.7, 0, 0, r); c.arcTo(0, 0, w, 0, r); c.closePath(); c.fill();
+        _poly(c, [[w*0.28,h*0.7],[w*0.22,h],[w*0.5,h*0.7]]); c.fill();
+      } },
+    { id: 'thoughtCloud', name: 'Thought Cloud', cat: 'Talk bubbles',
+      draw(c, w, h) {
+        [[0.32,0.4,0.26],[0.58,0.32,0.3],[0.78,0.5,0.22],[0.5,0.58,0.3]].forEach(b => {
+          _circ(c, w*b[0], h*b[1], Math.min(w,h)*b[2]); c.fill();
+        });
+        _circ(c, w*0.3, h*0.82, Math.min(w,h)*0.08); c.fill();
+        _circ(c, w*0.2, h*0.95, Math.min(w,h)*0.05); c.fill();
+      } },
+    { id: 'burstBubble', name: 'Burst', cat: 'Talk bubbles',
+      draw(c, w, h) { _star(c, w/2, h/2, w/2, h/2, 14, 0.74); c.fill(); } },
+    { id: 'captionBox', name: 'Caption', cat: 'Talk bubbles',
+      draw(c, w, h) {
+        c.fillRect(0, 0, w, h*0.74);
+        _poly(c, [[w*0.6,h*0.74],[w*0.78,h*0.74],[w*0.66,h]]); c.fill();
+      } },
+
+    // ---- Banners & ribbons ----
+    { id: 'ribbon', name: 'Ribbon', cat: 'Banners',
+      draw(c, w, h) { _poly(c, [[0,h*0.25],[w*0.12,h/2],[0,h*0.75],[w,h*0.75],[w*0.88,h/2],[w,h*0.25]]); c.fill(); } },
+    { id: 'pennant', name: 'Pennant', cat: 'Banners',
+      draw(c, w, h) { _poly(c, [[0,h*0.1],[w,h*0.1],[w*0.35,h*0.55],[w,h]]); c.fill();
+        c.fillRect(0, h*0.1, w*0.05, h*0.9); } },
+    { id: 'scroll', name: 'Scroll', cat: 'Banners',
+      draw(c, w, h) {
+        c.fillRect(w*0.1, h*0.2, w*0.8, h*0.6);
+        _circ(c, w*0.1, h*0.5, h*0.3); c.fill();
+        _circ(c, w*0.9, h*0.5, h*0.3); c.fill();
+      } },
+    { id: 'bannerFlag', name: 'Banner Flag', cat: 'Banners',
+      draw(c, w, h) {
+        c.beginPath();
+        c.moveTo(0, h*0.2);
+        c.quadraticCurveTo(w*0.5, 0, w, h*0.2);
+        c.lineTo(w, h*0.8);
+        c.quadraticCurveTo(w*0.5, h, 0, h*0.8);
+        c.closePath(); c.fill();
+      } },
+    { id: 'awardRosette', name: 'Award Rosette', cat: 'Banners',
+      draw(c, w, h) {
+        _poly(c, [[w*0.4,h*0.55],[w*0.55,h*0.55],[w*0.6,h],[w*0.5,h*0.85],[w*0.4,h]]); c.fill();
+        _star(c, w/2, h*0.4, w*0.4, h*0.4, 12, 0.78); c.fill();
+        _circ(c, w/2, h*0.4, Math.min(w,h)*0.16); c.fill();
+      } },
+
+    // ---- Symbols ----
+    { id: 'checkMark', name: 'Check', cat: 'Symbols',
+      draw(c, w, h) { _poly(c, [[w*0.1,h*0.5],[w*0.22,h*0.38],[w*0.42,h*0.6],[w*0.8,h*0.16],[w*0.92,h*0.3],[w*0.42,h*0.88]]); c.fill(); } },
+    { id: 'crossMark', name: 'Cross (X)', cat: 'Symbols',
+      draw(c, w, h) {
+        const t = Math.min(w, h) * 0.16;
+        _poly(c, [[t,0],[w/2,h/2-t*1.4],[w-t,0],[w,t],[w/2+t*1.4,h/2],[w,h-t],[w-t,h],[w/2,h/2+t*1.4],[t,h],[0,h-t],[w/2-t*1.4,h/2],[0,t]]);
+        c.fill();
+      } },
+    { id: 'plusSign', name: 'Plus', cat: 'Symbols',
+      draw(c, w, h) { c.fillRect(w*0.36, 0, w*0.28, h); c.fillRect(0, h*0.36, w, h*0.28); } },
+    { id: 'minusSign', name: 'Minus', cat: 'Symbols',
+      draw(c, w, h) { c.fillRect(0, h*0.38, w, h*0.24); } },
+    { id: 'lightningBolt', name: 'Lightning', cat: 'Symbols',
+      draw(c, w, h) { _poly(c, [[w*0.55,0],[w*0.1,h*0.58],[w*0.42,h*0.58],[w*0.32,h],[w*0.85,h*0.4],[w*0.52,h*0.4]]); c.fill(); } },
+    { id: 'exclaim', name: 'Exclamation', cat: 'Symbols',
+      draw(c, w, h) {
+        _poly(c, [[w*0.36,0],[w*0.64,0],[w*0.58,h*0.62],[w*0.42,h*0.62]]); c.fill();
+        _circ(c, w/2, h*0.84, w*0.13); c.fill();
+      } },
+    { id: 'ring', name: 'Ring', cat: 'Symbols',
+      draw(c, w, h) {
+        c.beginPath();
+        c.arc(w/2, h/2, Math.min(w,h)/2, 0, Math.PI*2);
+        c.arc(w/2, h/2, Math.min(w,h)*0.28, 0, Math.PI*2);
+        c.fill('evenodd');
+      } },
+    { id: 'asterisk', name: 'Asterisk', cat: 'Symbols',
+      draw(c, w, h) { _star(c, w/2, h/2, w/2, h/2, 6, 0.16); c.fill(); } },
+
+    // ---- Nature ----
+    { id: 'sun', name: 'Sun', cat: 'Nature',
+      draw(c, w, h) {
+        for (let i = 0; i < 12; i++) {
+          const a = i / 12 * Math.PI * 2;
+          c.save(); c.translate(w/2, h/2); c.rotate(a);
+          c.fillRect(-w*0.04, -h*0.5, w*0.08, h*0.16);
+          c.restore();
+        }
+        _circ(c, w/2, h/2, Math.min(w,h)*0.3); c.fill();
+      } },
+    { id: 'moon', name: 'Moon', cat: 'Nature',
+      draw(c, w, h) {
+        c.beginPath();
+        c.arc(w*0.5, h/2, w*0.45, Math.PI*0.42, Math.PI*1.58);
+        c.arc(w*0.78, h/2, w*0.46, Math.PI*1.58, Math.PI*0.42, true);
+        c.closePath(); c.fill();
+      } },
+    { id: 'cloud', name: 'Cloud', cat: 'Nature',
+      draw(c, w, h) {
+        [[0.3,0.62,0.26],[0.5,0.46,0.32],[0.72,0.6,0.26]].forEach(b => {
+          _circ(c, w*b[0], h*b[1], Math.min(w,h)*b[2]); c.fill();
+        });
+        c.fillRect(w*0.28, h*0.6, w*0.46, h*0.26);
+      } },
+    { id: 'raindrop', name: 'Raindrop', cat: 'Nature',
+      draw(c, w, h) {
+        c.beginPath();
+        c.moveTo(w/2, 0);
+        c.bezierCurveTo(w, h*0.55, w*0.82, h, w/2, h);
+        c.bezierCurveTo(w*0.18, h, 0, h*0.55, w/2, 0);
+        c.closePath(); c.fill();
+      } },
+    { id: 'leaf', name: 'Leaf', cat: 'Nature',
+      draw(c, w, h) {
+        c.beginPath();
+        c.moveTo(w*0.1, h*0.9);
+        c.quadraticCurveTo(0, h*0.1, w*0.9, h*0.1);
+        c.quadraticCurveTo(h ? w : w, h, w*0.1, h*0.9);
+        c.closePath(); c.fill();
+      } },
+    { id: 'flower', name: 'Flower', cat: 'Nature',
+      draw(c, w, h) {
+        for (let i = 0; i < 6; i++) {
+          const a = i / 6 * Math.PI * 2;
+          _circ(c, w/2 + Math.cos(a)*w*0.26, h/2 + Math.sin(a)*h*0.26, Math.min(w,h)*0.2);
+          c.fill();
+        }
+        _circ(c, w/2, h/2, Math.min(w,h)*0.17); c.fill();
+      } },
+    { id: 'tree', name: 'Tree', cat: 'Nature',
+      draw(c, w, h) {
+        c.fillRect(w*0.42, h*0.6, w*0.16, h*0.4);
+        _poly(c, [[w/2,0],[w*0.86,h*0.42],[w*0.6,h*0.42],[w*0.94,h*0.72],[w*0.06,h*0.72],[w*0.4,h*0.42],[w*0.14,h*0.42]]);
+        c.fill();
+      } },
+    { id: 'snowflake', name: 'Snowflake', cat: 'Nature',
+      draw(c, w, h) {
+        c.save(); c.translate(w/2, h/2);
+        for (let i = 0; i < 6; i++) {
+          c.rotate(Math.PI/3);
+          c.fillRect(-w*0.03, 0, w*0.06, -h*0.48);
+          c.save(); c.translate(0, -h*0.3); c.rotate(-0.7);
+          c.fillRect(-w*0.02, 0, w*0.04, -h*0.14); c.restore();
+          c.save(); c.translate(0, -h*0.3); c.rotate(0.7);
+          c.fillRect(-w*0.02, 0, w*0.04, -h*0.14); c.restore();
+        }
+        c.restore();
+      } },
+
+    // ---- Objects ----
+    { id: 'gear', name: 'Gear', cat: 'Objects',
+      draw(c, w, h) {
+        const cx = w/2, cy = h/2, R = Math.min(w,h)*0.46, teeth = 10;
+        c.beginPath();
+        for (let i = 0; i < teeth * 2; i++) {
+          const a = i / (teeth*2) * Math.PI*2;
+          const r = (i % 2) ? R*0.78 : R;
+          const x = cx + Math.cos(a)*r, y = cy + Math.sin(a)*r;
+          i ? c.lineTo(x, y) : c.moveTo(x, y);
+        }
+        c.closePath();
+        c.arc(cx, cy, R*0.32, 0, Math.PI*2);
+        c.fill('evenodd');
+      } },
+    { id: 'key', name: 'Key', cat: 'Objects',
+      draw(c, w, h) {
+        c.beginPath();
+        c.arc(w*0.26, h/2, h*0.3, 0, Math.PI*2);
+        c.arc(w*0.26, h/2, h*0.13, 0, Math.PI*2);
+        c.fill('evenodd');
+        c.fillRect(w*0.42, h*0.43, w*0.5, h*0.14);
+        c.fillRect(w*0.78, h*0.43, w*0.06, h*0.28);
+        c.fillRect(w*0.66, h*0.43, w*0.05, h*0.22);
+      } },
+    { id: 'lightbulb', name: 'Lightbulb', cat: 'Objects',
+      draw(c, w, h) {
+        _circ(c, w/2, h*0.4, Math.min(w,h)*0.36); c.fill();
+        c.fillRect(w*0.38, h*0.66, w*0.24, h*0.18);
+        c.fillRect(w*0.42, h*0.84, w*0.16, h*0.12);
+      } },
+    { id: 'magnifier', name: 'Magnifier', cat: 'Objects',
+      draw(c, w, h) {
+        c.beginPath();
+        c.arc(w*0.4, h*0.4, w*0.34, 0, Math.PI*2);
+        c.arc(w*0.4, h*0.4, w*0.22, 0, Math.PI*2);
+        c.fill('evenodd');
+        c.save(); c.translate(w*0.63, h*0.63); c.rotate(Math.PI/4);
+        c.fillRect(-w*0.06, 0, w*0.12, h*0.4); c.restore();
+      } },
+    { id: 'padlock', name: 'Padlock', cat: 'Objects',
+      draw(c, w, h) {
+        c.beginPath();
+        c.arc(w/2, h*0.42, w*0.24, Math.PI, 0);
+        c.lineWidth = Math.max(2, w*0.1);
+        c.strokeStyle = c.fillStyle;
+        c.stroke();
+        c.fillRect(w*0.22, h*0.42, w*0.56, h*0.46);
+      } },
+    { id: 'locationPin', name: 'Location Pin', cat: 'Objects',
+      draw(c, w, h) {
+        c.beginPath();
+        c.moveTo(w/2, h);
+        c.bezierCurveTo(0, h*0.5, w*0.06, 0, w/2, 0);
+        c.bezierCurveTo(w*0.94, 0, w, h*0.5, w/2, h);
+        c.closePath();
+        c.arc(w/2, h*0.36, w*0.16, 0, Math.PI*2);
+        c.fill('evenodd');
+      } },
+  ];
+  const SHAPE_MAP = {};
+  SHAPES.forEach(s => { SHAPE_MAP[s.id] = s; });
+  const SHAPE_CATS = ['Geometric', 'Arrows', 'Talk bubbles', 'Banners', 'Symbols', 'Nature', 'Objects'];
+
+  // Fill shape `id` into bbox {x,y,w,h} on context `c`.
+  function drawShapeToCtx(c, id, bbox, color) {
+    const s = SHAPE_MAP[id] || SHAPES[0];
+    if (!s || bbox.w < 1 || bbox.h < 1) return;
+    c.save();
+    c.translate(bbox.x, bbox.y);
+    c.fillStyle = color || state.primary || '#000000';
+    s.draw(c, bbox.w, bbox.h);
+    c.restore();
+  }
+
   // ---- Tool handlers ----
   // Each handler returns { down, move, up }; receives world position {x,y}
   const Tools = {
@@ -530,6 +856,18 @@
         ctx.beginPath();
         ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
         ctx.fill();
+      }
+    },
+    customShape: {
+      down(p) { saveSnapshot(); state.startX = p.x; state.startY = p.y; },
+      move(p) {
+        restoreSnapshot();
+        const e = state.shift ? snapToSquare(state.startX, state.startY, p.x, p.y) : p;
+        const bbox = {
+          x: Math.min(state.startX, e.x), y: Math.min(state.startY, e.y),
+          w: Math.abs(e.x - state.startX), h: Math.abs(e.y - state.startY)
+        };
+        drawShapeToCtx(ctx, state.activeShape || 'star5', bbox);
       }
     },
     musicpencil: {
@@ -6908,6 +7246,41 @@
   }
   function centerView() { state.panX = 0; state.panY = 0; applyZoomTransform(); }
 
+  // ---- Custom Shape picker ----
+  // A categorised gallery of all 50 shapes; clicking a cell selects
+  // the shape, activates the customShape tool, and closes the modal.
+  function openShapePicker() {
+    let html = '<div style="max-height:60vh;overflow:auto">';
+    for (const cat of SHAPE_CATS) {
+      html += `<div style="font-weight:bold;margin:8px 2px 4px;opacity:0.8">${cat}</div>`;
+      html += '<div style="display:flex;flex-wrap:wrap;gap:6px">';
+      for (const s of SHAPES.filter(x => x.cat === cat)) {
+        html += `<button type="button" class="shape-cell" data-shape="${s.id}" title="${s.name}" ` +
+          `style="width:52px;height:60px;display:flex;flex-direction:column;align-items:center;` +
+          `gap:2px;cursor:pointer;background:#fff;border:1px solid #bbb;border-radius:4px;padding:3px">` +
+          `<canvas width="40" height="40" data-thumb="${s.id}"></canvas>` +
+          `<span style="font-size:8px;line-height:1;text-align:center;color:#333;overflow:hidden">${s.name}</span>` +
+          `</button>`;
+      }
+      html += '</div>';
+    }
+    html += '</div>';
+    showModal('Custom Shapes — pick one, then drag on the canvas',
+      html, { okText: 'Close', hideCancel: true });
+    const body = $('modal-body');
+    body.querySelectorAll('canvas[data-thumb]').forEach((cv) => {
+      const tctx = cv.getContext('2d');
+      drawShapeToCtx(tctx, cv.dataset.thumb, { x: 4, y: 4, w: 32, h: 32 }, '#2b6cb0');
+    });
+    body.querySelectorAll('.shape-cell').forEach((cell) => {
+      cell.addEventListener('click', () => {
+        state.activeShape = cell.dataset.shape;
+        setTool('customShape');
+        $('modal-ok').click();
+      });
+    });
+  }
+
   window.RP = {
     applyFilter,
     openLevels, openHSL, openColorBalance, openThreshold,
@@ -6932,6 +7305,8 @@
     expandSelection, contractSelection, borderSelection,
     smoothSelection, featherSelection, selectOpaque,
     // View
-    zoomFit, zoom50, zoom100, zoom200, zoom400, zoom800, centerView
+    zoomFit, zoom50, zoom100, zoom200, zoom400, zoom800, centerView,
+    // Custom shapes
+    openShapePicker
   };
 })();
