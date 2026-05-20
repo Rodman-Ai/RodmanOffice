@@ -2501,6 +2501,34 @@
     return src[(y * w + x) * 4 + ch];
   }
 
+  // Fractal value-noise field in [0,1] — used by the Render family
+  // (clouds, plasma, fibers). `scale` = base lattice cell size in px;
+  // `octaves` sums successively finer, weaker layers.
+  function valueNoise(w, h, scale, octaves) {
+    const out = new Float32Array(w * h);
+    let amp = 1, totAmp = 0, cell = scale;
+    for (let o = 0; o < octaves; o++) {
+      const gw = Math.ceil(w / cell) + 2, gh = Math.ceil(h / cell) + 2;
+      const lat = new Float32Array(gw * gh);
+      for (let i = 0; i < lat.length; i++) lat[i] = Math.random();
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const gx = x / cell, gy = y / cell;
+          const x0 = gx | 0, y0 = gy | 0, fx = gx - x0, fy = gy - y0;
+          const a = lat[y0 * gw + x0], b = lat[y0 * gw + x0 + 1];
+          const c = lat[(y0 + 1) * gw + x0], e = lat[(y0 + 1) * gw + x0 + 1];
+          const sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
+          const top = a + (b - a) * sx, bot = c + (e - c) * sx;
+          out[y * w + x] += (top + (bot - top) * sy) * amp;
+        }
+      }
+      totAmp += amp; amp *= 0.5; cell *= 0.5;
+      if (cell < 2) break;
+    }
+    for (let i = 0; i < out.length; i++) out[i] /= totAmp;
+    return out;
+  }
+
   const EXTRA_FILTERS = {
     // ---- Blur & Focus ----
     gaussianBlur(img) { convolve(img, K_GAUSS5, 5, 5, 256, 0); },
@@ -2991,6 +3019,508 @@
         d[i] = clamp8(r * f); d[i+1] = clamp8(g * f); d[i+2] = clamp8(b * f);
       }
     },
+
+    // =============== Round 2 ===============
+
+    // ---- Pixelate ----
+    crystallize(img) {
+      const w = img.width, h = img.height, d = img.data, src = new Uint8ClampedArray(d);
+      const C = 14, gw = Math.ceil(w / C) + 1, gh = Math.ceil(h / C) + 1;
+      const px = new Float32Array(gw * gh), py = new Float32Array(gw * gh);
+      for (let gy = 0; gy < gh; gy++) for (let gx = 0; gx < gw; gx++) {
+        const gi = gy * gw + gx;
+        px[gi] = gx * C + Math.random() * C;
+        py[gi] = gy * C + Math.random() * C;
+      }
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const cgx = (x / C) | 0, cgy = (y / C) | 0;
+        let best = 1e9, bx = x, by = y;
+        for (let oy = -1; oy <= 1; oy++) for (let ox = -1; ox <= 1; ox++) {
+          const gx = cgx + ox, gy = cgy + oy;
+          if (gx < 0 || gy < 0 || gx >= gw || gy >= gh) continue;
+          const gi = gy * gw + gx, dx = px[gi] - x, dy = py[gi] - y, dist = dx * dx + dy * dy;
+          if (dist < best) { best = dist; bx = px[gi] | 0; by = py[gi] | 0; }
+        }
+        if (bx < 0) bx = 0; else if (bx >= w) bx = w - 1;
+        if (by < 0) by = 0; else if (by >= h) by = h - 1;
+        const si = (by * w + bx) * 4, di = (y * w + x) * 4;
+        d[di] = src[si]; d[di+1] = src[si+1]; d[di+2] = src[si+2];
+      }
+    },
+    colorHalftone(img) {
+      const w = img.width, h = img.height, d = img.data, src = new Uint8ClampedArray(d);
+      const C = 6, offs = [[0,0],[3,1],[1,3]];
+      for (let c = 0; c < 3; c++) {
+        const ox = offs[c][0], oy = offs[c][1];
+        for (let cy = -C; cy < h; cy += C) for (let cx = -C; cx < w; cx += C) {
+          let sum = 0, n = 0;
+          for (let y = cy + oy; y < cy + oy + C; y++) for (let x = cx + ox; x < cx + ox + C; x++) {
+            if (x < 0 || y < 0 || x >= w || y >= h) continue;
+            sum += src[(y * w + x) * 4 + c]; n++;
+          }
+          const avg = n ? sum / n : 0, rad = avg / 255 * (C / 2) * 1.4;
+          const mx = cx + ox + C / 2, my = cy + oy + C / 2;
+          for (let y = cy + oy; y < cy + oy + C; y++) for (let x = cx + ox; x < cx + ox + C; x++) {
+            if (x < 0 || y < 0 || x >= w || y >= h) continue;
+            d[(y * w + x) * 4 + c] = Math.hypot(x - mx, y - my) <= rad ? 255 : 0;
+          }
+        }
+      }
+    },
+    mezzotint(img) {
+      const d = img.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const v = luma(d[i], d[i+1], d[i+2]) / 255 > Math.random() ? 255 : 0;
+        d[i] = d[i+1] = d[i+2] = v;
+      }
+    },
+    fragment(img) {
+      const w = img.width, h = img.height, d = img.data, src = new Uint8ClampedArray(d);
+      const k = 4, off = [[-k,-k],[k,-k],[-k,k],[k,k]];
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        let r = 0, g = 0, b = 0;
+        for (let o = 0; o < 4; o++) {
+          let xx = x + off[o][0], yy = y + off[o][1];
+          if (xx < 0) xx = 0; else if (xx >= w) xx = w - 1;
+          if (yy < 0) yy = 0; else if (yy >= h) yy = h - 1;
+          const si = (yy * w + xx) * 4;
+          r += src[si]; g += src[si+1]; b += src[si+2];
+        }
+        const di = (y * w + x) * 4;
+        d[di] = r / 4; d[di+1] = g / 4; d[di+2] = b / 4;
+      }
+    },
+    facet(img) {
+      const w = img.width, h = img.height, d = img.data, src = new Uint8ClampedArray(d);
+      const BINS = 12;
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const cnt = new Int32Array(BINS), sr = new Int32Array(BINS),
+              sg = new Int32Array(BINS), sb = new Int32Array(BINS);
+        for (let oy = -1; oy <= 1; oy++) for (let ox = -1; ox <= 1; ox++) {
+          let yy = y + oy, xx = x + ox;
+          if (yy < 0) yy = 0; else if (yy >= h) yy = h - 1;
+          if (xx < 0) xx = 0; else if (xx >= w) xx = w - 1;
+          const si = (yy * w + xx) * 4;
+          const bin = Math.min(BINS - 1, luma(src[si], src[si+1], src[si+2]) / 256 * BINS | 0);
+          cnt[bin]++; sr[bin] += src[si]; sg[bin] += src[si+1]; sb[bin] += src[si+2];
+        }
+        let best = 0;
+        for (let bN = 1; bN < BINS; bN++) if (cnt[bN] > cnt[best]) best = bN;
+        const di = (y * w + x) * 4, c = cnt[best] || 1;
+        d[di] = sr[best] / c; d[di+1] = sg[best] / c; d[di+2] = sb[best] / c;
+      }
+    },
+    extrude(img) {
+      const w = img.width, h = img.height, d = img.data, src = new Uint8ClampedArray(d), C = 14;
+      for (let cy = 0; cy < h; cy += C) for (let cx = 0; cx < w; cx += C) {
+        let sr = 0, sg = 0, sb = 0, n = 0;
+        for (let y = cy; y < cy + C && y < h; y++) for (let x = cx; x < cx + C && x < w; x++) {
+          const si = (y * w + x) * 4; sr += src[si]; sg += src[si+1]; sb += src[si+2]; n++;
+        }
+        const r = sr / n, g = sg / n, b = sb / n, L = luma(r, g, b) / 255;
+        const inset = Math.round((1 - L) * (C / 2 - 1));
+        for (let y = cy; y < cy + C && y < h; y++) for (let x = cx; x < cx + C && x < w; x++) {
+          const ex = x - cx, ey = y - cy, di = (y * w + x) * 4;
+          const edge = ex < inset || ey < inset || ex >= C - inset || ey >= C - inset;
+          const f = edge ? 0.35 : 1;
+          d[di] = r * f; d[di+1] = g * f; d[di+2] = b * f;
+        }
+      }
+    },
+
+    // ---- Render & Generate ----
+    clouds(img) {
+      const w = img.width, h = img.height, d = img.data, n = valueNoise(w, h, 80, 5);
+      for (let p = 0; p < w * h; p++) {
+        const v = clamp8(n[p] * 255);
+        d[p*4] = d[p*4+1] = d[p*4+2] = v;
+      }
+    },
+    differenceClouds(img) {
+      const w = img.width, h = img.height, d = img.data, n = valueNoise(w, h, 80, 5);
+      for (let p = 0; p < w * h; p++) {
+        const v = clamp8(n[p] * 255);
+        d[p*4] = Math.abs(d[p*4] - v);
+        d[p*4+1] = Math.abs(d[p*4+1] - v);
+        d[p*4+2] = Math.abs(d[p*4+2] - v);
+      }
+    },
+    fibers(img) {
+      const w = img.width, h = img.height, d = img.data;
+      const colv = new Float32Array(w);
+      for (let x = 0; x < w; x++) colv[x] = Math.random();
+      const sm = new Float32Array(w);
+      for (let x = 0; x < w; x++) {
+        let s = 0, n = 0;
+        for (let k = -2; k <= 2; k++) { const xx = x + k; if (xx >= 0 && xx < w) { s += colv[xx]; n++; } }
+        sm[x] = s / n;
+      }
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const v = clamp8((sm[x] * 0.7 + Math.random() * 0.3) * 255), p = (y * w + x) * 4;
+        d[p] = d[p+1] = d[p+2] = v;
+      }
+    },
+    checkerboard(img) {
+      const w = img.width, h = img.height, d = img.data, C = 16;
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const v = (((x / C | 0) + (y / C | 0)) & 1) ? 40 : 220, p = (y * w + x) * 4;
+        d[p] = d[p+1] = d[p+2] = v;
+      }
+    },
+    stripes(img) {
+      const w = img.width, h = img.height, d = img.data;
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const v = ((x + y) % 28) < 14 ? 60 : 232, p = (y * w + x) * 4;
+        d[p] = d[p+1] = d[p+2] = v;
+      }
+    },
+    gridRender(img) {
+      const w = img.width, h = img.height, d = img.data, C = 24;
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const v = (x % C) < 2 || (y % C) < 2 ? 40 : 248, p = (y * w + x) * 4;
+        d[p] = d[p+1] = d[p+2] = v;
+      }
+    },
+    radialGradient(img) {
+      const w = img.width, h = img.height, d = img.data;
+      const cx = w / 2, cy = h / 2, mr = Math.hypot(cx, cy);
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const v = clamp8((1 - Math.hypot(x - cx, y - cy) / mr) * 255), p = (y * w + x) * 4;
+        d[p] = d[p+1] = d[p+2] = v;
+      }
+    },
+    linearGradient2(img) {
+      const w = img.width, h = img.height, d = img.data;
+      const a = [26, 42, 108], b = [253, 187, 45];
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const t = (x + y) / (w + h), p = (y * w + x) * 4;
+        d[p] = a[0] + (b[0] - a[0]) * t;
+        d[p+1] = a[1] + (b[1] - a[1]) * t;
+        d[p+2] = a[2] + (b[2] - a[2]) * t;
+      }
+    },
+    plasma(img) {
+      const w = img.width, h = img.height, d = img.data;
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const v = Math.sin(x / 16) + Math.sin(y / 13)
+          + Math.sin((x + y) / 22) + Math.sin(Math.hypot(x - w / 2, y - h / 2) / 19);
+        const rgb = hsl2rgb(((v + 4) / 8) % 1, 0.7, 0.55), p = (y * w + x) * 4;
+        d[p] = rgb[0]; d[p+1] = rgb[1]; d[p+2] = rgb[2];
+      }
+    },
+    noiseField(img) {
+      const d = img.data;
+      for (let i = 0; i < d.length; i += 4) {
+        d[i] = Math.random() * 255; d[i+1] = Math.random() * 255; d[i+2] = Math.random() * 255;
+      }
+    },
+
+    // ---- Sketch ----
+    charcoal(img) {
+      const w = img.width, h = img.height, mag = sobelMag(img, true), d = img.data;
+      for (let p = 0; p < w * h; p++) {
+        let v = luma(d[p*4], d[p*4+1], d[p*4+2]) - Math.min(255, mag[p*3]) * 1.1
+                + (Math.random() - 0.5) * 44;
+        v = clamp8(v);
+        d[p*4] = d[p*4+1] = d[p*4+2] = v;
+      }
+    },
+    chalkCharcoal(img) {
+      const w = img.width, h = img.height, mag = sobelMag(img, true), d = img.data;
+      for (let p = 0; p < w * h; p++) {
+        const L = luma(d[p*4], d[p*4+1], d[p*4+2]);
+        let v = L > 140 ? 210 : 45;
+        if (mag[p*3] > 60) v = L > 140 ? 255 : 20;
+        v = clamp8(v + (Math.random() - 0.5) * 30);
+        d[p*4] = d[p*4+1] = d[p*4+2] = v;
+      }
+    },
+    conteCrayon(img) {
+      const d = img.data;
+      for (let i = 0; i < d.length; i += 4) {
+        let L = Math.round(luma(d[i], d[i+1], d[i+2]) / 64) * 64;
+        L = clamp8(L + (Math.random() - 0.5) * 36);
+        d[i] = clamp8(L * 1.06); d[i+1] = clamp8(L * 0.98); d[i+2] = clamp8(L * 0.82);
+      }
+    },
+    graphicPen(img) {
+      const w = img.width, h = img.height, d = img.data, src = new Uint8ClampedArray(d);
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4, L = luma(src[i], src[i+1], src[i+2]);
+        let ink = false;
+        if (L < 210 && (x + y) % 5 === 0) ink = true;
+        if (L < 150 && (x + y) % 5 === 2) ink = true;
+        if (L < 90 && (x + y) % 5 === 4) ink = true;
+        const v = ink ? 25 : 250;
+        d[i] = d[i+1] = d[i+2] = v;
+      }
+    },
+    photocopy(img) {
+      const w = img.width, h = img.height, mag = sobelMag(img, true), d = img.data;
+      for (let p = 0; p < w * h; p++) {
+        const L = luma(d[p*4], d[p*4+1], d[p*4+2]);
+        const v = L > 150 ? 255 : (L < 70 || mag[p*3] > 45 ? 15 : clamp8(L * 1.4));
+        d[p*4] = d[p*4+1] = d[p*4+2] = v;
+      }
+    },
+    basRelief(img) {
+      convolve(img, K_EMBOSS, 3, 3, 1, 128);
+      const d = img.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const v = luma(d[i], d[i+1], d[i+2]);
+        d[i] = d[i+1] = d[i+2] = v;
+      }
+    },
+    notePaper(img) {
+      const w = img.width, h = img.height, d = img.data, n = valueNoise(w, h, 3, 2);
+      for (let p = 0; p < w * h; p++) {
+        const L = luma(d[p*4], d[p*4+1], d[p*4+2]);
+        const v = clamp8((L > 128 ? 235 : 60) + (n[p] - 0.5) * 60);
+        d[p*4] = clamp8(v * 1.02); d[p*4+1] = v; d[p*4+2] = clamp8(v * 0.9);
+      }
+    },
+    stampArt(img) {
+      const d = img.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const v = luma(d[i], d[i+1], d[i+2]) > 128 ? 255 : 0;
+        d[i] = d[i+1] = d[i+2] = v;
+      }
+    },
+    reticulation(img) {
+      const w = img.width, h = img.height, d = img.data, n = valueNoise(w, h, 6, 3);
+      for (let p = 0; p < w * h; p++) {
+        const L = luma(d[p*4], d[p*4+1], d[p*4+2]) / 255;
+        const v = (n[p] * 0.7 + 0.15) < L ? 235 : 35;
+        d[p*4] = d[p*4+1] = d[p*4+2] = v;
+      }
+    },
+
+    // ---- Texture ----
+    grainTexture(img) {
+      const d = img.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const n = (Math.random() - 0.5) * 96;
+        d[i] = clamp8(d[i] + n); d[i+1] = clamp8(d[i+1] + n); d[i+2] = clamp8(d[i+2] + n);
+      }
+    },
+    mosaicTiles(img) {
+      const w = img.width, h = img.height, d = img.data, src = new Uint8ClampedArray(d), C = 16;
+      for (let cy = 0; cy < h; cy += C) for (let cx = 0; cx < w; cx += C) {
+        let sr = 0, sg = 0, sb = 0, n = 0;
+        for (let y = cy; y < cy + C && y < h; y++) for (let x = cx; x < cx + C && x < w; x++) {
+          const si = (y * w + x) * 4; sr += src[si]; sg += src[si+1]; sb += src[si+2]; n++;
+        }
+        const r = sr / n, g = sg / n, b = sb / n;
+        for (let y = cy; y < cy + C && y < h; y++) for (let x = cx; x < cx + C && x < w; x++) {
+          const ex = x - cx, ey = y - cy;
+          const f = (ex === 0 || ey === 0 || ex === C - 1 || ey === C - 1) ? 0.4 : 1;
+          const di = (y * w + x) * 4;
+          d[di] = r * f; d[di+1] = g * f; d[di+2] = b * f;
+        }
+      }
+    },
+    patchwork(img) {
+      const w = img.width, h = img.height, d = img.data, src = new Uint8ClampedArray(d), C = 12;
+      for (let cy = 0; cy < h; cy += C) for (let cx = 0; cx < w; cx += C) {
+        let sr = 0, sg = 0, sb = 0, n = 0;
+        for (let y = cy; y < cy + C && y < h; y++) for (let x = cx; x < cx + C && x < w; x++) {
+          const si = (y * w + x) * 4; sr += src[si]; sg += src[si+1]; sb += src[si+2]; n++;
+        }
+        const lift = (Math.random() - 0.5) * 70;
+        const r = clamp8(sr / n + lift), g = clamp8(sg / n + lift), b = clamp8(sb / n + lift);
+        for (let y = cy; y < cy + C && y < h; y++) for (let x = cx; x < cx + C && x < w; x++) {
+          const di = (y * w + x) * 4;
+          d[di] = r; d[di+1] = g; d[di+2] = b;
+        }
+      }
+    },
+    stainedGlass(img) {
+      EXTRA_FILTERS.crystallize(img);
+      const w = img.width, h = img.height, mag = sobelMag(img, true), d = img.data;
+      for (let p = 0; p < w * h; p++) {
+        if (mag[p*3] > 30) { d[p*4] = d[p*4+1] = d[p*4+2] = 10; }
+      }
+    },
+    craquelure(img) {
+      const w = img.width, h = img.height, d = img.data, n = valueNoise(w, h, 10, 3);
+      for (let p = 0; p < w * h; p++) {
+        if (Math.abs(n[p] - 0.5) < 0.045) {
+          d[p*4] = clamp8(d[p*4] * 0.45);
+          d[p*4+1] = clamp8(d[p*4+1] * 0.45);
+          d[p*4+2] = clamp8(d[p*4+2] * 0.45);
+        }
+      }
+    },
+    canvasTexture(img) {
+      const w = img.width, h = img.height, d = img.data;
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const t = 0.85 + 0.15 * ((Math.sin(x * 1.4) + Math.sin(y * 1.4)) * 0.25 + 0.5);
+        const p = (y * w + x) * 4;
+        d[p] = clamp8(d[p] * t); d[p+1] = clamp8(d[p+1] * t); d[p+2] = clamp8(d[p+2] * t);
+      }
+    },
+    tiles(img) {
+      const w = img.width, h = img.height, d = img.data, src = new Uint8ClampedArray(d);
+      const C = 24, gap = 2;
+      for (let i = 0; i < d.length; i += 4) { d[i] = d[i+1] = d[i+2] = 235; }
+      for (let cy = 0; cy < h; cy += C) for (let cx = 0; cx < w; cx += C) {
+        const ox = (Math.random() - 0.5) * 6 | 0, oy = (Math.random() - 0.5) * 6 | 0;
+        for (let y = cy + gap; y < cy + C - gap && y < h; y++) {
+          for (let x = cx + gap; x < cx + C - gap && x < w; x++) {
+            let sx = x - ox, sy = y - oy;
+            if (sx < 0) sx = 0; else if (sx >= w) sx = w - 1;
+            if (sy < 0) sy = 0; else if (sy >= h) sy = h - 1;
+            const si = (sy * w + sx) * 4, di = (y * w + x) * 4;
+            d[di] = src[si]; d[di+1] = src[si+1]; d[di+2] = src[si+2];
+          }
+        }
+      }
+    },
+
+    // ---- Distort II ----
+    zigzag(img) {
+      remapPixels(img, (x, y, w, h) => {
+        const cx = w / 2, cy = h / 2, dx = x - cx, dy = y - cy, r = Math.hypot(dx, dy);
+        if (r === 0) return [x, y];
+        const off = (Math.abs(((r / 14) % 2) - 1) - 0.5) * 10;
+        return [x + dx / r * off, y + dy / r * off];
+      });
+    },
+    shear(img) {
+      remapPixels(img, (x, y, w, h) => [x + Math.sin(y / h * Math.PI * 2) * 18, y]);
+    },
+    kaleidoscope(img) {
+      const SEG = 6, segAng = Math.PI * 2 / SEG;
+      remapPixels(img, (x, y, w, h) => {
+        const cx = w / 2, cy = h / 2, dx = x - cx, dy = y - cy, r = Math.hypot(dx, dy);
+        let a = Math.atan2(dy, dx);
+        a = ((a % segAng) + segAng) % segAng;
+        if (a > segAng / 2) a = segAng - a;
+        return [cx + Math.cos(a) * r, cy + Math.sin(a) * r];
+      });
+    },
+    barrel(img) {
+      remapPixels(img, (x, y, w, h) => {
+        const cx = w / 2, cy = h / 2, mr = Math.min(cx, cy);
+        const dx = (x - cx) / mr, dy = (y - cy) / mr, f = 1 - 0.20 * (dx * dx + dy * dy);
+        return [cx + dx * mr * f, cy + dy * mr * f];
+      });
+    },
+    pincushion(img) {
+      remapPixels(img, (x, y, w, h) => {
+        const cx = w / 2, cy = h / 2, mr = Math.min(cx, cy);
+        const dx = (x - cx) / mr, dy = (y - cy) / mr, f = 1 + 0.30 * (dx * dx + dy * dy);
+        return [cx + dx * mr * f, cy + dy * mr * f];
+      });
+    },
+    squeeze(img) {
+      remapPixels(img, (x, y, w, h) => {
+        const cx = w / 2, f = 1 + 0.35 * Math.cos(y / h * Math.PI);
+        return [cx + (x - cx) / f, y];
+      });
+    },
+
+    // ---- Photo Looks ----
+    bwRedFilter(img) {
+      const d = img.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const v = clamp8(d[i] * 0.78 + d[i+1] * 0.18 + d[i+2] * 0.04);
+        d[i] = d[i+1] = d[i+2] = v;
+      }
+    },
+    bwGreenFilter(img) {
+      const d = img.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const v = clamp8(d[i] * 0.20 + d[i+1] * 0.70 + d[i+2] * 0.10);
+        d[i] = d[i+1] = d[i+2] = v;
+      }
+    },
+    bwBlueFilter(img) {
+      const d = img.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const v = clamp8(d[i] * 0.05 + d[i+1] * 0.22 + d[i+2] * 0.73);
+        d[i] = d[i+1] = d[i+2] = v;
+      }
+    },
+    infrared(img) {
+      const d = img.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const r = d[i], g = d[i+1], b = d[i+2];
+        d[i] = clamp8((clamp8(g * 1.35) - 128) * 1.25 + 128);
+        d[i+1] = clamp8((clamp8(r * 0.7 + b * 0.2) - 128) * 1.25 + 128);
+        d[i+2] = clamp8((clamp8(b * 0.45) - 128) * 1.25 + 128);
+      }
+    },
+    crossProcess(img) {
+      const d = img.data;
+      for (let i = 0; i < d.length; i += 4) {
+        d[i] = clamp8((d[i] - 128) * 1.3 + 128 + 12);
+        d[i+1] = clamp8((d[i+1] - 128) * 1.18 + 128 + 6);
+        d[i+2] = clamp8((d[i+2] - 128) * 1.08 + 128 - 18);
+      }
+    },
+    bleachBypass(img) {
+      const d = img.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const L = luma(d[i], d[i+1], d[i+2]);
+        d[i] = clamp8((d[i] * 0.4 + L * 0.6 - 128) * 1.4 + 128);
+        d[i+1] = clamp8((d[i+1] * 0.4 + L * 0.6 - 128) * 1.4 + 128);
+        d[i+2] = clamp8((d[i+2] * 0.4 + L * 0.6 - 128) * 1.4 + 128);
+      }
+    },
+    tealOrange(img) {
+      const d = img.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const L = luma(d[i], d[i+1], d[i+2]) / 255, sh = 1 - L, hi = L;
+        d[i] = clamp8(d[i] + hi * 26 - sh * 18);
+        d[i+1] = clamp8(d[i+1] + hi * 10 + sh * 4);
+        d[i+2] = clamp8(d[i+2] - hi * 22 + sh * 30);
+      }
+    },
+    vintageFilm(img) {
+      const d = img.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const L = luma(d[i], d[i+1], d[i+2]);
+        const r = d[i] * 0.85 + L * 0.15, g = d[i+1] * 0.85 + L * 0.15, b = d[i+2] * 0.85 + L * 0.15;
+        d[i] = clamp8(r * 0.9 + 34);
+        d[i+1] = clamp8(g * 0.9 + 22);
+        d[i+2] = clamp8(b * 0.85 + 12);
+      }
+    },
+    matte(img) {
+      const d = img.data;
+      for (let i = 0; i < d.length; i += 4) {
+        d[i] = clamp8(34 + d[i] / 255 * 221);
+        d[i+1] = clamp8(32 + d[i+1] / 255 * 221);
+        d[i+2] = clamp8(38 + d[i+2] / 255 * 215);
+      }
+    },
+    goldenHour(img) {
+      const d = img.data;
+      for (let i = 0; i < d.length; i += 4) {
+        d[i] = clamp8(d[i] * 1.12 + 18);
+        d[i+1] = clamp8(d[i+1] * 1.04 + 8);
+        d[i+2] = clamp8(d[i+2] * 0.86 - 6);
+      }
+    },
+    moody(img) {
+      const d = img.data;
+      for (let i = 0; i < d.length; i += 4) {
+        d[i] = clamp8((d[i] - 128) * 1.15 + 128 - 14);
+        d[i+1] = clamp8((d[i+1] - 128) * 1.15 + 128 - 8);
+        d[i+2] = clamp8((d[i+2] - 128) * 1.15 + 128 + 6);
+      }
+    },
+    technicolor(img) {
+      const d = img.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const hsl = rgb2hsl(d[i], d[i+1], d[i+2]);
+        hsl[1] = Math.min(1, hsl[1] * 1.7);
+        hsl[2] = Math.max(0, Math.min(1, (hsl[2] * 255 - 128) * 1.15 / 255 + 0.5));
+        const rgb = hsl2rgb(hsl[0], hsl[1], hsl[2]);
+        d[i] = rgb[0]; d[i+1] = rgb[1]; d[i+2] = rgb[2];
+      }
+    },
   };
 
   // Display labels + the categorised Filter Gallery layout.
@@ -3015,6 +3545,24 @@
     addNoise: 'Add Noise', median: 'Despeckle (Median)', filmGrain: 'Film Grain',
     halftone: 'Halftone', scanlines: 'Scanlines (CRT)',
     vignette: 'Vignette', lomo: 'Lomo',
+    crystallize: 'Crystallize', colorHalftone: 'Color Halftone', mezzotint: 'Mezzotint',
+    fragment: 'Fragment', facet: 'Facet', extrude: 'Extrude',
+    clouds: 'Clouds', differenceClouds: 'Difference Clouds', fibers: 'Fibers',
+    checkerboard: 'Checkerboard', stripes: 'Stripes', gridRender: 'Grid',
+    radialGradient: 'Radial Gradient', linearGradient2: 'Linear Gradient', plasma: 'Plasma',
+    noiseField: 'Noise Field',
+    charcoal: 'Charcoal', chalkCharcoal: 'Chalk & Charcoal', conteCrayon: 'Conté Crayon',
+    graphicPen: 'Graphic Pen', photocopy: 'Photocopy', basRelief: 'Bas Relief',
+    notePaper: 'Note Paper', stampArt: 'Stamp', reticulation: 'Reticulation',
+    grainTexture: 'Grain', mosaicTiles: 'Mosaic Tiles', patchwork: 'Patchwork',
+    stainedGlass: 'Stained Glass', craquelure: 'Craquelure', canvasTexture: 'Canvas Texture',
+    tiles: 'Tiles',
+    zigzag: 'ZigZag', shear: 'Shear', kaleidoscope: 'Kaleidoscope',
+    barrel: 'Barrel Distortion', pincushion: 'Pincushion', squeeze: 'Squeeze',
+    bwRedFilter: 'B&W — Red Filter', bwGreenFilter: 'B&W — Green Filter',
+    bwBlueFilter: 'B&W — Blue Filter', infrared: 'Infrared', crossProcess: 'Cross Process',
+    bleachBypass: 'Bleach Bypass', tealOrange: 'Teal & Orange', vintageFilm: 'Vintage Film',
+    matte: 'Matte', goldenHour: 'Golden Hour', moody: 'Moody', technicolor: 'Technicolor',
   };
   const FILTER_GALLERY = [
     ['Basics', ['invert', 'grayscale', 'sepia', 'posterize', 'blur', 'brighten', 'darken']],
@@ -3026,6 +3574,12 @@
     ['Color & Tone', ['brightContrast', 'exposure', 'vibrance', 'warm', 'cool', 'hueRotate', 'autoLevels', 'autoContrast', 'gradientMap', 'duotone']],
     ['Noise & Texture', ['addNoise', 'median', 'filmGrain', 'halftone', 'scanlines']],
     ['Vintage / Photo', ['vignette', 'lomo']],
+    ['Pixelate', ['crystallize', 'colorHalftone', 'mezzotint', 'fragment', 'facet', 'extrude']],
+    ['Render & Generate', ['clouds', 'differenceClouds', 'fibers', 'checkerboard', 'stripes', 'gridRender', 'radialGradient', 'linearGradient2', 'plasma', 'noiseField']],
+    ['Sketch', ['charcoal', 'chalkCharcoal', 'conteCrayon', 'graphicPen', 'photocopy', 'basRelief', 'notePaper', 'stampArt', 'reticulation']],
+    ['Texture', ['grainTexture', 'mosaicTiles', 'patchwork', 'stainedGlass', 'craquelure', 'canvasTexture', 'tiles']],
+    ['Distort II', ['zigzag', 'shear', 'kaleidoscope', 'barrel', 'pincushion', 'squeeze']],
+    ['Photo Looks', ['bwRedFilter', 'bwGreenFilter', 'bwBlueFilter', 'infrared', 'crossProcess', 'bleachBypass', 'tealOrange', 'vintageFilm', 'matte', 'goldenHour', 'moody', 'technicolor']],
   ];
 
   function applyFilter(kind) {
