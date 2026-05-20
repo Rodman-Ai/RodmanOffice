@@ -1,5 +1,5 @@
 /* Retro Paint — network-first app shell cache with offline fallback. */
-const CACHE = 'retro-paint-v13';
+const CACHE = 'retro-paint-v14';
 const CACHE_PREFIX = 'retro-paint-';
 const ASSETS = [
   './',
