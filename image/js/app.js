@@ -6511,12 +6511,427 @@
   // Expose only what the menu bar needs to dispatch. Everything else stays
   // private to this IIFE. Buttons reachable via `getElementById(...).click()`
   // are not re-exposed here.
+  // ===================================================================
+  // Photoshop-parity menu commands (Image / Edit / Layer / Select / View).
+  // Each is exposed on window.RP and wired into js/menus.js.
+  // ===================================================================
+
+  // Rebuild every layer's canvas at a new size. drawFn(srcCanvas,
+  // newCtx) places/transforms the old content. Updates W/H, the
+  // display canvas, doc dimensions, and rebinds the active ctx.
+  // Structural — old per-layer undo snapshots no longer fit, so the
+  // doc's undo/redo stacks are cleared.
+  function resizeDocument(newW, newH, drawFn) {
+    newW = Math.max(1, Math.round(newW));
+    newH = Math.max(1, Math.round(newH));
+    const doc = activeDoc(); if (!doc) return;
+    for (const layer of doc.layers) {
+      const nc = window.document.createElement('canvas');
+      nc.width = newW; nc.height = newH;
+      const nctx = nc.getContext('2d', { willReadFrequently: true });
+      drawFn(layer.canvas, nctx);
+      layer.canvas = nc; layer.ctx = nctx;
+    }
+    W = newW; H = newH;
+    doc.width = newW; doc.height = newH;
+    canvas.width = newW; canvas.height = newH;
+    doc.undoStack.length = 0; doc.redoStack.length = 0;
+    setActiveLayer(doc.activeIdx);
+    composite();
+    if (typeof applyZoomTransform === 'function') applyZoomTransform();
+    if (typeof updateUndoButtons === 'function') updateUndoButtons();
+    scheduleAutosave();
+  }
+
+  // Flatten an array of layers (respecting visible/opacity/blend) onto
+  // a fresh W×H canvas.
+  function flattenLayers(list) {
+    const c = window.document.createElement('canvas');
+    c.width = W; c.height = H;
+    const cx = c.getContext('2d');
+    for (const layer of list) {
+      if (!layer.visible) continue;
+      cx.globalAlpha = layer.opacity;
+      cx.globalCompositeOperation = layer.blend || 'source-over';
+      cx.drawImage(layer.canvas, 0, 0);
+    }
+    return c;
+  }
+
+  function selRectOrFull() {
+    return selectionRect() || { x: 0, y: 0, w: W, h: H };
+  }
+  function refreshLayers() {
+    composite();
+    if (typeof renderLayersPanel === 'function') renderLayersPanel();
+    scheduleAutosave();
+  }
+
+  // ---- Image ----
+  function rotate90cw() {
+    resizeDocument(H, W, (src, nctx) => {
+      nctx.translate(src.height, 0);
+      nctx.rotate(Math.PI / 2);
+      nctx.drawImage(src, 0, 0);
+    });
+  }
+  function rotate90ccw() {
+    resizeDocument(H, W, (src, nctx) => {
+      nctx.translate(0, src.width);
+      nctx.rotate(-Math.PI / 2);
+      nctx.drawImage(src, 0, 0);
+    });
+  }
+  function rotate180() {
+    resizeDocument(W, H, (src, nctx) => {
+      nctx.translate(src.width, src.height);
+      nctx.rotate(Math.PI);
+      nctx.drawImage(src, 0, 0);
+    });
+  }
+  function rotateArbitrary(deg) {
+    if (deg == null) {
+      const v = prompt('Rotate canvas by how many degrees?', '45');
+      if (v == null) return;
+      deg = parseFloat(v);
+    }
+    if (!isFinite(deg) || deg === 0) return;
+    const rad = deg * Math.PI / 180;
+    const ow = W, oh = H;
+    const nw = Math.abs(ow * Math.cos(rad)) + Math.abs(oh * Math.sin(rad));
+    const nh = Math.abs(ow * Math.sin(rad)) + Math.abs(oh * Math.cos(rad));
+    resizeDocument(nw, nh, (src, nctx) => {
+      nctx.translate(nctx.canvas.width / 2, nctx.canvas.height / 2);
+      nctx.rotate(rad);
+      nctx.drawImage(src, -ow / 2, -oh / 2);
+    });
+  }
+  function flipCanvasH() {
+    resizeDocument(W, H, (src, nctx) => {
+      nctx.translate(src.width, 0); nctx.scale(-1, 1);
+      nctx.drawImage(src, 0, 0);
+    });
+  }
+  function flipCanvasV() {
+    resizeDocument(W, H, (src, nctx) => {
+      nctx.translate(0, src.height); nctx.scale(1, -1);
+      nctx.drawImage(src, 0, 0);
+    });
+  }
+  function cropToSelection() {
+    const r = selectionRect();
+    if (!r || r.w < 1 || r.h < 1) { alert('Make a selection first.'); return; }
+    const rx = r.x, ry = r.y, rw = r.w, rh = r.h;
+    resizeDocument(rw, rh, (src, nctx) => nctx.drawImage(src, -rx, -ry));
+    state.selection = null;
+  }
+  function trimImage() {
+    // Autocrop a uniform border (matches the top-left pixel of the
+    // flattened composite).
+    const flat = flattenLayers(activeDoc().layers);
+    const d = flat.getContext('2d').getImageData(0, 0, W, H).data;
+    const at = (x, y) => { const i = (y * W + x) * 4; return [d[i], d[i+1], d[i+2], d[i+3]]; };
+    const ref = at(0, 0);
+    const same = (p) => p[0]===ref[0] && p[1]===ref[1] && p[2]===ref[2] && p[3]===ref[3];
+    let minX = W, minY = H, maxX = -1, maxY = -1;
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      if (!same(at(x, y))) {
+        if (x < minX) minX = x; if (x > maxX) maxX = x;
+        if (y < minY) minY = y; if (y > maxY) maxY = y;
+      }
+    }
+    if (maxX < 0) { alert('Nothing to trim — the image is a single colour.'); return; }
+    const rw = maxX - minX + 1, rh = maxY - minY + 1;
+    resizeDocument(rw, rh, (src, nctx) => nctx.drawImage(src, -minX, -minY));
+  }
+  function imageSizeDialog() {
+    const v = prompt('Resize image to (width x height):', W + ' x ' + H);
+    if (!v) return;
+    const m = v.split(/[x×,\s]+/).map(s => parseInt(s, 10)).filter(n => n > 0);
+    if (m.length < 2) return;
+    const nw = m[0], nh = m[1];
+    resizeDocument(nw, nh, (src, nctx) => {
+      nctx.imageSmoothingEnabled = true;
+      nctx.drawImage(src, 0, 0, src.width, src.height, 0, 0, nw, nh);
+    });
+  }
+  function canvasSizeDialog() {
+    const v = prompt('Canvas size — width x height (content stays centred):', W + ' x ' + H);
+    if (!v) return;
+    const m = v.split(/[x×,\s]+/).map(s => parseInt(s, 10)).filter(n => n > 0);
+    if (m.length < 2) return;
+    const nw = m[0], nh = m[1];
+    const ox = Math.round((nw - W) / 2), oy = Math.round((nh - H) / 2);
+    resizeDocument(nw, nh, (src, nctx) => nctx.drawImage(src, ox, oy));
+  }
+  function scaleHalf() {
+    resizeDocument(Math.max(1, W / 2), Math.max(1, H / 2), (src, nctx) => {
+      nctx.imageSmoothingEnabled = true;
+      nctx.drawImage(src, 0, 0, src.width, src.height, 0, 0, nctx.canvas.width, nctx.canvas.height);
+    });
+  }
+  function scaleDouble() {
+    resizeDocument(W * 2, H * 2, (src, nctx) => {
+      nctx.imageSmoothingEnabled = true;
+      nctx.drawImage(src, 0, 0, src.width, src.height, 0, 0, nctx.canvas.width, nctx.canvas.height);
+    });
+  }
+  function duplicateImage() {
+    const flat = flattenLayers(activeDoc().layers);
+    const nd = newDocument(W, H, (activeDoc().name || 'untitled') + ' copy');
+    nd.layers[0].ctx.drawImage(flat, 0, 0);
+    docs.push(nd);
+    setActiveDoc(docs.length - 1);
+    refreshLayers();
+  }
+
+  // ---- Edit ----
+  function fillRect2(color) {
+    const r = selRectOrFull();
+    pushUndo();
+    ctx.save();
+    ctx.fillStyle = color;
+    ctx.fillRect(r.x, r.y, r.w, r.h);
+    ctx.restore();
+    composite(); scheduleAutosave();
+  }
+  function fillForeground() { fillRect2(state.primary || '#000000'); }
+  function fillBackground() { fillRect2(state.secondary || '#ffffff'); }
+  function fillPattern() {
+    const r = selRectOrFull();
+    pushUndo();
+    let tile = state.definedPattern;
+    if (!tile) {
+      // default 16×16 checker
+      tile = window.document.createElement('canvas');
+      tile.width = tile.height = 16;
+      const tc = tile.getContext('2d');
+      tc.fillStyle = state.secondary || '#ffffff'; tc.fillRect(0, 0, 16, 16);
+      tc.fillStyle = state.primary || '#000000';
+      tc.fillRect(0, 0, 8, 8); tc.fillRect(8, 8, 8, 8);
+    }
+    const pat = ctx.createPattern(tile, 'repeat');
+    ctx.save();
+    ctx.fillStyle = pat;
+    ctx.translate(r.x, r.y);
+    ctx.fillRect(0, 0, r.w, r.h);
+    ctx.restore();
+    composite(); scheduleAutosave();
+  }
+  function strokeSel(width) {
+    const r = selRectOrFull();
+    pushUndo();
+    ctx.save();
+    ctx.strokeStyle = state.primary || '#000000';
+    ctx.lineWidth = width;
+    ctx.strokeRect(r.x + width / 2, r.y + width / 2, r.w - width, r.h - width);
+    ctx.restore();
+    composite(); scheduleAutosave();
+  }
+  function strokeSelectionThin() { strokeSel(1); }
+  function strokeSelectionThick() { strokeSel(4); }
+  function clearSelection() {
+    const r = selRectOrFull();
+    pushUndo();
+    ctx.clearRect(r.x, r.y, r.w, r.h);
+    composite(); scheduleAutosave();
+  }
+  function copyMerged() {
+    const r = selRectOrFull();
+    const flat = flattenLayers(activeDoc().layers);
+    state.clipboard = flat.getContext('2d').getImageData(r.x, r.y, r.w, r.h);
+  }
+  function definePattern() {
+    const r = selectionRect();
+    if (!r) { alert('Select a region to define as a pattern first.'); return; }
+    const tile = window.document.createElement('canvas');
+    tile.width = r.w; tile.height = r.h;
+    tile.getContext('2d').drawImage(activeLayer().canvas, -r.x, -r.y);
+    state.definedPattern = tile;
+    alert('Pattern defined (' + r.w + '×' + r.h + '). Use Edit ▸ Fill with Pattern.');
+  }
+
+  // ---- Layer ----
+  function layerList() { return activeDoc().layers; }
+  function moveActiveLayer(to) {
+    const doc = activeDoc(), list = doc.layers;
+    if (list.length < 2) return;
+    to = Math.max(0, Math.min(list.length - 1, to));
+    const cur = doc.activeIdx;
+    if (to === cur) return;
+    const [l] = list.splice(cur, 1);
+    list.splice(to, 0, l);
+    doc.activeIdx = to;
+    setActiveLayer(to);
+    refreshLayers();
+  }
+  function layerToFront() { moveActiveLayer(layerList().length - 1); }
+  function layerForward() { moveActiveLayer(activeDoc().activeIdx + 1); }
+  function layerBackward() { moveActiveLayer(activeDoc().activeIdx - 1); }
+  function layerToBack() { moveActiveLayer(0); }
+  function mergeVisible() {
+    const doc = activeDoc();
+    const vis = doc.layers.filter(l => l.visible);
+    if (vis.length < 2) return;
+    const flat = flattenLayers(vis);
+    const merged = createLayer('Merged', W, H);
+    merged.ctx.drawImage(flat, 0, 0);
+    const lowest = doc.layers.indexOf(vis[0]);
+    doc.layers = doc.layers.filter(l => !l.visible);
+    doc.layers.splice(Math.min(lowest, doc.layers.length), 0, merged);
+    doc.activeIdx = doc.layers.indexOf(merged);
+    setActiveLayer(doc.activeIdx);
+    refreshLayers();
+  }
+  function flattenImage() {
+    const doc = activeDoc();
+    if (doc.layers.length < 2) return;
+    const flat = flattenLayers(doc.layers);
+    const base = createLayer('Background', W, H);
+    base.ctx.fillStyle = '#ffffff'; base.ctx.fillRect(0, 0, W, H);
+    base.ctx.drawImage(flat, 0, 0);
+    doc.layers = [base];
+    doc.activeIdx = 0;
+    setActiveLayer(0);
+    refreshLayers();
+  }
+  function toggleLayerVisibility() {
+    const l = activeLayer(); if (!l) return;
+    l.visible = !l.visible;
+    refreshLayers();
+  }
+  function hideOtherLayers() {
+    const doc = activeDoc();
+    doc.layers.forEach((l, i) => { l.visible = (i === doc.activeIdx); });
+    refreshLayers();
+  }
+  function showAllLayers() {
+    activeDoc().layers.forEach(l => { l.visible = true; });
+    refreshLayers();
+  }
+  function clearActiveLayer() {
+    pushUndo();
+    ctx.clearRect(0, 0, W, H);
+    composite(); scheduleAutosave();
+  }
+  function fillActiveLayer() {
+    pushUndo();
+    ctx.save();
+    ctx.fillStyle = state.primary || '#000000';
+    ctx.fillRect(0, 0, W, H);
+    ctx.restore();
+    composite(); scheduleAutosave();
+  }
+  function layerViaCopy() {
+    const r = selRectOrFull();
+    const doc = activeDoc();
+    const nl = createLayer('Layer', W, H);
+    nl.ctx.drawImage(activeLayer().canvas, r.x, r.y, r.w, r.h, r.x, r.y, r.w, r.h);
+    doc.layers.splice(doc.activeIdx + 1, 0, nl);
+    doc.activeIdx += 1;
+    setActiveLayer(doc.activeIdx);
+    refreshLayers();
+  }
+  function layerViaCut() {
+    const r = selectionRect();
+    if (!r) { alert('Make a selection first.'); return; }
+    pushUndo();
+    layerViaCopy();
+    // erase from the layer below (the source)
+    const doc = activeDoc();
+    const below = doc.layers[doc.activeIdx - 1];
+    if (below) below.ctx.clearRect(r.x, r.y, r.w, r.h);
+    refreshLayers();
+  }
+
+  // ---- Select ----
+  function rpSelectAll() { selectAll(); }
+  function deselect() { state.selection = null; state.floating = null; composite(); }
+  function inverseSelection() { selectInvert(); composite(); }
+  function setRectSel(x, y, w, h) {
+    x = Math.max(0, Math.min(W, x)); y = Math.max(0, Math.min(H, y));
+    w = Math.max(1, Math.min(W - x, w)); h = Math.max(1, Math.min(H - y, h));
+    state.selection = { x, y, w, h };
+    composite();
+  }
+  function expandSelection() {
+    const r = selectionRect(); if (!r) { selectAll(); return; }
+    setRectSel(r.x - 8, r.y - 8, r.w + 16, r.h + 16);
+  }
+  function contractSelection() {
+    const r = selectionRect(); if (!r) return;
+    setRectSel(r.x + 8, r.y + 8, r.w - 16, r.h - 16);
+  }
+  function borderSelection() {
+    const r = selectionRect(); if (!r) return;
+    // mark a ring: store inner rect so tools can subtract (kept simple —
+    // selects the expanded frame bounds).
+    state.selection = { x: r.x - 6, y: r.y - 6, w: r.w + 12, h: r.h + 12,
+      border: { x: r.x + 6, y: r.y + 6, w: Math.max(1, r.w - 12), h: Math.max(1, r.h - 12) } };
+    composite();
+  }
+  function smoothSelection() {
+    const r = selectionRect(); if (!r) return;
+    setRectSel(Math.round(r.x), Math.round(r.y), Math.round(r.w), Math.round(r.h));
+  }
+  function featherSelection() {
+    if (!state.selection) return;
+    state.selection.feather = (state.selection.feather || 0) + 6;
+    composite();
+  }
+  function selectOpaque() {
+    const d = activeLayer().ctx.getImageData(0, 0, W, H).data;
+    let minX = W, minY = H, maxX = -1, maxY = -1;
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      if (d[(y * W + x) * 4 + 3] > 8) {
+        if (x < minX) minX = x; if (x > maxX) maxX = x;
+        if (y < minY) minY = y; if (y > maxY) maxY = y;
+      }
+    }
+    if (maxX < 0) { alert('The active layer is empty.'); return; }
+    setRectSel(minX, minY, maxX - minX + 1, maxY - minY + 1);
+  }
+
+  // ---- View ----
+  function zoomTo(z) { state.panX = 0; state.panY = 0; setZoom(z); }
+  function zoom50() { zoomTo(0.5); }
+  function zoom100() { zoomTo(1); }
+  function zoom200() { zoomTo(2); }
+  function zoom400() { zoomTo(4); }
+  function zoom800() { zoomTo(8); }
+  function zoomFit() {
+    const stage = canvas.parentElement;
+    if (!stage) { zoomTo(1); return; }
+    const pad = 32;
+    const z = Math.min((stage.clientWidth - pad) / W, (stage.clientHeight - pad) / H);
+    zoomTo(Math.max(0.25, Math.min(8, z)));
+  }
+  function centerView() { state.panX = 0; state.panY = 0; applyZoomTransform(); }
+
   window.RP = {
     applyFilter,
     openLevels, openHSL, openColorBalance, openThreshold,
     openHistoryPanel, openSnapshots, shortcutsModal,
     nextBgPattern,
     newLayer, dupLayer, mergeDown, delLayer,
-    saveSnapshotState
+    saveSnapshotState,
+    // Image
+    rotate90cw, rotate90ccw, rotate180, rotateArbitrary,
+    flipCanvasH, flipCanvasV, cropToSelection, trimImage,
+    imageSizeDialog, canvasSizeDialog, scaleHalf, scaleDouble, duplicateImage,
+    // Edit
+    fillForeground, fillBackground, fillPattern,
+    strokeSelectionThin, strokeSelectionThick, clearSelection,
+    copyMerged, definePattern,
+    // Layer
+    mergeVisible, flattenImage, layerToFront, layerForward,
+    layerBackward, layerToBack, toggleLayerVisibility, hideOtherLayers,
+    showAllLayers, clearActiveLayer, fillActiveLayer, layerViaCopy, layerViaCut,
+    // Select
+    selectAll: rpSelectAll, deselect, inverseSelection,
+    expandSelection, contractSelection, borderSelection,
+    smoothSelection, featherSelection, selectOpaque,
+    // View
+    zoomFit, zoom50, zoom100, zoom200, zoom400, zoom800, centerView
   };
 })();
