@@ -2375,6 +2375,659 @@
   }
 
   // ---- Image filters ----
+
+  // ===================================================================
+  // Filter Gallery — 50 effects routed through applyFilter(). Each entry
+  // in EXTRA_FILTERS is a pure ImageData transform: it mutates img.data
+  // (geometric ones copy the source buffer internally). applyFilter()
+  // handles pushUndo / putImageData / composite / autosave.
+  // ===================================================================
+  function clamp8(v) { return v < 0 ? 0 : v > 255 ? 255 : v; }
+
+  // 2-D convolution over a copied source; edges clamp to nearest pixel.
+  function convolve(img, kernel, kw, kh, divisor, offset) {
+    const w = img.width, h = img.height, d = img.data;
+    const src = new Uint8ClampedArray(d);
+    const cx = kw >> 1, cy = kh >> 1, div = divisor || 1, off = offset || 0;
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        let r = 0, g = 0, b = 0;
+        for (let ky = 0; ky < kh; ky++) {
+          let sy = y + ky - cy; if (sy < 0) sy = 0; else if (sy >= h) sy = h - 1;
+          for (let kx = 0; kx < kw; kx++) {
+            let sx = x + kx - cx; if (sx < 0) sx = 0; else if (sx >= w) sx = w - 1;
+            const k = kernel[ky * kw + kx], si = (sy * w + sx) * 4;
+            r += src[si] * k; g += src[si + 1] * k; b += src[si + 2] * k;
+          }
+        }
+        const di = (y * w + x) * 4;
+        d[di] = clamp8(r / div + off);
+        d[di + 1] = clamp8(g / div + off);
+        d[di + 2] = clamp8(b / div + off);
+      }
+    }
+  }
+
+  // Geometric remap: mapFn(x,y,w,h) -> [sx,sy]; bilinear-sampled.
+  function remapPixels(img, mapFn) {
+    const w = img.width, h = img.height, d = img.data;
+    const src = new Uint8ClampedArray(d);
+    function sample(sx, sy, ch) {
+      if (sx < 0) sx = 0; else if (sx > w - 1) sx = w - 1;
+      if (sy < 0) sy = 0; else if (sy > h - 1) sy = h - 1;
+      const x0 = sx | 0, y0 = sy | 0;
+      const x1 = x0 + 1 < w ? x0 + 1 : x0, y1 = y0 + 1 < h ? y0 + 1 : y0;
+      const fx = sx - x0, fy = sy - y0;
+      const a = src[(y0 * w + x0) * 4 + ch], b = src[(y0 * w + x1) * 4 + ch];
+      const c = src[(y1 * w + x0) * 4 + ch], e = src[(y1 * w + x1) * 4 + ch];
+      const top = a + (b - a) * fx, bot = c + (e - c) * fx;
+      return top + (bot - top) * fy;
+    }
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const m = mapFn(x, y, w, h), di = (y * w + x) * 4;
+        d[di] = sample(m[0], m[1], 0);
+        d[di + 1] = sample(m[0], m[1], 1);
+        d[di + 2] = sample(m[0], m[1], 2);
+      }
+    }
+  }
+
+  function rgb2hsl(r, g, b) {
+    r /= 255; g /= 255; b /= 255;
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+    let hh = 0, s = 0; const l = (mx + mn) / 2, dl = mx - mn;
+    if (dl > 0) {
+      s = l > 0.5 ? dl / (2 - mx - mn) : dl / (mx + mn);
+      if (mx === r) hh = (g - b) / dl + (g < b ? 6 : 0);
+      else if (mx === g) hh = (b - r) / dl + 2;
+      else hh = (r - g) / dl + 4;
+      hh /= 6;
+    }
+    return [hh, s, l];
+  }
+  function hue2rgb(p, q, t) {
+    if (t < 0) t += 1; if (t > 1) t -= 1;
+    if (t < 1 / 6) return p + (q - p) * 6 * t;
+    if (t < 1 / 2) return q;
+    if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+    return p;
+  }
+  function hsl2rgb(hh, s, l) {
+    let r, g, b;
+    if (s === 0) { r = g = b = l; }
+    else {
+      const q = l < 0.5 ? l * (1 + s) : l + s - l * s, p = 2 * l - q;
+      r = hue2rgb(p, q, hh + 1 / 3); g = hue2rgb(p, q, hh); b = hue2rgb(p, q, hh - 1 / 3);
+    }
+    return [r * 255, g * 255, b * 255];
+  }
+  const luma = (r, g, b) => r * 0.299 + g * 0.587 + b * 0.114;
+
+  // Convolution kernels.
+  const K_GAUSS5 = [1,4,6,4,1, 4,16,24,16,4, 6,24,36,24,6, 4,16,24,16,4, 1,4,6,4,1];
+  const K_BOX5 = new Array(25).fill(1);
+  const K_SHARP9 = [-1,-1,-1, -1,9,-1, -1,-1,-1];
+  const K_SHARP5 = [0,-1,0, -1,5,-1, 0,-1,0];
+  const K_EMBOSS = [-2,-1,0, -1,1,1, 0,1,2];
+
+  // Per-channel Sobel edge magnitude into a fresh buffer.
+  function sobelMag(img, gray) {
+    const w = img.width, h = img.height, s = img.data;
+    const out = new Float32Array(w * h * 3);
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        for (let c = 0; c < 3; c++) {
+          const at = (xx, yy) => {
+            xx = xx < 0 ? 0 : xx >= w ? w - 1 : xx;
+            yy = yy < 0 ? 0 : yy >= h ? h - 1 : yy;
+            const i = (yy * w + xx) * 4;
+            return gray ? luma(s[i], s[i + 1], s[i + 2]) : s[i + c];
+          };
+          const gx = at(x-1,y-1)+2*at(x-1,y)+at(x-1,y+1) - at(x+1,y-1)-2*at(x+1,y)-at(x+1,y+1);
+          const gy = at(x-1,y-1)+2*at(x,y-1)+at(x+1,y-1) - at(x-1,y+1)-2*at(x,y+1)-at(x+1,y+1);
+          out[(y * w + x) * 3 + c] = Math.sqrt(gx * gx + gy * gy);
+        }
+      }
+    }
+    return out;
+  }
+
+  // Nearest-sample accumulator (for zoom / spin blur).
+  function nearest(src, w, h, sx, sy, ch) {
+    let x = sx | 0, y = sy | 0;
+    if (x < 0) x = 0; else if (x >= w) x = w - 1;
+    if (y < 0) y = 0; else if (y >= h) y = h - 1;
+    return src[(y * w + x) * 4 + ch];
+  }
+
+  const EXTRA_FILTERS = {
+    // ---- Blur & Focus ----
+    gaussianBlur(img) { convolve(img, K_GAUSS5, 5, 5, 256, 0); },
+    boxBlur(img) { convolve(img, K_BOX5, 5, 5, 25, 0); },
+    motionBlur(img) {
+      convolve(img, [1,1,1,1,1,1,1,1,1], 9, 1, 9, 0);
+    },
+    zoomBlur(img) {
+      const w = img.width, h = img.height, d = img.data, src = new Uint8ClampedArray(d);
+      const cx = w / 2, cy = h / 2, N = 10;
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        let r = 0, g = 0, b = 0;
+        for (let s = 0; s < N; s++) {
+          const t = 1 - s / N * 0.18;
+          const sx = cx + (x - cx) * t, sy = cy + (y - cy) * t;
+          r += nearest(src, w, h, sx, sy, 0);
+          g += nearest(src, w, h, sx, sy, 1);
+          b += nearest(src, w, h, sx, sy, 2);
+        }
+        const di = (y * w + x) * 4;
+        d[di] = r / N; d[di + 1] = g / N; d[di + 2] = b / N;
+      }
+    },
+    spinBlur(img) {
+      const w = img.width, h = img.height, d = img.data, src = new Uint8ClampedArray(d);
+      const cx = w / 2, cy = h / 2, N = 10;
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        let r = 0, g = 0, b = 0;
+        const dx = x - cx, dy = y - cy, ang = Math.atan2(dy, dx), rad = Math.hypot(dx, dy);
+        for (let s = 0; s < N; s++) {
+          const a = ang + (s / N - 0.5) * 0.16;
+          const sx = cx + Math.cos(a) * rad, sy = cy + Math.sin(a) * rad;
+          r += nearest(src, w, h, sx, sy, 0);
+          g += nearest(src, w, h, sx, sy, 1);
+          b += nearest(src, w, h, sx, sy, 2);
+        }
+        const di = (y * w + x) * 4;
+        d[di] = r / N; d[di + 1] = g / N; d[di + 2] = b / N;
+      }
+    },
+    unsharpMask(img) {
+      const w = img.width, h = img.height;
+      const blur = new ImageData(new Uint8ClampedArray(img.data), w, h);
+      convolve(blur, K_GAUSS5, 5, 5, 256, 0);
+      const d = img.data, b = blur.data, amt = 0.9;
+      for (let i = 0; i < d.length; i += 4) {
+        d[i] = clamp8(d[i] + (d[i] - b[i]) * amt);
+        d[i+1] = clamp8(d[i+1] + (d[i+1] - b[i+1]) * amt);
+        d[i+2] = clamp8(d[i+2] + (d[i+2] - b[i+2]) * amt);
+      }
+    },
+
+    // ---- Sharpen & Detail ----
+    sharpenMore(img) { convolve(img, K_SHARP9, 3, 3, 1, 0); },
+    clarity(img) {
+      const w = img.width, h = img.height;
+      const blur = new ImageData(new Uint8ClampedArray(img.data), w, h);
+      convolve(blur, K_BOX5, 5, 5, 25, 0);
+      const d = img.data, b = blur.data, amt = 0.6;
+      for (let i = 0; i < d.length; i += 4) {
+        d[i] = clamp8(d[i] + (d[i] - b[i]) * amt);
+        d[i+1] = clamp8(d[i+1] + (d[i+1] - b[i+1]) * amt);
+        d[i+2] = clamp8(d[i+2] + (d[i+2] - b[i+2]) * amt);
+      }
+    },
+    detailEnhance(img) { convolve(img, K_SHARP5, 3, 3, 1, 0); },
+
+    // ---- Stylize & Edges ----
+    emboss(img) { convolve(img, K_EMBOSS, 3, 3, 1, 128); },
+    findEdges(img) {
+      const mag = sobelMag(img, true), d = img.data;
+      for (let p = 0; p < d.length / 4; p++) {
+        const v = clamp8(mag[p * 3]);
+        d[p*4] = d[p*4+1] = d[p*4+2] = v;
+      }
+    },
+    sobelColor(img) {
+      const mag = sobelMag(img, false), d = img.data;
+      for (let p = 0; p < d.length / 4; p++) {
+        d[p*4] = clamp8(mag[p*3]);
+        d[p*4+1] = clamp8(mag[p*3+1]);
+        d[p*4+2] = clamp8(mag[p*3+2]);
+      }
+    },
+    glowingEdges(img) {
+      const mag = sobelMag(img, false), d = img.data;
+      for (let p = 0; p < d.length / 4; p++) {
+        d[p*4] = clamp8(mag[p*3] * 1.6);
+        d[p*4+1] = clamp8(mag[p*3+1] * 1.6);
+        d[p*4+2] = clamp8(mag[p*3+2] * 1.6);
+      }
+    },
+    solarize(img) {
+      const d = img.data;
+      for (let i = 0; i < d.length; i += 4) {
+        if (d[i] > 128) d[i] = 255 - d[i];
+        if (d[i+1] > 128) d[i+1] = 255 - d[i+1];
+        if (d[i+2] > 128) d[i+2] = 255 - d[i+2];
+      }
+    },
+    relief(img) { convolve(img, [-1,-1,0, -1,1,1, 0,1,1], 3, 3, 1, 64); },
+    traceContour(img) {
+      const mag = sobelMag(img, true), d = img.data;
+      for (let p = 0; p < d.length / 4; p++) {
+        const v = mag[p * 3] > 60 ? 0 : 255;
+        d[p*4] = d[p*4+1] = d[p*4+2] = v;
+      }
+    },
+    wind(img) {
+      const w = img.width, h = img.height, d = img.data, src = new Uint8ClampedArray(d);
+      for (let y = 0; y < h; y++) for (let x = 1; x < w; x++) {
+        const i = (y * w + x) * 4, pi = (y * w + x - 1) * 4;
+        const diff = Math.abs(luma(src[i], src[i+1], src[i+2]) - luma(src[pi], src[pi+1], src[pi+2]));
+        if (diff > 28) {
+          for (let k = 1; k <= 6 && x + k < w; k++) {
+            const ti = (y * w + x + k) * 4, a = 1 - k / 7;
+            d[ti] = clamp8(d[ti] * (1 - a) + src[i] * a);
+            d[ti+1] = clamp8(d[ti+1] * (1 - a) + src[i+1] * a);
+            d[ti+2] = clamp8(d[ti+2] * (1 - a) + src[i+2] * a);
+          }
+        }
+      }
+    },
+
+    // ---- Artistic ----
+    oilPaint(img) {
+      const w = img.width, h = img.height, d = img.data, src = new Uint8ClampedArray(d);
+      const R = 3, BINS = 20;
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const cnt = new Int32Array(BINS), sr = new Int32Array(BINS),
+              sg = new Int32Array(BINS), sb = new Int32Array(BINS);
+        for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++) {
+          let yy = y + dy, xx = x + dx;
+          if (yy < 0) yy = 0; else if (yy >= h) yy = h - 1;
+          if (xx < 0) xx = 0; else if (xx >= w) xx = w - 1;
+          const si = (yy * w + xx) * 4;
+          const bin = Math.min(BINS - 1, luma(src[si], src[si+1], src[si+2]) / 256 * BINS | 0);
+          cnt[bin]++; sr[bin] += src[si]; sg[bin] += src[si+1]; sb[bin] += src[si+2];
+        }
+        let best = 0;
+        for (let bN = 1; bN < BINS; bN++) if (cnt[bN] > cnt[best]) best = bN;
+        const di = (y * w + x) * 4, c = cnt[best] || 1;
+        d[di] = sr[best] / c; d[di+1] = sg[best] / c; d[di+2] = sb[best] / c;
+      }
+    },
+    watercolor(img) {
+      const d = img.data;
+      for (let i = 0; i < d.length; i += 4) {
+        d[i] = Math.round(d[i] / 42) * 42;
+        d[i+1] = Math.round(d[i+1] / 42) * 42;
+        d[i+2] = Math.round(d[i+2] / 42) * 42;
+      }
+      convolve(img, K_GAUSS5, 5, 5, 256, 0);
+      const mag = sobelMag(img, true), dd = img.data;
+      for (let p = 0; p < dd.length / 4; p++) {
+        const e = Math.min(1, mag[p*3] / 200);
+        dd[p*4] = clamp8(dd[p*4] * (1 - e * 0.6));
+        dd[p*4+1] = clamp8(dd[p*4+1] * (1 - e * 0.6));
+        dd[p*4+2] = clamp8(dd[p*4+2] * (1 - e * 0.6));
+      }
+    },
+    pencilSketch(img) {
+      const w = img.width, h = img.height, d = img.data;
+      const gray = new Uint8ClampedArray(d.length);
+      for (let i = 0; i < d.length; i += 4) {
+        const v = luma(d[i], d[i+1], d[i+2]);
+        gray[i] = gray[i+1] = gray[i+2] = v; gray[i+3] = 255;
+      }
+      const inv = new ImageData(new Uint8ClampedArray(d.length), w, h);
+      for (let i = 0; i < d.length; i += 4) {
+        inv.data[i] = inv.data[i+1] = inv.data[i+2] = 255 - gray[i]; inv.data[i+3] = 255;
+      }
+      convolve(inv, K_GAUSS5, 5, 5, 256, 0);
+      for (let i = 0; i < d.length; i += 4) {
+        // colour-dodge: base / (1 - blend)
+        const blend = inv.data[i] / 255;
+        const v = blend >= 1 ? 255 : clamp8(gray[i] / (1 - blend));
+        d[i] = d[i+1] = d[i+2] = v;
+      }
+    },
+    colorPencil(img) {
+      const w = img.width, h = img.height, orig = new Uint8ClampedArray(img.data);
+      EXTRA_FILTERS.pencilSketch(img);
+      const d = img.data;
+      for (let i = 0; i < d.length; i += 4) {
+        d[i] = clamp8(d[i] / 255 * orig[i] * 1.15);
+        d[i+1] = clamp8(d[i+1] / 255 * orig[i+1] * 1.15);
+        d[i+2] = clamp8(d[i+2] / 255 * orig[i+2] * 1.15);
+      }
+    },
+    cartoon(img) {
+      const mag = sobelMag(img, true), d = img.data;
+      for (let i = 0; i < d.length; i += 4) {
+        d[i] = Math.round(d[i] / 51) * 51;
+        d[i+1] = Math.round(d[i+1] / 51) * 51;
+        d[i+2] = Math.round(d[i+2] / 51) * 51;
+      }
+      for (let p = 0; p < d.length / 4; p++) {
+        if (mag[p*3] > 70) { d[p*4] = d[p*4+1] = d[p*4+2] = 0; }
+      }
+    },
+    crosshatch(img) {
+      const w = img.width, h = img.height, d = img.data, src = new Uint8ClampedArray(d);
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4, L = luma(src[i], src[i+1], src[i+2]);
+        let ink = false;
+        if (L < 220 && (x + y) % 6 === 0) ink = true;
+        if (L < 170 && (x - y + 600) % 6 === 0) ink = true;
+        if (L < 110 && (x + y) % 6 === 3) ink = true;
+        if (L < 60 && (x - y + 600) % 6 === 3) ink = true;
+        const v = ink ? 30 : 245;
+        d[i] = d[i+1] = d[i+2] = v;
+      }
+    },
+    pointillism(img) {
+      const w = img.width, h = img.height, d = img.data, src = new Uint8ClampedArray(d);
+      for (let i = 0; i < d.length; i += 4) { d[i] = d[i+1] = d[i+2] = 250; }
+      const dots = (w * h / 18) | 0;
+      for (let n = 0; n < dots; n++) {
+        const x = Math.random() * w | 0, y = Math.random() * h | 0;
+        const si = (y * w + x) * 4, rad = 1 + Math.random() * 2;
+        for (let dy = -rad; dy <= rad; dy++) for (let dx = -rad; dx <= rad; dx++) {
+          if (dx*dx + dy*dy > rad*rad) continue;
+          const xx = x + dx | 0, yy = y + dy | 0;
+          if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue;
+          const di = (yy * w + xx) * 4;
+          d[di] = src[si]; d[di+1] = src[si+1]; d[di+2] = src[si+2];
+        }
+      }
+    },
+    stipple(img) {
+      const w = img.width, h = img.height, d = img.data, src = new Uint8ClampedArray(d);
+      for (let i = 0; i < d.length; i += 4) { d[i] = d[i+1] = d[i+2] = 255; }
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const si = (y * w + x) * 4;
+        const dark = 1 - luma(src[si], src[si+1], src[si+2]) / 255;
+        if (Math.random() < dark * dark * 0.9) {
+          d[si] = d[si+1] = d[si+2] = 20;
+        }
+      }
+    },
+    neonGlow(img) {
+      const w = img.width, h = img.height;
+      const mag = sobelMag(img, false);
+      const edge = new ImageData(w, h), ed = edge.data;
+      for (let p = 0; p < w * h; p++) {
+        ed[p*4] = clamp8(mag[p*3] * 1.4);
+        ed[p*4+1] = clamp8(mag[p*3+1] * 1.4);
+        ed[p*4+2] = clamp8(mag[p*3+2] * 1.4);
+        ed[p*4+3] = 255;
+      }
+      const glow = new ImageData(new Uint8ClampedArray(ed), w, h);
+      convolve(glow, K_GAUSS5, 5, 5, 256, 0);
+      const d = img.data;
+      for (let i = 0; i < d.length; i += 4) {
+        d[i] = clamp8(ed[i] + glow.data[i] * 0.8);
+        d[i+1] = clamp8(ed[i+1] + glow.data[i+1] * 0.8);
+        d[i+2] = clamp8(ed[i+2] + glow.data[i+2] * 0.8);
+      }
+    },
+
+    // ---- Distort ----
+    pinch(img) {
+      remapPixels(img, (x, y, w, h) => {
+        const cx = w / 2, cy = h / 2, dx = x - cx, dy = y - cy;
+        const r = Math.hypot(dx, dy), mr = Math.min(cx, cy);
+        if (r >= mr || r === 0) return [x, y];
+        const t = Math.pow(r / mr, 1.6) * mr / r;
+        return [cx + dx * t, cy + dy * t];
+      });
+    },
+    spherize(img) {
+      remapPixels(img, (x, y, w, h) => {
+        const cx = w / 2, cy = h / 2, dx = x - cx, dy = y - cy;
+        const r = Math.hypot(dx, dy), mr = Math.min(cx, cy);
+        if (r >= mr || r === 0) return [x, y];
+        const t = Math.sin(r / mr * Math.PI / 2) * mr / r;
+        return [cx + dx * t, cy + dy * t];
+      });
+    },
+    twirl(img) {
+      remapPixels(img, (x, y, w, h) => {
+        const cx = w / 2, cy = h / 2, dx = x - cx, dy = y - cy;
+        const r = Math.hypot(dx, dy), mr = Math.min(cx, cy);
+        if (r >= mr) return [x, y];
+        const a = Math.atan2(dy, dx) + (1 - r / mr) * 2.2;
+        return [cx + Math.cos(a) * r, cy + Math.sin(a) * r];
+      });
+    },
+    wave(img) {
+      remapPixels(img, (x, y) => [x + Math.sin(y / 18) * 8, y + Math.sin(x / 18) * 8]);
+    },
+    ripple(img) {
+      remapPixels(img, (x, y, w, h) => {
+        const cx = w / 2, cy = h / 2, dx = x - cx, dy = y - cy;
+        const r = Math.hypot(dx, dy);
+        if (r === 0) return [x, y];
+        const off = Math.sin(r / 12) * 6;
+        return [x + dx / r * off, y + dy / r * off];
+      });
+    },
+    polarCoords(img) {
+      remapPixels(img, (x, y, w, h) => {
+        const ang = x / w * Math.PI * 2;
+        const rad = y / h * Math.min(w, h) / 2;
+        return [w / 2 + Math.cos(ang) * rad, h / 2 + Math.sin(ang) * rad];
+      });
+    },
+    glass(img) {
+      remapPixels(img, (x, y) => [x + (Math.random() - 0.5) * 7, y + (Math.random() - 0.5) * 7]);
+    },
+
+    // ---- Color & Tone ----
+    brightContrast(img) {
+      const d = img.data, c = 1.35, bright = 8;
+      for (let i = 0; i < d.length; i += 4) {
+        d[i] = clamp8((d[i] - 128) * c + 128 + bright);
+        d[i+1] = clamp8((d[i+1] - 128) * c + 128 + bright);
+        d[i+2] = clamp8((d[i+2] - 128) * c + 128 + bright);
+      }
+    },
+    exposure(img) {
+      const d = img.data, f = Math.pow(2, 0.6);
+      for (let i = 0; i < d.length; i += 4) {
+        d[i] = clamp8(d[i] * f); d[i+1] = clamp8(d[i+1] * f); d[i+2] = clamp8(d[i+2] * f);
+      }
+    },
+    vibrance(img) {
+      const d = img.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const hsl = rgb2hsl(d[i], d[i+1], d[i+2]);
+        hsl[1] = Math.min(1, hsl[1] + (1 - hsl[1]) * 0.5);
+        const rgb = hsl2rgb(hsl[0], hsl[1], hsl[2]);
+        d[i] = rgb[0]; d[i+1] = rgb[1]; d[i+2] = rgb[2];
+      }
+    },
+    warm(img) {
+      const d = img.data;
+      for (let i = 0; i < d.length; i += 4) {
+        d[i] = clamp8(d[i] + 22); d[i+1] = clamp8(d[i+1] + 6); d[i+2] = clamp8(d[i+2] - 20);
+      }
+    },
+    cool(img) {
+      const d = img.data;
+      for (let i = 0; i < d.length; i += 4) {
+        d[i] = clamp8(d[i] - 20); d[i+1] = clamp8(d[i+1] + 4); d[i+2] = clamp8(d[i+2] + 24);
+      }
+    },
+    hueRotate(img) {
+      const d = img.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const hsl = rgb2hsl(d[i], d[i+1], d[i+2]);
+        hsl[0] = (hsl[0] + 1 / 6) % 1;
+        const rgb = hsl2rgb(hsl[0], hsl[1], hsl[2]);
+        d[i] = rgb[0]; d[i+1] = rgb[1]; d[i+2] = rgb[2];
+      }
+    },
+    autoLevels(img) {
+      const d = img.data;
+      for (let c = 0; c < 3; c++) {
+        let mn = 255, mx = 0;
+        for (let i = c; i < d.length; i += 4) { if (d[i] < mn) mn = d[i]; if (d[i] > mx) mx = d[i]; }
+        const range = mx - mn || 1;
+        for (let i = c; i < d.length; i += 4) d[i] = clamp8((d[i] - mn) / range * 255);
+      }
+    },
+    autoContrast(img) {
+      const d = img.data;
+      let mn = 255, mx = 0;
+      for (let i = 0; i < d.length; i += 4) {
+        const L = luma(d[i], d[i+1], d[i+2]);
+        if (L < mn) mn = L; if (L > mx) mx = L;
+      }
+      const range = mx - mn || 1, scale = 255 / range;
+      for (let i = 0; i < d.length; i += 4) {
+        d[i] = clamp8((d[i] - mn) * scale);
+        d[i+1] = clamp8((d[i+1] - mn) * scale);
+        d[i+2] = clamp8((d[i+2] - mn) * scale);
+      }
+    },
+    gradientMap(img) {
+      // luma → black ▸ #ff7a18 ▸ white (cinematic fire ramp).
+      const d = img.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const t = luma(d[i], d[i+1], d[i+2]) / 255;
+        let r, g, b;
+        if (t < 0.5) { const u = t / 0.5; r = 255 * u * 0.5 + 255 * 0; r = 255 * u; g = 122 * u; b = 24 * u; }
+        else { const u = (t - 0.5) / 0.5; r = 255; g = 122 + (255 - 122) * u; b = 24 + (255 - 24) * u; }
+        d[i] = r; d[i+1] = g; d[i+2] = b;
+      }
+    },
+    duotone(img) {
+      // luma → navy #102040 ▸ cream #f0e6d2.
+      const d = img.data, lo = [16, 32, 64], hi = [240, 230, 210];
+      for (let i = 0; i < d.length; i += 4) {
+        const t = luma(d[i], d[i+1], d[i+2]) / 255;
+        d[i] = lo[0] + (hi[0] - lo[0]) * t;
+        d[i+1] = lo[1] + (hi[1] - lo[1]) * t;
+        d[i+2] = lo[2] + (hi[2] - lo[2]) * t;
+      }
+    },
+
+    // ---- Noise & Texture ----
+    addNoise(img) {
+      const d = img.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const n = (Math.random() - 0.5) * 70;
+        d[i] = clamp8(d[i] + n); d[i+1] = clamp8(d[i+1] + n); d[i+2] = clamp8(d[i+2] + n);
+      }
+    },
+    median(img) {
+      const w = img.width, h = img.height, d = img.data, src = new Uint8ClampedArray(d);
+      const buf = new Array(9);
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        for (let c = 0; c < 3; c++) {
+          let n = 0;
+          for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+            let yy = y + dy, xx = x + dx;
+            if (yy < 0) yy = 0; else if (yy >= h) yy = h - 1;
+            if (xx < 0) xx = 0; else if (xx >= w) xx = w - 1;
+            buf[n++] = src[(yy * w + xx) * 4 + c];
+          }
+          buf.sort((a, b) => a - b);
+          d[(y * w + x) * 4 + c] = buf[4];
+        }
+      }
+    },
+    filmGrain(img) {
+      const d = img.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const L = luma(d[i], d[i+1], d[i+2]) / 255;
+        const n = (Math.random() - 0.5) * 60 * (0.4 + (1 - L) * 0.9);
+        d[i] = clamp8(d[i] + n); d[i+1] = clamp8(d[i+1] + n); d[i+2] = clamp8(d[i+2] + n);
+      }
+    },
+    halftone(img) {
+      const w = img.width, h = img.height, d = img.data, src = new Uint8ClampedArray(d);
+      const cell = 6;
+      for (let cy = 0; cy < h; cy += cell) for (let cx = 0; cx < w; cx += cell) {
+        let sum = 0, n = 0;
+        for (let y = cy; y < cy + cell && y < h; y++) for (let x = cx; x < cx + cell && x < w; x++) {
+          const i = (y * w + x) * 4; sum += luma(src[i], src[i+1], src[i+2]); n++;
+        }
+        const avg = sum / (n || 1);
+        const rad = (1 - avg / 255) * (cell / 2) * 1.25;
+        const mx = cx + cell / 2, my = cy + cell / 2;
+        for (let y = cy; y < cy + cell && y < h; y++) for (let x = cx; x < cx + cell && x < w; x++) {
+          const inside = Math.hypot(x - mx, y - my) <= rad;
+          const v = inside ? 20 : 245, i = (y * w + x) * 4;
+          d[i] = d[i+1] = d[i+2] = v;
+        }
+      }
+    },
+    scanlines(img) {
+      const w = img.width, h = img.height, d = img.data;
+      for (let y = 0; y < h; y++) {
+        const dim = (y % 2 === 0) ? 1 : 0.7;
+        for (let x = 0; x < w; x++) {
+          const i = (y * w + x) * 4;
+          d[i] = clamp8(d[i] * dim * 1.04);
+          d[i+1] = clamp8(d[i+1] * dim);
+          d[i+2] = clamp8(d[i+2] * dim * 1.04);
+        }
+      }
+    },
+
+    // ---- Vintage / Photo ----
+    vignette(img) {
+      const w = img.width, h = img.height, d = img.data;
+      const cx = w / 2, cy = h / 2, mr = Math.hypot(cx, cy);
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const r = Math.hypot(x - cx, y - cy) / mr;
+        const f = 1 - Math.pow(r, 2.4) * 0.85;
+        const i = (y * w + x) * 4;
+        d[i] = clamp8(d[i] * f); d[i+1] = clamp8(d[i+1] * f); d[i+2] = clamp8(d[i+2] * f);
+      }
+    },
+    lomo(img) {
+      const w = img.width, h = img.height, d = img.data;
+      const cx = w / 2, cy = h / 2, mr = Math.hypot(cx, cy);
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        let r = (d[i] - 128) * 1.4 + 128 + 14;
+        let g = (d[i+1] - 128) * 1.4 + 128;
+        let b = (d[i+2] - 128) * 1.4 + 128 - 16;
+        const rr = Math.hypot(x - cx, y - cy) / mr;
+        const f = 1 - Math.pow(rr, 2.6) * 0.9;
+        d[i] = clamp8(r * f); d[i+1] = clamp8(g * f); d[i+2] = clamp8(b * f);
+      }
+    },
+  };
+
+  // Display labels + the categorised Filter Gallery layout.
+  const FILTER_LABELS = {
+    invert: 'Invert', grayscale: 'Grayscale', sepia: 'Sepia', posterize: 'Posterize',
+    blur: 'Quick Blur', brighten: 'Brighten', darken: 'Darken',
+    gaussianBlur: 'Gaussian Blur', boxBlur: 'Box Blur', motionBlur: 'Motion Blur',
+    zoomBlur: 'Zoom Blur', spinBlur: 'Spin Blur', unsharpMask: 'Unsharp Mask',
+    sharpenMore: 'Sharpen More', clarity: 'Clarity', detailEnhance: 'Detail Enhance',
+    emboss: 'Emboss', findEdges: 'Find Edges', glowingEdges: 'Glowing Edges',
+    sobelColor: 'Color Edges', solarize: 'Solarize', wind: 'Wind',
+    traceContour: 'Trace Contour', relief: 'Relief',
+    oilPaint: 'Oil Painting', watercolor: 'Watercolor', pencilSketch: 'Pencil Sketch',
+    colorPencil: 'Color Pencil', cartoon: 'Cartoon', crosshatch: 'Crosshatch',
+    pointillism: 'Pointillism', stipple: 'Stipple', neonGlow: 'Neon Glow',
+    pinch: 'Pinch', spherize: 'Spherize', twirl: 'Twirl', wave: 'Wave',
+    ripple: 'Ripple', polarCoords: 'Polar Coordinates', glass: 'Glass',
+    brightContrast: 'Brightness / Contrast', exposure: 'Exposure', vibrance: 'Vibrance',
+    warm: 'Warm', cool: 'Cool', hueRotate: 'Hue Rotate',
+    autoLevels: 'Auto Levels', autoContrast: 'Auto Contrast',
+    gradientMap: 'Gradient Map', duotone: 'Duotone',
+    addNoise: 'Add Noise', median: 'Despeckle (Median)', filmGrain: 'Film Grain',
+    halftone: 'Halftone', scanlines: 'Scanlines (CRT)',
+    vignette: 'Vignette', lomo: 'Lomo',
+  };
+  const FILTER_GALLERY = [
+    ['Basics', ['invert', 'grayscale', 'sepia', 'posterize', 'blur', 'brighten', 'darken']],
+    ['Blur & Focus', ['gaussianBlur', 'boxBlur', 'motionBlur', 'zoomBlur', 'spinBlur', 'unsharpMask']],
+    ['Sharpen & Detail', ['sharpenMore', 'clarity', 'detailEnhance']],
+    ['Stylize & Edges', ['emboss', 'findEdges', 'glowingEdges', 'sobelColor', 'solarize', 'wind', 'traceContour', 'relief']],
+    ['Artistic', ['oilPaint', 'watercolor', 'pencilSketch', 'colorPencil', 'cartoon', 'crosshatch', 'pointillism', 'stipple', 'neonGlow']],
+    ['Distort', ['pinch', 'spherize', 'twirl', 'wave', 'ripple', 'polarCoords', 'glass']],
+    ['Color & Tone', ['brightContrast', 'exposure', 'vibrance', 'warm', 'cool', 'hueRotate', 'autoLevels', 'autoContrast', 'gradientMap', 'duotone']],
+    ['Noise & Texture', ['addNoise', 'median', 'filmGrain', 'halftone', 'scanlines']],
+    ['Vintage / Photo', ['vignette', 'lomo']],
+  ];
+
   function applyFilter(kind) {
     pushUndo();
     const img = ctx.getImageData(0, 0, W, H);
@@ -2404,6 +3057,8 @@
       for (let i = 0; i < d.length; i += 4) { d[i] = Math.min(255, d[i] + 24); d[i+1] = Math.min(255, d[i+1] + 24); d[i+2] = Math.min(255, d[i+2] + 24); }
     } else if (kind === 'darken') {
       for (let i = 0; i < d.length; i += 4) { d[i] = Math.max(0, d[i] - 24); d[i+1] = Math.max(0, d[i+1] - 24); d[i+2] = Math.max(0, d[i+2] - 24); }
+    } else if (EXTRA_FILTERS[kind]) {
+      EXTRA_FILTERS[kind](img, W, H);
     }
     ctx.putImageData(img, 0, 0);
     if (kind === 'blur') {
@@ -2419,10 +3074,18 @@
     scheduleAutosave();
   }
   $('btn-filter').addEventListener('click', async () => {
-    const kinds = ['invert', 'grayscale', 'sepia', 'posterize', 'blur', 'brighten', 'darken'];
-    const opts = kinds.map(k =>
-      `<label style="display:block;padding:4px"><input type="radio" name="filter" value="${k}" ${k==='invert'?'checked':''}> ${k}</label>`).join('');
-    const ok = await showModal('Image filter', `<div>Pick a filter:</div>${opts}`);
+    let first = true;
+    const groups = FILTER_GALLERY.map(([cat, kinds]) => {
+      const rows = kinds.map((k) => {
+        const checked = first ? ' checked' : ''; first = false;
+        return `<label class="filt-row" style="display:block;padding:3px 6px;cursor:pointer">` +
+          `<input type="radio" name="filter" value="${k}"${checked}> ${FILTER_LABELS[k] || k}</label>`;
+      }).join('');
+      return `<div style="font-weight:bold;margin:8px 0 2px;opacity:0.8">${cat}</div>${rows}`;
+    }).join('');
+    const ok = await showModal('Filter Gallery',
+      `<div style="margin-bottom:4px">Pick a filter (applies to the active layer):</div>` +
+      `<div style="max-height:60vh;overflow:auto;border:1px solid rgba(128,128,128,0.3);padding:4px">${groups}</div>`);
     if (!ok) return;
     const sel = document.querySelector('input[name="filter"]:checked');
     if (sel) applyFilter(sel.value);
