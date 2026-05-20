@@ -170,19 +170,50 @@
       </form>
     </aside>
 
+    <div id="options-bar" class="options-bar" aria-label="Tool options">
+      <span id="opt-tool-name" class="opt-tool-name">Pencil</span>
+      <div class="opt-group" data-opt="size">
+        <label for="brush-size">Size</label>
+        <input id="brush-size" type="range" min="1" max="32" value="4">
+        <span id="brush-size-display">4</span>
+      </div>
+      <div class="opt-group" data-opt="opacity">
+        <label for="brush-opacity">Alpha</label>
+        <input id="brush-opacity" type="range" min="5" max="100" value="100">
+        <span id="brush-opacity-display">100</span>
+      </div>
+      <div class="opt-group" data-opt="tolerance" hidden>
+        <label for="opt-tolerance">Tolerance</label>
+        <input id="opt-tolerance" type="range" min="0" max="128" value="32">
+        <span id="opt-tolerance-display">32</span>
+      </div>
+      <div class="opt-group" data-opt="gradient" hidden>
+        <label for="opt-gradstyle">Style</label>
+        <select id="opt-gradstyle">
+          <option value="linear">Linear</option>
+          <option value="radial">Radial</option>
+          <option value="angle">Angle</option>
+          <option value="reflected">Reflected</option>
+          <option value="diamond">Diamond</option>
+        </select>
+      </div>
+      <div class="opt-group" data-opt="crop" hidden>
+        <label for="opt-cropratio">Ratio</label>
+        <select id="opt-cropratio">
+          <option value="0">Free</option>
+          <option value="1">1:1</option>
+          <option value="1.33333">4:3</option>
+          <option value="1.5">3:2</option>
+          <option value="1.77778">16:9</option>
+          <option value="0.5625">9:16</option>
+        </select>
+      </div>
+      <span id="opt-hint" class="opt-hint"></span>
+    </div>
+
     <main class="workspace">
       <aside class="tools-panel">
         <div id="tools" class="tools-grid"></div>
-        <div class="size-picker">
-          <label for="brush-size">Size</label>
-          <input id="brush-size" type="range" min="1" max="32" value="4">
-          <span id="brush-size-display">4</span>
-        </div>
-        <div class="size-picker">
-          <label for="brush-opacity">Alpha</label>
-          <input id="brush-opacity" type="range" min="5" max="100" value="100">
-          <span id="brush-opacity-display">100</span>
-        </div>
         <div class="symmetry-picker">
           <label>Mirror</label>
           <button id="btn-symmetry" title="Toggle symmetry mirror (Y)" aria-label="Symmetry">⌒ Off</button>
@@ -212,6 +243,9 @@
         <div class="status-bar" id="status-bar">
           <span id="status-tool">Pencil</span>
           <span id="status-pos">0, 0</span>
+          <span id="status-zoom">100%</span>
+          <span id="status-doc">640 × 480</span>
+          <span id="status-layer">Background</span>
           <span id="status-mode">MS Paint 95</span>
         </div>
         <div id="anim-bar" class="anim-bar" hidden>
@@ -268,6 +302,8 @@
       </div>
     </div>
   </div>
+
+  <div id="context-menu" class="context-menu" hidden></div>
 
   <script src="js/sounds.js" defer></script>
   <script src="js/modes.js" defer></script>

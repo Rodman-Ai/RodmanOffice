@@ -133,6 +133,7 @@
     const d = activeDoc(); if (!d) return;
     d.activeIdx = Math.max(0, Math.min(d.layers.length - 1, idx));
     ctx = d.layers[d.activeIdx].ctx;
+    if (typeof updateStatusBar === 'function') updateStatusBar();
   }
   function setActiveDoc(idx) {
     activeDocIdx = Math.max(0, Math.min(docs.length - 1, idx));
@@ -2022,30 +2023,104 @@
   canvas.addEventListener('pointerup', endStroke);
   canvas.addEventListener('pointercancel', endStroke);
   canvas.addEventListener('pointerleave', endStroke);
-  canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+  // (canvas context menu is wired in the round-10 UX block below)
 
   // ---- UI building ----
+  // Round 10 — group related tools into Photoshop-style flyout slots.
+  const TOOL_GROUP = {
+    select: 'gMarquee', ellipseSelect: 'gMarquee', rowMarquee: 'gMarquee', colMarquee: 'gMarquee',
+    eyedrop: 'gSample', colorSampler: 'gSample',
+    brush: 'gPaint', pencil: 'gPaint', spray: 'gPaint', mixerBrush: 'gPaint',
+    fill: 'gFill', gradient: 'gFill',
+    clone: 'gRetouch', heal: 'gRetouch', patch: 'gRetouch', redEye: 'gRetouch',
+    contentAwareMove: 'gRetouch', historyBrush: 'gRetouch', patternStamp: 'gRetouch', smudge: 'gRetouch',
+    dodge: 'gTone', burn: 'gTone',
+    line: 'gShape', rect: 'gShape', rectFill: 'gShape', ellipse: 'gShape',
+    ellipseFill: 'gShape', customShape: 'gShape',
+    transform: 'gXform', distort: 'gXform',
+    measure: 'gInfo', notes: 'gInfo', slice: 'gInfo'
+  };
+  const groupActive = {};
+  function toolTip(t) {
+    return t.label + (t.shortcut ? ' (' + t.shortcut.toUpperCase() + ')' : '');
+  }
+  function makeToolButton(t) {
+    const btn = window.document.createElement('button');
+    btn.className = 'tool-btn';
+    btn.dataset.tool = t.id;
+    btn.title = toolTip(t);
+    btn.textContent = t.icon;
+    const lab = window.document.createElement('span');
+    lab.className = 'tool-label';
+    lab.textContent = t.label;
+    btn.appendChild(lab);
+    btn.addEventListener('click', () => {
+      Sounds.click();
+      const grp = btn.closest('.tool-group');
+      if (grp && btn.classList.contains('flyout-item')) {
+        groupActive[grp.dataset.group] = t.id;
+        rebuildGroupFace(grp);
+      }
+      setTool(t.id, t);
+    });
+    return btn;
+  }
+  function rebuildGroupFace(grp) {
+    const t = grp._members.find(m => m.id === groupActive[grp.dataset.group]) || grp._members[0];
+    const face = grp.querySelector('.tool-group-face');
+    face.dataset.tool = t.id;
+    face.firstChild.nodeValue = t.icon;
+    face.querySelector('.tool-label').textContent = t.label;
+    face.title = toolTip(t) + '  —  click ▾ for ' + grp._members.length + ' tools';
+    face.dataset.active = (state.tool === t.id) ? 'true' : 'false';
+  }
   function buildTools() {
     const root = $('tools');
     root.innerHTML = '';
     const tools = PaintModes.tools[state.mode];
+    const order = [], byKey = {};
     for (const t of tools) {
-      const btn = document.createElement('button');
-      btn.className = 'tool-btn';
-      btn.title = t.label;
-      btn.textContent = t.icon;
-      btn.dataset.tool = t.id;
-      btn.addEventListener('click', () => {
+      const key = TOOL_GROUP[t.id] || ('@' + t.id);
+      if (!byKey[key]) { byKey[key] = []; order.push(key); }
+      byKey[key].push(t);
+    }
+    for (const key of order) {
+      const members = byKey[key];
+      if (members.length === 1) { root.appendChild(makeToolButton(members[0])); continue; }
+      if (!groupActive[key] || !members.some(m => m.id === groupActive[key])) {
+        groupActive[key] = members[0].id;
+      }
+      const grp = window.document.createElement('div');
+      grp.className = 'tool-group';
+      grp.dataset.group = key;
+      grp._members = members;
+      const face = window.document.createElement('button');
+      face.className = 'tool-btn tool-group-face';
+      face.appendChild(window.document.createTextNode(''));
+      const lab = window.document.createElement('span');
+      lab.className = 'tool-label';
+      face.appendChild(lab);
+      const tri = window.document.createElement('span');
+      tri.className = 'flyout-tri';
+      tri.textContent = '▾';
+      face.appendChild(tri);
+      face.addEventListener('click', () => {
         Sounds.click();
+        const t = grp._members.find(m => m.id === groupActive[key]) || grp._members[0];
         setTool(t.id, t);
       });
-      const lab = document.createElement('span');
-      lab.className = 'tool-label';
-      lab.textContent = t.label;
-      btn.appendChild(lab);
-      root.appendChild(btn);
+      grp.appendChild(face);
+      const fly = window.document.createElement('div');
+      fly.className = 'tool-flyout';
+      for (const m of members) {
+        const mb = makeToolButton(m);
+        mb.classList.add('flyout-item');
+        fly.appendChild(mb);
+      }
+      grp.appendChild(fly);
+      root.appendChild(grp);
+      rebuildGroupFace(grp);
     }
-    // Default tool selection
     const def = tools[0];
     setTool(def.id, def);
   }
@@ -2154,6 +2229,9 @@
     const labelMap = {};
     PaintModes.tools[state.mode].forEach(t => labelMap[t.id] = t.label);
     $('status-tool').textContent = labelMap[id] || id;
+    renderOptionsBar(id, labelMap[id] || id);
+    applyToolCursor(id);
+    if (typeof updateStatusBar === 'function') updateStatusBar();
     if (id === 'transform' && !state.transform) startTransform();
     if (id === 'distort' && !state.distort) startDistort();
   }
@@ -2195,6 +2273,161 @@
   function updateStatusPos(p) {
     $('status-pos').textContent = `${p.x}, ${p.y}`;
   }
+
+  /* =====================================================================
+     Round 10 — Photoshop-2026 UX/UI overhaul
+     ===================================================================== */
+
+  // ---- 1. Contextual tool options bar ----
+  const OPT_SIZE = new Set(['pencil', 'brush', 'eraser', 'spray', 'smudge', 'clone',
+    'heal', 'patch', 'dodge', 'burn', 'saturate', 'desaturate', 'mixerBrush',
+    'historyBrush', 'patternStamp', 'colorReplace', 'bgErase', 'redEye']);
+  const OPT_OPACITY = new Set(['brush', 'eraser', 'spray', 'smudge', 'clone', 'heal',
+    'mixerBrush', 'historyBrush', 'patternStamp', 'gradient']);
+  const OPT_TOLERANCE = new Set(['wand', 'fill', 'colorReplace', 'bgErase',
+    'magicEraser', 'quickSelect']);
+  const OPT_HINTS = {
+    transform: 'Drag handles to scale · drag inside to move · Enter commits · Esc cancels',
+    distort: 'Drag the corners to warp · Enter commits · Esc cancels',
+    clone: 'Shift-click to set the source, then paint',
+    heal: 'Shift-click to set the source, then paint',
+    measure: 'Drag a line to read distance & angle',
+    eyedrop: 'Click the canvas to sample a colour',
+    text: 'Click the canvas to place text',
+    customShape: 'Edit ▸ Custom Shapes to pick a shape, then drag',
+    patch: 'Select a region, then drag it onto clean pixels',
+    contentAwareMove: 'Select a region, then drag it to a new spot'
+  };
+  function renderOptionsBar(id, label) {
+    const bar = $('options-bar'); if (!bar) return;
+    const want = new Set();
+    if (OPT_SIZE.has(id)) want.add('size');
+    if (OPT_OPACITY.has(id)) want.add('opacity');
+    if (OPT_TOLERANCE.has(id)) want.add('tolerance');
+    if (id === 'gradient') want.add('gradient');
+    if (id === 'crop') want.add('crop');
+    bar.querySelectorAll('.opt-group').forEach(g => { g.hidden = !want.has(g.dataset.opt); });
+    const nm = $('opt-tool-name'); if (nm) nm.textContent = label || id;
+    const hint = $('opt-hint'); if (hint) hint.textContent = OPT_HINTS[id] || '';
+  }
+  // Wire the new option controls (Size/Alpha keep their existing wiring).
+  {
+    const tol = $('opt-tolerance'), tolD = $('opt-tolerance-display');
+    if (tol) {
+      tol.value = state.wandTolerance;
+      if (tolD) tolD.textContent = String(state.wandTolerance);
+      tol.addEventListener('input', () => {
+        state.wandTolerance = +tol.value;
+        if (tolD) tolD.textContent = tol.value;
+      });
+    }
+    const gs = $('opt-gradstyle');
+    if (gs) {
+      gs.value = state.gradientStyle || 'linear';
+      gs.addEventListener('change', () => { state.gradientStyle = gs.value; });
+    }
+    const cr = $('opt-cropratio');
+    if (cr) cr.addEventListener('change', () => { state.cropAspect = +cr.value || 0; });
+  }
+
+  // ---- 7. Per-tool cursors ----
+  const TOOL_CURSOR = {
+    eyedrop: 'crosshair', wand: 'crosshair', colorSampler: 'crosshair', measure: 'crosshair',
+    fill: 'crosshair', gradient: 'crosshair', magicEraser: 'crosshair',
+    transform: 'move', distort: 'move', contentAwareMove: 'move',
+    text: 'text', crop: 'cell', slice: 'cell'
+  };
+  function applyToolCursor(id) {
+    canvas.style.cursor = TOOL_CURSOR[id] || 'default';
+  }
+
+  // ---- 6. Status bar ----
+  function updateStatusBar() {
+    const z = $('status-zoom'); if (z) z.textContent = Math.round((state.zoom || 1) * 100) + '%';
+    const d = $('status-doc'); if (d) d.textContent = W + ' × ' + H;
+    const ly = $('status-layer');
+    if (ly) { const L = (typeof activeLayer === 'function') && activeLayer(); ly.textContent = L ? (L.name || 'Layer') : '—'; }
+  }
+
+  // ---- 4. Draggable panels with a titlebar + close button ----
+  function makePanelChrome(el, title, onClose) {
+    if (!el || el.querySelector('.panel-titlebar')) return;
+    const bar = window.document.createElement('div');
+    bar.className = 'panel-titlebar';
+    const tt = window.document.createElement('span');
+    tt.className = 'panel-title';
+    tt.textContent = title;
+    const x = window.document.createElement('button');
+    x.className = 'panel-close';
+    x.textContent = '×';
+    x.title = 'Close';
+    x.addEventListener('click', (e) => { e.stopPropagation(); if (onClose) onClose(); });
+    bar.appendChild(tt);
+    bar.appendChild(x);
+    el.insertBefore(bar, el.firstChild);
+    let drag = null;
+    bar.addEventListener('pointerdown', (e) => {
+      if (e.target === x) return;
+      const r = el.getBoundingClientRect();
+      drag = { dx: e.clientX - r.left, dy: e.clientY - r.top };
+      bar.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    bar.addEventListener('pointermove', (e) => {
+      if (!drag) return;
+      el.style.left = Math.max(0, Math.min(window.innerWidth - 48, e.clientX - drag.dx)) + 'px';
+      el.style.top = Math.max(0, Math.min(window.innerHeight - 24, e.clientY - drag.dy)) + 'px';
+      el.style.right = 'auto';
+      el.style.bottom = 'auto';
+    });
+    bar.addEventListener('pointerup', () => { drag = null; });
+  }
+
+  // ---- 9. Canvas right-click context menu ----
+  const CONTEXT_ITEMS = [
+    { label: 'Undo', run: () => undo() },
+    { label: 'Redo', run: () => redo() },
+    { sep: true },
+    { label: 'Cut', run: () => cutSelection() },
+    { label: 'Copy', run: () => copySelection() },
+    { label: 'Paste', run: () => pasteSelection() },
+    { sep: true },
+    { label: 'Fill with Foreground', run: () => fillForeground() },
+    { label: 'Select All', run: () => rpSelectAll() },
+    { label: 'Deselect', run: () => deselect() },
+    { sep: true },
+    { label: 'Free Transform', run: () => freeTransform() }
+  ];
+  function hideContextMenu() { const cm = $('context-menu'); if (cm) cm.hidden = true; }
+  function showContextMenu(x, y) {
+    const cm = $('context-menu'); if (!cm) return;
+    cm.innerHTML = '';
+    for (const it of CONTEXT_ITEMS) {
+      if (it.sep) {
+        const s = window.document.createElement('div');
+        s.className = 'ctx-sep';
+        cm.appendChild(s);
+        continue;
+      }
+      const b = window.document.createElement('button');
+      b.className = 'ctx-item';
+      b.textContent = it.label;
+      b.addEventListener('click', () => { hideContextMenu(); try { it.run(); } catch (e) { /* ignore */ } });
+      cm.appendChild(b);
+    }
+    cm.hidden = false;
+    cm.style.left = Math.min(x, window.innerWidth - 190) + 'px';
+    cm.style.top = Math.min(y, window.innerHeight - cm.offsetHeight - 8) + 'px';
+  }
+  canvas.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    showContextMenu(e.clientX, e.clientY);
+  });
+  window.addEventListener('pointerdown', (e) => {
+    const cm = $('context-menu');
+    if (cm && !cm.hidden && !cm.contains(e.target)) hideContextMenu();
+  });
+  window.addEventListener('keydown', (e) => { if (e.key === 'Escape') hideContextMenu(); });
 
   // ---- Header actions ----
   document.querySelectorAll('.mode-btn').forEach(btn => {
@@ -2863,22 +3096,34 @@
 
   // ---- New canvas dialog ----
   $('btn-new').addEventListener('click', async () => {
-    const sizes = [
-      ['320 × 240 (small)', 320, 240],
-      ['480 × 360',         480, 360],
-      ['640 × 480 (default)', 640, 480],
-      ['800 × 600',         800, 600],
-      ['1024 × 768',       1024, 768]
+    const presets = [
+      ['Default', 640, 480], ['Photo HD', 1920, 1080], ['Square', 1080, 1080],
+      ['Social Story', 1080, 1920], ['Web', 1366, 768], ['Print A4', 2480, 3508],
+      ['Icon', 512, 512], ['Banner', 1500, 500]
     ];
-    const opts = sizes.map(([l, w, h]) =>
-      `<label style="display:block;padding:4px"><input type="radio" name="size" value="${w}x${h}" ${w===640?'checked':''}> ${l}</label>`
-    ).join('');
-    const ok = await showModal('New canvas',
-      `<div>Pick a size:</div>${opts}<div style="margin-top:8px">This will erase the current drawing.</div>`);
+    const cells = presets.map(([l, w, h], i) =>
+      `<button type="button" class="newdoc-cell${i === 0 ? ' sel' : ''}" data-w="${w}" data-h="${h}">` +
+      `<b>${l}</b><span>${w} × ${h}</span></button>`).join('');
+    const html =
+      `<div class="newdoc-grid">${cells}</div>` +
+      `<div class="newdoc-custom">Custom: ` +
+      `<input id="nd-w" type="number" min="1" max="8000" value="640" style="width:64px"> × ` +
+      `<input id="nd-h" type="number" min="1" max="8000" value="480" style="width:64px"> px</div>` +
+      `<div style="margin-top:8px;opacity:.7;font-size:11px">This replaces the current drawing.</div>`;
+    const pr = showModal('New Document', html);
+    const body = $('modal-body');
+    body.querySelectorAll('.newdoc-cell').forEach((cell) => {
+      cell.addEventListener('click', () => {
+        body.querySelectorAll('.newdoc-cell').forEach(c => c.classList.remove('sel'));
+        cell.classList.add('sel');
+        $('nd-w').value = cell.dataset.w;
+        $('nd-h').value = cell.dataset.h;
+      });
+    });
+    const ok = await pr;
     if (!ok) return;
-    const sel = document.querySelector('input[name="size"]:checked');
-    if (!sel) return;
-    const [w, h] = sel.value.split('x').map(Number);
+    const w = Math.max(1, Math.min(8000, +$('nd-w').value || 640));
+    const h = Math.max(1, Math.min(8000, +$('nd-h').value || 480));
     resizeCanvas(w, h);
   });
   function resizeCanvas(w, h) {
@@ -4283,6 +4528,7 @@
     canvas.style.transformOrigin = 'center';
     $('btn-zoom-reset').textContent = Math.round(state.zoom * 100) + '%';
     renderGrid();
+    if (typeof updateStatusBar === 'function') updateStatusBar();
   }
   function setZoom(z) {
     state.zoom = Math.max(0.25, Math.min(8, z));
@@ -5474,6 +5720,7 @@
       `<canvas width="48" height="32" data-cv="${k}"></canvas><span>${label}</span></button>`
     ).join('');
     window.document.body.appendChild(channelsPanel_);
+    makePanelChrome(channelsPanel_, 'Channels', openChannelsPanel);
     channelsPanel_.querySelectorAll('.chan-row').forEach(btn => {
       btn.addEventListener('click', () => {
         const k = btn.dataset.chan;
@@ -5561,6 +5808,7 @@
     histogramPanel_.className = 'histogram-panel';
     histogramPanel_.innerHTML = `<canvas width="160" height="100"></canvas>`;
     window.document.body.appendChild(histogramPanel_);
+    makePanelChrome(histogramPanel_, 'Histogram', openHistogramPanel);
     function paint() {
       if (!histogramPanel_) return;
       const c = histogramPanel_.querySelector('canvas').getContext('2d');
@@ -5754,6 +6002,10 @@
     infoPanel_ = window.document.createElement('div');
     infoPanel_.className = 'info-panel';
     window.document.body.appendChild(infoPanel_);
+    makePanelChrome(infoPanel_, 'Info', openInfoPanel);
+    const body = window.document.createElement('div');
+    body.className = 'info-body';
+    infoPanel_.appendChild(body);
     const sample = (x, y) => {
       if (x < 0 || y < 0 || x >= W || y >= H) return null;
       try { return displayCtx.getImageData(x, y, 1, 1).data; } catch (e) { return null; }
@@ -5767,7 +6019,7 @@
       if (!state.colorSamples.length) {
         html += `<div class="info-row" style="opacity:.6">Click with the Color Sampler tool to add points.</div>`;
       }
-      infoPanel_.innerHTML = html;
+      body.innerHTML = html;
       setTimeout(paint, 200);
     }
     paint();
@@ -6669,6 +6921,7 @@
     navigator_.className = 'navigator-panel';
     navigator_.innerHTML = `<canvas width="120" height="90"></canvas><div class="nav-rect"></div>`;
     window.document.body.appendChild(navigator_);
+    makePanelChrome(navigator_, 'Navigator', openNavigator);
     function paint() {
       const c = navigator_.querySelector('canvas');
       const cx = c.getContext('2d');
