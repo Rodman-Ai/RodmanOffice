@@ -20,7 +20,7 @@ import {
 
 | File              | What it does                                               |
 | ----------------- | ---------------------------------------------------------- |
-| `vsdx.js`         | VSDX writer + reader (hand-rolled OOXML inside a ZIP).     |
+| `vsdx.js`         | VSDX writer + reader (hand-rolled OOXML inside a ZIP). `saveVsdx` also embeds the full diagram model as a non-standard `visio/rodman-vision.json` part; `loadVsdx` prefers it for a lossless round-trip and falls back to OOXML parsing for real Visio files. |
 | `stencils.js`     | 132-shape catalog across 16 categories: Basic (12), Flowchart (18), BPMN (12), Network (10), UML (12), Org Chart (6), Swimlanes (5), Wireframe (12), Electrical (8), Floor Plan (8), Mind Map (5), Notes (1), Engineering (5), Cloud (6), Workflow (6), Arrows (6). |
 | `themes.js`       | 6 palettes (Office, Slate, Marigold, Mist, Tech, Print).   |
 | `svg-export.js`   | Diagram → SVG string. Used by the editor canvas *and* the PNG/PDF exporters. |
