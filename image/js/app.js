@@ -4919,28 +4919,40 @@
     if (bar.hidden) return;
     bar.innerHTML = '';
     docs.forEach((d, i) => {
-      const tab = window.document.createElement('button');
+      // A wrapper div holding two real <button>s — keeps the close
+      // affordance keyboard-focusable (a <button> can't nest one).
+      const tab = window.document.createElement('div');
       tab.className = 'psp-tab' + (i === activeDocIdx ? ' is-active' : '');
-      tab.textContent = d.name;
-      tab.addEventListener('click', () => { setActiveDoc(i); renderLayersPanel(); renderTabs(); });
-      const x = window.document.createElement('span');
-      x.className = 'psp-tab-close';
-      x.textContent = '×';
-      x.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (docs.length <= 1) return;
-        docs.splice(i, 1);
-        if (activeDocIdx >= docs.length) activeDocIdx = docs.length - 1;
-        setActiveDoc(activeDocIdx);
-        renderLayersPanel(); renderTabs();
-      });
-      tab.appendChild(x);
+      const sel = window.document.createElement('button');
+      sel.type = 'button';
+      sel.className = 'psp-tab-select';
+      sel.textContent = d.name;
+      sel.addEventListener('click', () => { setActiveDoc(i); renderLayersPanel(); renderTabs(); });
+      tab.appendChild(sel);
+      if (docs.length > 1) {
+        const x = window.document.createElement('button');
+        x.type = 'button';
+        x.className = 'psp-tab-close';
+        x.textContent = '×';
+        x.title = 'Close ' + d.name;
+        x.setAttribute('aria-label', 'Close ' + d.name);
+        x.addEventListener('click', (e) => {
+          e.stopPropagation();
+          docs.splice(i, 1);
+          if (activeDocIdx >= docs.length) activeDocIdx = docs.length - 1;
+          setActiveDoc(activeDocIdx);
+          renderLayersPanel(); renderTabs();
+        });
+        tab.appendChild(x);
+      }
       bar.appendChild(tab);
     });
     const add = window.document.createElement('button');
+    add.type = 'button';
     add.className = 'psp-tab-add';
     add.textContent = '＋';
     add.title = 'New document';
+    add.setAttribute('aria-label', 'New document');
     add.addEventListener('click', () => {
       docs.push(newDocument(W, H, 'untitled-' + (docs.length + 1)));
       setActiveDoc(docs.length - 1);

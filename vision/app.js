@@ -1597,6 +1597,15 @@
     layerSel.innerHTML = diagram.layers.map((l) =>
       `<option value="${l.id}" ${l.id === sh.layerId ? 'selected' : ''}>${escHtml(l.name)}</option>`
     ).join('');
+    // Image shapes render their src directly — fill / stroke / stroke
+    // width have no visible effect, so hide those rows for them.
+    const isImage = sh.stencil === 'image';
+    ['propFill', 'propStroke', 'propStrokeWidth'].forEach((id) => {
+      const inp = $('#' + id);
+      const lab = $('label[for="' + id + '"]');
+      if (inp) inp.hidden = isImage;
+      if (lab) lab.hidden = isImage;
+    });
   }
 
   function bindPropertyInputs() {
