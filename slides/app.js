@@ -2054,11 +2054,18 @@
     const d = activeDoc();
     saveActiveDocState();
     const fmt = (d && d.originalFormat) || 'pptx';
-    let built;
-    try { built = await buildDeckBlob(fmt); }
-    catch (err) { alert('Save failed: ' + (err.message || err)); return; }
-    const suggested = (deck.title || 'presentation').replace(/[^\w\-]+/g, '_') + '.' + built.ext;
+    // Resolve the target extension/MIME synchronously so the file
+    // picker and permission prompt run before any async blob-building
+    // burns the transient user activation those APIs require.
+    const ext = (fmt === 'json' || fmt === 'pdf') ? fmt : 'pptx';
+    const mime = ext === 'json' ? 'application/json'
+      : ext === 'pdf' ? 'application/pdf'
+      : 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+    const suggested = (deck.title || 'presentation').replace(/[^\w\-]+/g, '_') + '.' + ext;
     if (!('showSaveFilePicker' in window)) {
+      let built;
+      try { built = await buildDeckBlob(fmt); }
+      catch (err) { alert('Save failed: ' + (err.message || err)); return; }
       downloadDeckBlob(built.blob, built.ext);
       return;
     }
@@ -2068,8 +2075,8 @@
         handle = await window.showSaveFilePicker({
           suggestedName: suggested,
           types: [{
-            description: built.ext.toUpperCase() + ' file',
-            accept: { [built.blob.type || 'application/octet-stream']: ['.' + built.ext] },
+            description: ext.toUpperCase() + ' file',
+            accept: { [mime]: ['.' + ext] },
           }],
         });
         if (d) d.fsHandle = handle;
@@ -2078,6 +2085,10 @@
         const perm = await handle.requestPermission({ mode: 'readwrite' });
         if (perm !== 'granted') { alert('Write permission denied'); return; }
       }
+      // Build the blob only after the picker + permission prompt.
+      let built;
+      try { built = await buildDeckBlob(fmt); }
+      catch (err) { alert('Save failed: ' + (err.message || err)); return; }
       const writable = await handle.createWritable();
       await writable.write(built.blob);
       await writable.close();
