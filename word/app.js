@@ -109,6 +109,20 @@
   const docHeader = document.getElementById('docHeader');
   const docFooter = document.getElementById('docFooter');
 
+  // ---------- Multi-document tab state ----------
+  const STORE_TABS = 'rodmanword:tabs';
+  let documents = [];
+  let activeDocId = null;
+  let suppressTabPersist = false;
+  // Active-document mirrors of the engine state. These always reflect
+  // the document currently live in the editor DOM; saveActiveDocState()
+  // copies them into the active doc object and loadDocState() restores
+  // them, so the ~40 callers that read these never need tab awareness.
+  let threads = {};
+  let docProps = {};
+  let originalPdfBytes = null;
+  let fsHandle = null;
+
   function initAskClaudePanel() {
     const button = $('#askClaudeBtn');
     const panel = $('#askClaudePanel');
@@ -763,15 +777,10 @@
     syncBrowserTitle();
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
-      try {
-        localStorage.setItem(STORE_KEY, editor.innerHTML);
-        localStorage.setItem(STORE_TITLE, docTitle.value);
-        if (docHeader) localStorage.setItem(STORE_HEADER, docHeader.innerHTML);
-        if (docFooter) localStorage.setItem(STORE_FOOTER, docFooter.innerHTML);
-        statusSaved.textContent = 'Saved';
-        if (typeof markClean === 'function') markClean();
-      } catch {
-        statusSaved.textContent = 'Save failed (storage full)';
+      if (!suppressTabPersist) {
+        saveActiveDocState();
+        persistAllTabs();
+        markClean();
       }
       updateCounts();
     }, 400);
@@ -793,12 +802,17 @@
 
   function markDirty() {
     isDirty = true;
-    dirtyDot.hidden = false;
+    if (dirtyDot) dirtyDot.hidden = false;
     lastEditAt = Date.now();
+    const d = activeDoc();
+    if (d) d.dirty = true;
   }
   function markClean() {
+    // Clears only the transient autosave indicator. A document's
+    // per-tab `dirty` flag (used by the close-tab confirm) stays set
+    // once edited — localStorage autosave is not a file save.
     isDirty = false;
-    dirtyDot.hidden = true;
+    if (dirtyDot) dirtyDot.hidden = true;
   }
 
   // One composite handler per editable surface so we don't pay the
@@ -808,7 +822,7 @@
     refreshEmptyState();
     markDirty();
   }
-  function onTitleInput() { queueAutosave(); markDirty(); }
+  function onTitleInput() { queueAutosave(); markDirty(); renderTabStrip(); }
   editor.addEventListener('input', onEditorInput);
   docTitle.addEventListener('input', onTitleInput);
   if (docHeader) docHeader.addEventListener('input', onTitleInput);
@@ -972,7 +986,7 @@
     const shift = e.shiftKey;
     if (key === 's') {
       e.preventDefault();
-      saveDocument();
+      openSaveDialog();
     } else if (key === 'p') {
       e.preventDefault();
       preparePrint();
@@ -1100,6 +1114,14 @@
       case 'open-save-dialog':
         closeBackstage();
         openSaveDialog();
+        break;
+      case 'save-docx':
+        closeBackstage();
+        exportDocx();
+        break;
+      case 'save-pdf':
+        closeBackstage();
+        exportPdf();
         break;
       case 'save-fs':
         closeBackstage();
@@ -1268,8 +1290,10 @@
     save: {
       title: 'Save',
       tiles: [
-        { ico: '💾', label: 'Save…', desc: 'Pick a file type and any per-format options. Native .rwd, Office, OpenDocument, PDF, EPUB, Markdown, JSON, YAML, PPTX, ODP and more.', action: 'open-save-dialog' },
-        { ico: '🗂', label: 'Save to file…', desc: 'Save directly back to the same file via File System Access.', action: 'save-fs' },
+        { ico: '📘', label: 'Save as Word (.docx)', desc: 'Download this document as a Microsoft Word .docx file.', action: 'save-docx' },
+        { ico: '📕', label: 'Save as PDF', desc: 'Download this document as a PDF using the current page size and margins.', action: 'save-pdf' },
+        { ico: '💾', label: 'More formats…', desc: 'Open the Save dialog for OpenDocument, EPUB, RTF, Markdown, HTML, plain text and more.', action: 'open-save-dialog' },
+        { ico: '🗂', label: 'Save to file…', desc: 'Save directly back to disk in the document’s original format via File System Access.', action: 'save-fs' },
         { ico: '⭐', label: 'Save as template', desc: 'Add the current document to your template gallery.', action: 'save-template' },
       ],
     },
@@ -1422,15 +1446,344 @@
   });
 
   // ---------- Document operations ----------
-  async function newDocument() {
-    if (isDirty &&
-        !(await confirmDialog('Start a new blank document? Unsaved changes will be lost.', 'New document'))) {
+  // ============================================================
+  // Multi-document tabs — one live editor DOM, an array of
+  // serialized document objects, swap-on-switch.
+  // ============================================================
+  function genDocId() {
+    return 'doc-' + Date.now().toString(36) + '-' +
+      Math.random().toString(36).slice(2, 7);
+  }
+
+  function makeDocObject(init) {
+    init = init || {};
+    return {
+      id: init.id || genDocId(),
+      title: init.title || 'Document',
+      html: init.html != null ? init.html : '<h1>Untitled document</h1><p><br/></p>',
+      header: init.header || '',
+      footer: init.footer || '',
+      layout: init.layout && typeof init.layout === 'object'
+        ? init.layout
+        : { size: 'a4', orientation: 'portrait', margins: 'normal' },
+      threads: init.threads && typeof init.threads === 'object' ? init.threads : {},
+      docProps: init.docProps && typeof init.docProps === 'object' ? init.docProps : {},
+      originalFormat: init.originalFormat || null,
+      dirty: !!init.dirty,
+      fsHandle: init.fsHandle || null,
+      pdfBytes: init.pdfBytes || null,
+    };
+  }
+
+  function activeDoc() {
+    return documents.find((d) => d.id === activeDocId) || null;
+  }
+
+  // Serialize the live editor DOM into the active document object.
+  function saveActiveDocState() {
+    const doc = activeDoc();
+    if (!doc) return;
+    doc.html = editor.innerHTML;
+    doc.title = docTitle.value;
+    doc.header = docHeader ? docHeader.innerHTML : '';
+    doc.footer = docFooter ? docFooter.innerHTML : '';
+    doc.layout = {
+      size: pageSize.value,
+      orientation: orientation.value,
+      margins: margins.value,
+    };
+    doc.threads = threads;
+    doc.docProps = docProps;
+    doc.fsHandle = fsHandle;
+    doc.pdfBytes = originalPdfBytes;
+    // doc.dirty is owned by markDirty() — it means "edited, not saved
+    // to a file" and must outlive the transient `isDirty` autosave
+    // flag, so it is deliberately not overwritten here.
+  }
+
+  // Deserialize a document object into the live editor DOM.
+  function loadDocState(doc) {
+    if (!doc) return;
+    editor.innerHTML = doc.html || '<p><br/></p>';
+    docTitle.value = doc.title || 'Document';
+    if (docHeader) docHeader.innerHTML = doc.header || '';
+    if (docFooter) docFooter.innerHTML = doc.footer || '';
+    const lay = doc.layout || {};
+    if (lay.size) pageSize.value = lay.size;
+    if (lay.orientation) orientation.value = lay.orientation;
+    if (lay.margins) margins.value = lay.margins;
+    threads = doc.threads && typeof doc.threads === 'object' ? doc.threads : {};
+    docProps = doc.docProps && typeof doc.docProps === 'object' ? doc.docProps : {};
+    fsHandle = doc.fsHandle || null;
+    originalPdfBytes = doc.pdfBytes || null;
+    isDirty = !!doc.dirty;
+    if (dirtyDot) dirtyDot.hidden = !isDirty;
+    try { applyLayout(); } catch {}
+    try { refreshEmptyState(); } catch {}
+    try { if (typeof applyResolvedClasses === 'function') applyResolvedClasses(); } catch {}
+    try { if (typeof rebuildOutline === 'function') rebuildOutline(); } catch {}
+    try { if (typeof rebuildCommentsPane === 'function') rebuildCommentsPane(); } catch {}
+    try { if (typeof refreshFields === 'function') refreshFields(); } catch {}
+    try { updateCounts(); } catch {}
+    syncBrowserTitle();
+  }
+
+  function persistAllTabs() {
+    if (suppressTabPersist) return;
+    try {
+      const payload = {
+        activeDocId,
+        docs: documents.map((d) => ({
+          id: d.id, title: d.title, html: d.html,
+          header: d.header, footer: d.footer, layout: d.layout,
+          threads: d.threads, docProps: d.docProps,
+          originalFormat: d.originalFormat, dirty: d.dirty,
+        })),
+      };
+      localStorage.setItem(STORE_TABS, JSON.stringify(payload));
+      statusSaved.textContent = 'Saved';
+    } catch {
+      statusSaved.textContent = 'Save failed (storage full)';
+    }
+  }
+
+  // Drop references that point into the outgoing document's DOM.
+  function resetTransientEditorState() {
+    try { pendingCommentRange = null; } catch {}
+    try { editingCommentSpan = null; } catch {}
+    try { editingThreadId = null; } catch {}
+    document.querySelectorAll('.outline-edit-overlay').forEach((o) => o.remove());
+    const cm = document.getElementById('commentModal');
+    if (cm) cm.hidden = true;
+  }
+
+  function renderTabStrip() {
+    const strip = document.getElementById('docTabs');
+    if (!strip) return;
+    const newBtn = document.getElementById('newTabBtn');
+    strip.querySelectorAll('.doc-tab').forEach((t) => t.remove());
+    documents.forEach((doc) => {
+      const isActive = doc.id === activeDocId;
+      const tab = document.createElement('div');
+      tab.className = 'doc-tab' + (isActive ? ' active' : '');
+      tab.setAttribute('role', 'tab');
+      tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
+      tab.dataset.docId = doc.id;
+      tab.title = doc.title || 'Document';
+      const label = document.createElement('span');
+      label.className = 'doc-tab-label';
+      label.textContent = doc.title || 'Document';
+      const close = document.createElement('button');
+      close.type = 'button';
+      close.className = 'doc-tab-close';
+      close.textContent = '✕';
+      close.setAttribute('aria-label', 'Close ' + (doc.title || 'Document'));
+      close.addEventListener('click', (e) => {
+        e.stopPropagation();
+        closeTab(doc.id);
+      });
+      tab.appendChild(label);
+      tab.appendChild(close);
+      tab.addEventListener('click', () => switchToTab(doc.id));
+      if (newBtn) strip.insertBefore(tab, newBtn);
+      else strip.appendChild(tab);
+    });
+  }
+
+  function createTab(init) {
+    saveActiveDocState();
+    resetTransientEditorState();
+    const doc = makeDocObject(init);
+    documents.push(doc);
+    activeDocId = doc.id;
+    loadDocState(doc);
+    renderTabStrip();
+    persistAllTabs();
+    return doc;
+  }
+
+  function openDocumentInNewTab(init) {
+    const doc = createTab(init);
+    if (doc.title) { try { addRecent(doc.title); } catch {} }
+    closeBackstage();
+    editor.focus();
+    return doc;
+  }
+
+  function newDocument() {
+    const doc = createTab({});
+    closeBackstage();
+    editor.focus();
+    return doc;
+  }
+
+  function switchToTab(id) {
+    if (id === activeDocId) return;
+    const doc = documents.find((d) => d.id === id);
+    if (!doc) return;
+    // Flush the outgoing tab synchronously so the 400ms autosave
+    // debounce can't write its content under the new tab's identity.
+    clearTimeout(saveTimer);
+    saveActiveDocState();
+    resetTransientEditorState();
+    activeDocId = id;
+    loadDocState(doc);
+    renderTabStrip();
+    persistAllTabs();
+    editor.focus();
+  }
+
+  function closeTab(id) {
+    const idx = documents.findIndex((d) => d.id === id);
+    if (idx < 0) return;
+    const doc = documents[idx];
+    const isActive = id === activeDocId;
+    // Flush the live DOM into the active doc before persisting, so
+    // closing a background tab doesn't save a stale active document.
+    saveActiveDocState();
+    if (doc.dirty &&
+        !confirm('Close "' + (doc.title || 'Document') +
+          '"? Unsaved changes will be lost.')) {
       return;
     }
-    editor.innerHTML = '<h1>Untitled document</h1><p><br/></p>';
-    docTitle.value = 'Document';
-    queueAutosave();
-    editor.focus();
+    clearTimeout(saveTimer);
+    if (documents.length === 1) {
+      // Never leave zero tabs — replace the last one with a blank.
+      resetTransientEditorState();
+      const blank = makeDocObject({});
+      documents[0] = blank;
+      activeDocId = blank.id;
+      loadDocState(blank);
+      renderTabStrip();
+      persistAllTabs();
+      return;
+    }
+    documents.splice(idx, 1);
+    if (isActive) {
+      resetTransientEditorState();
+      const next = documents[Math.min(idx, documents.length - 1)];
+      activeDocId = next.id;
+      loadDocState(next);
+    }
+    renderTabStrip();
+    persistAllTabs();
+  }
+
+  // Detect a file's format, parse it with the matching engine, and
+  // open the result in a new tab. Shared by the file <input> and the
+  // File System Access path.
+  async function loadFileIntoNewTab(file, fsHandleArg) {
+    if (!file) return;
+    const name = file.name || 'document';
+    const base = name.replace(/\.[^.]+$/, '') || 'Document';
+    try {
+      if (/\.rwd\.enc$/i.test(name)) {
+        const data = await decryptRwd(await file.text());
+        if (!data) return;
+        openDocumentInNewTab({
+          title: data.title || base,
+          html: sanitizeImported(data.html || ''),
+          header: sanitizeImported(data.header || ''),
+          footer: sanitizeImported(data.footer || ''),
+          layout: data.layout, threads: data.threads,
+          docProps: data.properties, originalFormat: 'rwd',
+          fsHandle: fsHandleArg,
+        });
+        return;
+      }
+      if (/\.docx$/i.test(name) || file.type ===
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+        if (!window.RodmanDocx) throw new Error('docx engine not loaded');
+        const html = await window.RodmanDocx.loadDocx(await file.arrayBuffer());
+        openDocumentInNewTab({
+          title: base, html: sanitizeImported(html),
+          originalFormat: 'docx', fsHandle: fsHandleArg,
+        });
+        toast('Imported .docx', 'success');
+        return;
+      }
+      if (/\.pdf$/i.test(name) || file.type === 'application/pdf') {
+        if (!window.RodmanPdf) throw new Error('pdf engine not loaded');
+        const buf = await file.arrayBuffer();
+        const html = await window.RodmanPdf.loadPdf(buf);
+        openDocumentInNewTab({
+          title: base, html: sanitizeImported(html),
+          originalFormat: 'pdf', pdfBytes: new Uint8Array(buf),
+          fsHandle: fsHandleArg,
+        });
+        toast('Imported PDF text', 'success');
+        return;
+      }
+      if (/\.rtf$/i.test(name) || file.type === 'application/rtf') {
+        const html = window.RodmanInterop.rtfImport(await file.text());
+        openDocumentInNewTab({
+          title: base, html: sanitizeImported(html),
+          originalFormat: 'rtf', fsHandle: fsHandleArg,
+        });
+        toast('Imported .rtf', 'success');
+        return;
+      }
+      if (/\.odt$/i.test(name) || file.type ===
+          'application/vnd.oasis.opendocument.text') {
+        const html = await window.RodmanInterop.odtImport(await file.arrayBuffer());
+        openDocumentInNewTab({
+          title: base, html: sanitizeImported(html),
+          originalFormat: 'odt', fsHandle: fsHandleArg,
+        });
+        toast('Imported .odt', 'success');
+        return;
+      }
+      if (/\.epub$/i.test(name) || file.type === 'application/epub+zip') {
+        const html = await window.RodmanInterop.epubImport(await file.arrayBuffer());
+        openDocumentInNewTab({
+          title: base, html: sanitizeImported(html),
+          originalFormat: 'epub', fsHandle: fsHandleArg,
+        });
+        toast('Imported .epub', 'success');
+        return;
+      }
+      const text = await file.text();
+      if (/\.rwd$/i.test(name) || file.type === 'application/json') {
+        const data = JSON.parse(text);
+        openDocumentInNewTab({
+          title: data.title || base,
+          html: sanitizeImported(data.html || ''),
+          header: sanitizeImported(data.header || ''),
+          footer: sanitizeImported(data.footer || ''),
+          layout: data.layout, threads: data.threads,
+          docProps: data.properties, originalFormat: 'rwd',
+          fsHandle: fsHandleArg,
+        });
+        return;
+      }
+      if (/\.html?$/i.test(name) || (file.type || '').includes('html')) {
+        const tmp = document.createElement('div');
+        tmp.innerHTML = text;
+        const body = tmp.querySelector('body') || tmp;
+        openDocumentInNewTab({
+          title: base, html: sanitizeImported(body.innerHTML),
+          originalFormat: 'html', fsHandle: fsHandleArg,
+        });
+        return;
+      }
+      if (/\.md$/i.test(name)) {
+        openDocumentInNewTab({
+          title: base, html: sanitizeImported(tinyMdToHtml(text)),
+          originalFormat: 'md', fsHandle: fsHandleArg,
+        });
+        return;
+      }
+      const escaped = escapeHtml(text)
+        .split(/\n{2,}/)
+        .map((p) => '<p>' + p.replace(/\n/g, '<br/>') + '</p>')
+        .join('');
+      openDocumentInNewTab({
+        title: base, html: escaped || '<p><br/></p>',
+        originalFormat: 'txt', fsHandle: fsHandleArg,
+      });
+    } catch (err) {
+      toast('Could not open this file: ' + ((err && err.message) || err), 'error');
+    }
   }
 
   function downloadBlob(content, filename, mime) {
@@ -1445,31 +1798,6 @@
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     }, 100);
-  }
-
-  function saveDocument() {
-    const data = {
-      version: 1,
-      title: docTitle.value,
-      html: editor.innerHTML,
-      header: docHeader ? docHeader.innerHTML : '',
-      footer: docFooter ? docFooter.innerHTML : '',
-      layout: {
-        size: pageSize.value,
-        orientation: orientation.value,
-        margins: margins.value
-      },
-      properties: docProps || {},
-      threads: typeof threads === 'object' ? threads : {},
-      savedAt: new Date().toISOString()
-    };
-    downloadBlob(
-      JSON.stringify(data, null, 2),
-      sanitizeFileName(docTitle.value) + '.rwd',
-      'application/json'
-    );
-    addRecent(docTitle.value);
-    statusSaved.textContent = 'Saved';
   }
 
   // ============================================================
@@ -1501,7 +1829,6 @@
       fmtSel.value = 'docx';
     }
     // Reset per-format option fields to defaults.
-    $('#saveEncPassword').value = '';
     $('#saveMdFrontmatter').checked = true;
     $('#saveOptPdfRecode').checked = false;
     $('#saveOptPdfLevel').value = 'medium';
@@ -1513,7 +1840,6 @@
 
   function refreshSaveOptionsVisibility() {
     const fmt = $('#saveFormat').value;
-    $('#saveOptRwdEnc').hidden = fmt !== 'rwd.enc';
     $('#saveOptMd').hidden = fmt !== 'md';
     const pdfPanel = $('#saveOptPdf');
     pdfPanel.hidden = fmt !== 'pdf';
@@ -1537,18 +1863,10 @@
     const origTitle = docTitle.value;
     let restoreTitle = true;
     docTitle.value = filename;
+    // Don't let the autosave debounce snapshot the temporary filename.
+    suppressTabPersist = true;
     try {
       switch (fmt) {
-        case 'rwd':       saveDocument(); break;
-        case 'rwd.enc': {
-          const password = $('#saveEncPassword').value;
-          if (!password || password.length < 6) {
-            toast('Password must be at least 6 characters', 'error');
-            return false;
-          }
-          await encryptAndDownload(password);
-          break;
-        }
         case 'docx':      exportDocx(); break;
         case 'pdf': {
           if ($('#saveOptPdfRecode').checked && originalPdfBytes) {
@@ -1594,6 +1912,7 @@
       }
     } finally {
       if (restoreTitle) docTitle.value = origTitle;
+      suppressTabPersist = false;
     }
     return true;
   }
@@ -1644,8 +1963,8 @@
     });
   })();
 
-  function exportHtml() {
-    const html = `<!DOCTYPE html>
+  function buildStandaloneHtml() {
+    return `<!DOCTYPE html>
 <html><head><meta charset="utf-8" /><title>${escapeHtml(docTitle.value)}</title>
 <style>
 body { font-family: Calibri, Arial, sans-serif; max-width: 8.5in; margin: 1in auto; line-height: 1.5; color: #222; padding: 0 1in; }
@@ -1659,7 +1978,10 @@ hr.page-break { page-break-after: always; border: none; }
 </style></head><body>
 ${editor.innerHTML}
 </body></html>`;
-    downloadBlob(html, sanitizeFileName(docTitle.value) + '.html', 'text/html');
+  }
+
+  function exportHtml() {
+    downloadBlob(buildStandaloneHtml(), sanitizeFileName(docTitle.value) + '.html', 'text/html');
   }
 
   function exportTxt() {
@@ -1670,17 +1992,42 @@ ${editor.innerHTML}
     );
   }
 
+  function makeDocxBlob() {
+    if (!window.RodmanDocx) throw new Error('docx.js not loaded');
+    return window.RodmanDocx.saveDocx(editor.innerHTML, {
+      title: docTitle.value,
+      header: getHeaderHtml(),
+      footer: getFooterHtml(),
+    });
+  }
+
+  function makePdfBlob() {
+    if (!window.RodmanPdf) throw new Error('pdfio.js not loaded');
+    const sizes = {
+      a4:     { w: 595, h: 842 },
+      letter: { w: 612, h: 792 },
+      legal:  { w: 612, h: 1008 },
+    };
+    const sz = sizes[pageSize.value] || sizes.a4;
+    const land = orientation.value === 'landscape';
+    const marginsMap = { normal: 72, narrow: 36, wide: 108 };
+    return window.RodmanPdf.savePdf(editor.innerHTML, {
+      pageW: land ? sz.h : sz.w,
+      pageH: land ? sz.w : sz.h,
+      margin: marginsMap[margins.value] || 72,
+      title: docTitle.value,
+      header: getHeaderHtml(),
+      footer: getFooterHtml(),
+    });
+  }
+
   function exportDocx() {
     if (!window.RodmanDocx) {
       toast('docx.js not loaded', 'error');
       return;
     }
     try {
-      const blob = window.RodmanDocx.saveDocx(editor.innerHTML, {
-        title: docTitle.value,
-        header: getHeaderHtml(),
-        footer: getFooterHtml(),
-      });
+      const blob = makeDocxBlob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -1703,23 +2050,7 @@ ${editor.innerHTML}
       return;
     }
     try {
-      // Map current page size to PDF media box (points)
-      const sizes = {
-        a4:     { w: 595, h: 842 },
-        letter: { w: 612, h: 792 },
-        legal:  { w: 612, h: 1008 },
-      };
-      const sz = sizes[pageSize.value] || sizes.a4;
-      const land = orientation.value === 'landscape';
-      const marginsMap = { normal: 72, narrow: 36, wide: 108 };
-      const blob = window.RodmanPdf.savePdf(editor.innerHTML, {
-        pageW: land ? sz.h : sz.w,
-        pageH: land ? sz.w : sz.h,
-        margin: marginsMap[margins.value] || 72,
-        title: docTitle.value,
-        header: getHeaderHtml(),
-        footer: getFooterHtml(),
-      });
+      const blob = makePdfBlob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -1768,141 +2099,14 @@ ${editor.innerHTML}
     }
   }
 
+  // Single file-input handler — every supported format is detected
+  // and parsed inside loadFileIntoNewTab(), which opens the result in
+  // a new tab and closes the File backstage.
   $('#filePicker').addEventListener('change', async (e) => {
     const file = e.target.files && e.target.files[0];
-    if (!file) return;
-    // Any open clears the previous Compress-PDF source. The .pdf
-    // branch re-sets the slot below; every other path leaves it null,
-    // so opening a non-PDF after a PDF doesn't leave stale bytes
-    // attached to the next Compress PDF action.
-    originalPdfBytes = null;
-    if (/\.rwd\.enc$/i.test(file.name)) {
-      const txt = await file.text();
-      const data = await decryptRwd(txt);
-      e.target.value = '';
-      if (!data) return;
-      editor.innerHTML = sanitizeImported(data.html || '');
-      docTitle.value = data.title || file.name.replace(/\.rwd\.enc$/i, '');
-      if (docHeader) docHeader.innerHTML = sanitizeImported(data.header || '');
-      if (docFooter) docFooter.innerHTML = sanitizeImported(data.footer || '');
-      if (data.threads && typeof data.threads === 'object') {
-        threads = data.threads;
-        persistThreads();
-      }
-      if (data.layout) {
-        pageSize.value = data.layout.size || pageSize.value;
-        orientation.value = data.layout.orientation || orientation.value;
-        margins.value = data.layout.margins || margins.value;
-        applyLayout();
-      }
-      applyResolvedClasses();
-      rebuildCommentsPane();
-      addRecent(docTitle.value);
-      queueAutosave();
-      closeBackstage();
-      return;
-    }
-    // Hand off RTF/ODT/EPUB to the extended listener registered in the
-    // FEATURE: Section L block — letting both listeners run for the
-    // same change event would race the FileReader fallback below
-    // against the awaited binary parsers and produce flicker / wrong
-    // final state.
-    if (/\.(rtf|odt|epub)$/i.test(file.name) ||
-        file.type === 'application/rtf' ||
-        file.type === 'application/vnd.oasis.opendocument.text' ||
-        file.type === 'application/epub+zip') {
-      return;
-    }
-    if (/\.docx$/i.test(file.name) ||
-        file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
-      try {
-        const buf = await file.arrayBuffer();
-        if (!window.RodmanDocx) throw new Error('docx.js not loaded');
-        const html = await window.RodmanDocx.loadDocx(buf);
-        editor.innerHTML = sanitizeImported(html);
-        docTitle.value = file.name.replace(/\.docx$/i, '');
-        addRecent(docTitle.value);
-        queueAutosave();
-        rebuildOutline();
-        closeBackstage();
-        toast('Imported .docx', 'success');
-      } catch (err) {
-        toast('Could not read this .docx file: ' + err.message, 'error');
-      }
-      e.target.value = '';
-      return;
-    }
-    if (/\.pdf$/i.test(file.name) || file.type === 'application/pdf') {
-      try {
-        const buf = await file.arrayBuffer();
-        if (!window.RodmanPdf) throw new Error('pdfio.js not loaded');
-        const html = await window.RodmanPdf.loadPdf(buf);
-        editor.innerHTML = sanitizeImported(html);
-        docTitle.value = file.name.replace(/\.pdf$/i, '');
-        // Keep the original bytes so Compress PDF can re-rasterize
-        // the same source — text extraction is lossy and the
-        // rasterizer needs the real file.
-        originalPdfBytes = new Uint8Array(buf);
-        addRecent(docTitle.value);
-        queueAutosave();
-        rebuildOutline();
-        closeBackstage();
-        toast('Imported PDF text', 'success');
-      } catch (err) {
-        toast('Could not extract text from PDF: ' + err.message, 'error');
-      }
-      e.target.value = '';
-      return;
-    }
-    const reader = new FileReader();
-    reader.onerror = () => toast('Could not read this file', 'error');
-    reader.onload = () => {
-      try {
-        const content = String(reader.result);
-        if (file.name.endsWith('.rwd') || file.type === 'application/json') {
-          const data = JSON.parse(content);
-          editor.innerHTML = sanitizeImported(data.html || '');
-          docTitle.value = data.title || file.name.replace(/\.rwd$/, '');
-          if (docHeader) docHeader.innerHTML = sanitizeImported(data.header || '');
-          if (docFooter) docFooter.innerHTML = sanitizeImported(data.footer || '');
-          if (data.threads && typeof data.threads === 'object') {
-            threads = data.threads;
-            persistThreads();
-          }
-          if (data.layout) {
-            pageSize.value = data.layout.size || pageSize.value;
-            orientation.value = data.layout.orientation || orientation.value;
-            margins.value = data.layout.margins || margins.value;
-            applyLayout();
-          }
-          applyResolvedClasses();
-          rebuildCommentsPane();
-        } else if (/\.html?$/.test(file.name) || file.type.includes('html')) {
-          const tmp = document.createElement('div');
-          tmp.innerHTML = content;
-          const body = tmp.querySelector('body') || tmp;
-          editor.innerHTML = sanitizeImported(body.innerHTML);
-          docTitle.value = file.name.replace(/\.html?$/, '');
-        } else if (/\.md$/i.test(file.name)) {
-          editor.innerHTML = sanitizeImported(tinyMdToHtml(content));
-          docTitle.value = file.name.replace(/\.md$/i, '');
-        } else {
-          const escaped = escapeHtml(content)
-            .split(/\n{2,}/)
-            .map((p) => '<p>' + p.replace(/\n/g, '<br/>') + '</p>')
-            .join('');
-          editor.innerHTML = escaped;
-          docTitle.value = file.name.replace(/\.txt$/i, '');
-        }
-        addRecent(docTitle.value);
-        queueAutosave();
-        closeBackstage();
-      } catch (err) {
-        toast('Could not import this file: ' + err.message, 'error');
-      }
-    };
-    reader.readAsText(file);
     e.target.value = '';
+    if (!file) return;
+    await loadFileIntoNewTab(file);
   });
 
   function sanitizeImported(html) {
@@ -2264,16 +2468,56 @@ ${editor.innerHTML}
     }
   }
 
-  // ---------- Restore document ----------
+  // ---------- Restore document(s) ----------
   function restoreFromStorage() {
-    const html = localStorage.getItem(STORE_KEY);
-    const title = localStorage.getItem(STORE_TITLE);
-    const header = localStorage.getItem(STORE_HEADER);
-    const footer = localStorage.getItem(STORE_FOOTER);
-    if (html) editor.innerHTML = html;
-    if (title) docTitle.value = title;
-    if (header && docHeader) docHeader.innerHTML = header;
-    if (footer && docFooter) docFooter.innerHTML = footer;
+    let payload = null;
+    try { payload = JSON.parse(localStorage.getItem(STORE_TABS) || 'null'); } catch {}
+    if (payload && Array.isArray(payload.docs) && payload.docs.length) {
+      documents = payload.docs.map((d) => makeDocObject(d));
+      activeDocId = (payload.activeDocId &&
+        documents.some((d) => d.id === payload.activeDocId))
+          ? payload.activeDocId
+          : documents[0].id;
+    } else {
+      // Legacy single-document migration (rodmanword:doc/title/...).
+      const html = localStorage.getItem(STORE_KEY);
+      const title = localStorage.getItem(STORE_TITLE);
+      const header = localStorage.getItem(STORE_HEADER);
+      const footer = localStorage.getItem(STORE_FOOTER);
+      let lThreads = {}, lProps = {};
+      try { lThreads = JSON.parse(localStorage.getItem('rodmanword:threads') || '{}'); } catch {}
+      try { lProps = JSON.parse(localStorage.getItem('rodmanword:props') || '{}'); } catch {}
+      const doc = makeDocObject({
+        html: html != null ? html : editor.innerHTML,
+        title: title || docTitle.value || 'Document',
+        header: header || (docHeader ? docHeader.innerHTML : ''),
+        footer: footer || (docFooter ? docFooter.innerHTML : ''),
+        threads: lThreads,
+        docProps: lProps,
+      });
+      documents = [doc];
+      activeDocId = doc.id;
+    }
+    // Write the active document into the live DOM directly — not via
+    // loadDocState(), which calls outline/comment rebuilders that are
+    // reassigned later in the IIFE. The setTimeout(rebuildOutline) in
+    // Init and the comments-pane init handle those after the IIFE.
+    const doc = documents.find((d) => d.id === activeDocId);
+    editor.innerHTML = doc.html || '<p><br/></p>';
+    docTitle.value = doc.title || 'Document';
+    if (docHeader) docHeader.innerHTML = doc.header || '';
+    if (docFooter) docFooter.innerHTML = doc.footer || '';
+    if (doc.layout) {
+      if (doc.layout.size) pageSize.value = doc.layout.size;
+      if (doc.layout.orientation) orientation.value = doc.layout.orientation;
+      if (doc.layout.margins) margins.value = doc.layout.margins;
+    }
+    threads = doc.threads && typeof doc.threads === 'object' ? doc.threads : {};
+    docProps = doc.docProps && typeof doc.docProps === 'object' ? doc.docProps : {};
+    originalPdfBytes = null;
+    fsHandle = null;
+    try { applyLayout(); } catch {}
+    renderTabStrip();
   }
 
   // ---------- Init ----------
@@ -2284,6 +2528,9 @@ ${editor.innerHTML}
   setInterval(updateCounts, 1500);
   // Outline rebuild after init (function defined later in feature block)
   setTimeout(() => { try { rebuildOutline(); } catch {} }, 0);
+
+  // New-tab button in the header tab strip.
+  document.getElementById('newTabBtn')?.addEventListener('click', () => newDocument());
 
   // Populate the About dialog from RW_BUILD so it can never show a
   // stale hard-coded date again.
@@ -4176,10 +4423,9 @@ ${editor.innerHTML}
   // replaced by compressPdfFromDialog() inside the unified Save
   // dialog flow. See openSaveDialog above.
   //
-  // Module-scope slot for the original PDF bytes when the active
-  // document was imported from a .pdf. Compress PDF re-rasterizes
-  // these bytes through lib/images/pdf.js compressPdf.
-  let originalPdfBytes = null;
+  // The original PDF bytes (when the active document was imported
+  // from a .pdf) are mirrored in the module-scope `originalPdfBytes`
+  // declared in the multi-document state block near the top.
 
   // Hook the existing exportMarkdown to add YAML front-matter support
   if (typeof exportMarkdown === 'function') {
@@ -4237,62 +4483,8 @@ ${editor.innerHTML}
     };
   })(setBackstageView);
 
-  // Extend file picker for RTF / ODT / EPUB
-  $('#filePicker').addEventListener('change', async (e) => {
-    const file = e.target.files && e.target.files[0];
-    if (!file) return;
-    if (/\.rtf$/i.test(file.name) || file.type === 'application/rtf') {
-      try {
-        const text = await file.text();
-        editor.innerHTML = sanitizeImported(window.RodmanInterop.rtfImport(text));
-        docTitle.value = file.name.replace(/\.rtf$/i, '');
-        addRecent(docTitle.value);
-        queueAutosave();
-        rebuildOutline();
-        closeBackstage();
-        toast('Imported .rtf', 'success');
-      } catch (err) {
-        toast('RTF import failed: ' + err.message, 'error');
-      }
-      e.target.value = '';
-      return;
-    }
-    if (/\.odt$/i.test(file.name) || file.type === 'application/vnd.oasis.opendocument.text') {
-      const buf = await file.arrayBuffer();
-      try {
-        const html = await window.RodmanInterop.odtImport(buf);
-        editor.innerHTML = sanitizeImported(html);
-        docTitle.value = file.name.replace(/\.odt$/i, '');
-        addRecent(docTitle.value);
-        queueAutosave();
-        rebuildOutline();
-        closeBackstage();
-        toast('Imported .odt', 'success');
-      } catch (err) {
-        toast('ODT import failed: ' + err.message, 'error');
-      }
-      e.target.value = '';
-      return;
-    }
-    if (/\.epub$/i.test(file.name) || file.type === 'application/epub+zip') {
-      const buf = await file.arrayBuffer();
-      try {
-        const html = await window.RodmanInterop.epubImport(buf);
-        editor.innerHTML = sanitizeImported(html);
-        docTitle.value = file.name.replace(/\.epub$/i, '');
-        addRecent(docTitle.value);
-        queueAutosave();
-        rebuildOutline();
-        closeBackstage();
-        toast('Imported .epub', 'success');
-      } catch (err) {
-        toast('EPUB import failed: ' + err.message, 'error');
-      }
-      e.target.value = '';
-      return;
-    }
-    // For other formats, fall back to existing handlers (already wired)
-  });
+  // RTF / ODT / EPUB are handled by the single file-input listener
+  // above via loadFileIntoNewTab().
 
   // ============================================================
   // FEATURE: Section K — View modes (#80–#85)
@@ -6892,7 +7084,8 @@ ${editor.innerHTML}
   // ============================================================
   // FEATURE: Cloud / File System Access (Tier 3, gap #26)
   // ============================================================
-  let fsHandle = null;
+  // `fsHandle` is declared in the multi-document state block and
+  // mirrors the active document's File System Access handle.
 
   function buildRwdJson() {
     return JSON.stringify({
@@ -6930,29 +7123,80 @@ ${editor.innerHTML}
     refreshFields();
   }
 
+  // Build a downloadable Blob for the document in a given format.
+  // Used by "Save to file" so it can write back in the original format.
+  function buildExportBlob(format) {
+    switch (format) {
+      case 'pdf':
+        return { blob: makePdfBlob(), ext: 'pdf' };
+      case 'html':
+        return { blob: new Blob([buildStandaloneHtml()], { type: 'text/html' }), ext: 'html' };
+      case 'txt':
+        return { blob: new Blob([editor.innerText], { type: 'text/plain' }), ext: 'txt' };
+      case 'rwd':
+        return { blob: new Blob([buildRwdJson()], { type: 'application/json' }), ext: 'rwd' };
+      case 'docx':
+      default:
+        // docx is the headline format and the fallback for any
+        // original format without a direct write-back builder.
+        return { blob: makeDocxBlob(), ext: 'docx' };
+    }
+  }
+
   async function saveToFileSystem() {
+    const doc = activeDoc();
+    saveActiveDocState();
+    const fmt = (doc && doc.originalFormat) || 'docx';
+    let built;
+    try {
+      built = buildExportBlob(fmt);
+    } catch (err) {
+      toast('Save failed: ' + (err && err.message || err), 'error');
+      return;
+    }
+    const suggestedName = sanitizeFileName(docTitle.value) + '.' + built.ext;
+    if (built.ext !== fmt && fmt !== 'docx') {
+      toast('Saved as .' + built.ext + ' (no direct writer for .' + fmt + ')', 'info');
+    }
     if (!('showSaveFilePicker' in window)) {
-      toast('File System Access not available — using download fallback', 'info');
-      saveDocument();
+      // No File System Access API — fall back to a normal download.
+      const url = URL.createObjectURL(built.blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = suggestedName;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => { a.remove(); URL.revokeObjectURL(url); }, 100);
+      toast('Saved (downloaded)', 'success');
       return;
     }
     try {
-      if (!fsHandle) {
-        fsHandle = await window.showSaveFilePicker({
-          suggestedName: sanitizeFileName(docTitle.value) + '.rwd',
+      let handle = doc && doc.fsHandle;
+      if (!handle) {
+        handle = await window.showSaveFilePicker({
+          suggestedName,
           types: [{
-            description: 'RodmanWord document',
-            accept: { 'application/json': ['.rwd'] },
+            description: built.ext.toUpperCase() + ' file',
+            accept: { [built.blob.type || 'application/octet-stream']: ['.' + built.ext] },
           }],
         });
+        if (doc) doc.fsHandle = handle;
+        fsHandle = handle;
       }
-      const writable = await fsHandle.createWritable();
-      await writable.write(buildRwdJson());
+      if (handle.requestPermission) {
+        const perm = await handle.requestPermission({ mode: 'readwrite' });
+        if (perm !== 'granted') {
+          toast('Write permission denied', 'error');
+          return;
+        }
+      }
+      const writable = await handle.createWritable();
+      await writable.write(built.blob);
       await writable.close();
-      toast('Saved to file system', 'success');
+      toast('Saved to file', 'success');
     } catch (err) {
       if (err && err.name === 'AbortError') return;
-      toast('Save failed: ' + err.message, 'error');
+      toast('Save failed: ' + (err && err.message || err), 'error');
     }
   }
 
@@ -6962,32 +7206,30 @@ ${editor.innerHTML}
       $('#filePicker').click();
       return;
     }
+    let handle;
     try {
-      const [h] = await window.showOpenFilePicker({
+      [handle] = await window.showOpenFilePicker({
         types: [{
-          description: 'RodmanWord / text formats',
-          accept: { 'application/json': ['.rwd'], 'text/html': ['.html', '.htm'],
-            'text/plain': ['.txt', '.md'] },
+          description: 'Documents',
+          accept: {
+            'application/json': ['.rwd'],
+            'text/html': ['.html', '.htm'],
+            'text/plain': ['.txt', '.md'],
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+            'application/pdf': ['.pdf'],
+            'application/rtf': ['.rtf'],
+            'application/vnd.oasis.opendocument.text': ['.odt'],
+            'application/epub+zip': ['.epub'],
+          },
         }],
       });
-      fsHandle = h;
-      const file = await h.getFile();
-      const text = await file.text();
-      if (file.name.endsWith('.rwd')) {
-        applyRwdJson(JSON.parse(text));
-      } else if (/\.html?$/i.test(file.name)) {
-        editor.innerHTML = sanitizeImported(text);
-        queueAutosave();
-      } else {
-        editor.innerHTML = '<p>' + escapeHtml(text).replace(/\n/g, '</p><p>') + '</p>';
-        queueAutosave();
-      }
-      docTitle.value = file.name.replace(/\.[^.]+$/, '');
-      toast('Opened from file system', 'success');
     } catch (err) {
       if (err && err.name === 'AbortError') return;
-      toast('Open failed: ' + err.message, 'error');
+      toast('Open failed: ' + (err && err.message || err), 'error');
+      return;
     }
+    const file = await handle.getFile();
+    await loadFileIntoNewTab(file, handle);
   }
 
   // ----- GitHub Gist sync -----
@@ -10375,8 +10617,8 @@ ${editor.innerHTML}
   // FEATURE: Document properties
   // ============================================================
   const STORE_PROPS = 'rodmanword:props';
-  let docProps = {};
-  try { docProps = JSON.parse(localStorage.getItem(STORE_PROPS) || '{}'); } catch {}
+  // `docProps` is declared in the multi-document state block; it is
+  // per-document and persisted inside the tab payload.
 
   const propsModal = $('#propsModal');
 
@@ -10405,11 +10647,12 @@ ${editor.innerHTML}
       keywords: $('#propKeywords').value,
       description: $('#propDesc').value,
     };
-    try { localStorage.setItem(STORE_PROPS, JSON.stringify(docProps)); } catch {}
     if (docProps.title) {
       docTitle.value = docProps.title;
-      queueAutosave();
+      renderTabStrip();
     }
+    markDirty();
+    queueAutosave();
     closeModal(propsModal);
     flashStatus('Properties saved');
   });
@@ -10992,11 +11235,14 @@ ${editor.innerHTML}
   let pendingCommentRange = null;
   let editingCommentSpan = null;
   let editingThreadId = null;
-  let threads = {};
-  try { threads = JSON.parse(localStorage.getItem(STORE_THREADS) || '{}'); } catch {}
+  // `threads` is declared in the multi-document state block; it is
+  // per-document and persisted inside the tab payload.
 
   function persistThreads() {
-    try { localStorage.setItem(STORE_THREADS, JSON.stringify(threads)); } catch {}
+    // Comment threads live inside the per-document tab payload now;
+    // route through the autosave debounce so they land in it.
+    markDirty();
+    queueAutosave();
   }
 
   function newThreadId() {
@@ -11444,13 +11690,11 @@ ${editor.innerHTML}
         <div class="desc">${escapeHtml(t.desc)}</div>
       `;
       card.addEventListener('click', () => {
-        if (editor.innerText.trim() &&
-            !confirm('Replace the current document with the ' + t.name + ' template?')) return;
-        editor.innerHTML = t.html;
-        docTitle.value = t.name === 'Blank' ? 'Document' : t.name;
-        queueAutosave();
-        rebuildOutline();
-        closeBackstage();
+        openDocumentInNewTab({
+          title: t.name === 'Blank' ? 'Document' : t.name,
+          html: t.html,
+          originalFormat: null,
+        });
       });
       grid.appendChild(card);
     });

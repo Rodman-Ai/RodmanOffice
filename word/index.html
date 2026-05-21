@@ -36,6 +36,10 @@
         <span class="app-subtitle">RodmanWord</span>
       </div>
     </div>
+    <div class="doc-tabs" id="docTabs" role="tablist" aria-label="Open documents">
+      <button class="doc-tab-new" id="newTabBtn" type="button"
+              title="New document" aria-label="New document">+</button>
+    </div>
     <div class="title-actions">
       <!-- Keep this visible for per-request BYOK setup; the key field lives in the panel. -->
       <button
@@ -1019,10 +1023,6 @@
         <label>Filename <input id="saveFilename" type="text" placeholder="document" /></label>
         <label>Format
           <select id="saveFormat">
-            <optgroup label="Native">
-              <option value="rwd">RodmanWord (.rwd)</option>
-              <option value="rwd.enc">RodmanWord encrypted (.rwd.enc)</option>
-            </optgroup>
             <optgroup label="Office">
               <option value="docx">Word (.docx)</option>
               <option value="pptx">PowerPoint (.pptx)</option>
@@ -1057,11 +1057,6 @@
 
         <!-- Per-format options. Each row is shown only when its
              format is selected; toggling is done in app.js. -->
-        <div id="saveOptRwdEnc" class="save-opt" hidden>
-          <label>Password
-            <input id="saveEncPassword" type="password" placeholder="At least 6 characters" />
-          </label>
-        </div>
         <div id="saveOptMd" class="save-opt" hidden>
           <label class="row">
             <input id="saveMdFrontmatter" type="checkbox" checked />

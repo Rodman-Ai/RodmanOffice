@@ -139,7 +139,77 @@ body {
 
 .app-subtitle { font-size: 11px; opacity: 0.85; padding-left: 6px; }
 
-.title-actions { display: flex; align-items: center; gap: 6px; }
+.title-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+
+/* Document tabs — sit between the file name and the title actions.
+   Sized so the header height never grows past the 28px logo. */
+.doc-tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+.doc-tabs::-webkit-scrollbar { height: 0; width: 0; }
+.doc-tab {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 0 0 auto;
+  height: 24px;
+  max-width: 160px;
+  padding: 0 2px 0 8px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid transparent;
+  border-radius: 4px 4px 0 0;
+  color: #fff;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.doc-tab:hover { background: rgba(255, 255, 255, 0.2); }
+.doc-tab.active {
+  background: rgba(255, 255, 255, 0.28);
+  font-weight: 600;
+}
+.doc-tab-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.doc-tab-close {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  line-height: 14px;
+  padding: 0;
+  border: 0;
+  border-radius: 2px;
+  background: transparent;
+  color: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  opacity: 0.6;
+}
+.doc-tab-close:hover { opacity: 1; background: rgba(255, 255, 255, 0.3); }
+.doc-tab-new {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+.doc-tab-new:hover { background: rgba(255, 255, 255, 0.28); }
 
 .title-bar .ask-claude {
   padding: 4px 10px;
@@ -2804,7 +2874,8 @@ textarea {
 @media (max-width: 720px) {
   body { font-size: 14px; }
   .app-subtitle { display: none; }
-  .doc-title { max-width: 50vw; font-size: 13px; }
+  .doc-title { max-width: 28vw; font-size: 13px; }
+  .doc-tab { max-width: 110px; font-size: 11px; }
   .tab { padding: 8px 14px; font-size: 12px; }
   /* The focus, help, and toggle-ribbon icon buttons collide with
      the Ask Claude pill in a cramped iPhone title bar and aren't
