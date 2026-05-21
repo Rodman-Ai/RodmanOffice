@@ -8,6 +8,9 @@ step.
 ## Supported Workflows
 
 - Create, duplicate, reorder, and delete slides.
+- Keep several presentations open at once in header tabs — each tab is
+  closable, and **File ▸ New** offers a template gallery (Blank, Pitch
+  deck, Lesson, Report, Photo deck).
 - Use a PowerPoint-style ribbon layout: File, Home, Insert, Design, Transitions, Animations, Slide Show, Record, Review, View, and Help.
 - Edit text, shapes, images, video/audio embeds, tables, notes, footers, slide numbers, themes, transitions, and simple animations.
 - Cut, copy, and paste slide elements inside the deck.
@@ -42,9 +45,12 @@ from there.
 
 ## Storage
 
-Autosave writes the current deck to `localStorage` under `slides.deck.v1`.
-Pick the RodmanSlides deck `.json` format in the Save dialog for
-backups and handoff between browsers.
+Autosave writes every open presentation tab to `localStorage` under
+`rodmanslides:tabs` and restores them on reload (a legacy single-deck
+`slides.deck.v1` store is migrated on first load). **File ▸ Save to
+file** writes back to disk in the document's original format via the
+File System Access API. Pick the RodmanSlides deck `.json` format in
+the Save dialog for backups and handoff between browsers.
 
 ## Offline And PWA Behavior
 

@@ -70,7 +70,7 @@ Photoshop mode is the default. The layout:
 
 | Menu     | Items                                                        |
 | -------- | ------------------------------------------------------------ |
-| File     | New Canvas · Open · **Save…** (unified dialog: filename + format + quality / resolution / colours options) · Clear · Reset All |
+| File     | New Canvas · Open · **Save…** (unified dialog: filename + format + quality / resolution / colours options) · **Save to File…** (File System Access write-back) · Clear · Reset All |
 | Edit     | Undo · Redo · Keyboard Shortcuts · History · Snapshots       |
 | Image    | Image Size · Adjustments (Levels / HSL / Color Balance / Threshold) · Replay |
 | Layer    | New · Duplicate · Merge Down · Delete                        |
