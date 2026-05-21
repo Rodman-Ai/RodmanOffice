@@ -29,6 +29,9 @@
         <span class="app-subtitle">RodmanVision</span>
       </div>
     </div>
+    <div class="doc-tabs" id="docTabs" role="tablist" aria-label="Open diagrams">
+      <button class="doc-tab-new" id="newTabBtn" type="button" title="New diagram" aria-label="New diagram">+</button>
+    </div>
     <div class="title-actions">
       <button
         id="askClaudeBtn"
@@ -106,6 +109,7 @@
       <div class="group">
         <div class="group-row">
           <button class="ribbon-btn wide" data-cmd="showSaveDialog">💾 Save…</button>
+          <button class="ribbon-btn wide" data-cmd="saveToFile" title="Save directly back to a file on disk">🖫 Save to file…</button>
         </div>
         <div class="group-row">
           <button class="ribbon-btn" data-cmd="saveAsVsdx" title="Quick-save as VSDX">.vsdx</button>

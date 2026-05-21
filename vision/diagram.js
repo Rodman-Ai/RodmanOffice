@@ -44,6 +44,9 @@
       w: opts.w ?? 140,
       h: opts.h ?? 80,
       rotation: opts.rotation || 0,
+      // Data-URL source for image shapes (stencil === 'image'); null
+      // for every normal stencil shape.
+      src: opts.src || null,
       fill: opts.fill || '#DAE3F3',
       stroke: opts.stroke || '#2E5597',
       strokeWidth: opts.strokeWidth ?? 1.5,

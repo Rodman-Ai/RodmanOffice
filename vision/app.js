@@ -32,6 +32,11 @@
   // ---------- State ----------
   let diagram = D.load() || D.newDiagram();
   sanitizeDiagram(diagram);
+  // Multi-document tabs: `diagram` is always a pointer to the active
+  // document's model; `documents` holds every open diagram.
+  const TABS_KEY = 'rodmanvision:tabs';
+  let documents = [];
+  let activeDocId = null;
   let state = {
     activePageId: diagram.pages[0].id,
     selectedShapeIds: new Set(),
@@ -67,6 +72,9 @@
       const obj = JSON.parse(snap);
       sanitizeDiagram(obj);
       diagram = obj;
+      // Keep the active document object pointing at the new model.
+      const ad = activeDoc();
+      if (ad) ad.model = diagram;
       // Keep activePageId pointing at a real page.
       if (!D.findPage(diagram, state.activePageId)) {
         state.activePageId = diagram.pages[0].id;
@@ -92,6 +100,191 @@
   // ---------- Helpers ----------
   function $(sel, root) { return (root || document).querySelector(sel); }
   function $$(sel, root) { return Array.from((root || document).querySelectorAll(sel)); }
+
+  // ---------- Multi-document tabs ----------
+  // One live editing surface; an array of serialized diagrams. Each
+  // tab carries its own undo history. `diagram` always points at the
+  // active document's model, so every call site that reads/mutates
+  // `diagram` stays correct unchanged.
+  function genDocId() {
+    return 'doc-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7);
+  }
+  function makeDocObject(init) {
+    init = init || {};
+    const model = init.model || D.newDiagram();
+    sanitizeDiagram(model);
+    const firstPage = model.pages[0];
+    const wantPage = init.viewState && init.viewState.activePageId;
+    return {
+      id: init.id || genDocId(),
+      title: init.title || model.title || 'Untitled Diagram',
+      model,
+      viewState: {
+        activePageId: (wantPage && D.findPage(model, wantPage))
+          ? wantPage : (firstPage ? firstPage.id : null),
+      },
+      originalFormat: init.originalFormat || null,
+      fsHandle: init.fsHandle || null,
+      dirty: !!init.dirty,
+      // Per-tab undo history. Not persisted (too large) — re-seeded
+      // from the loaded model when a tab is first activated.
+      history: { stack: [], index: -1 },
+    };
+  }
+  function activeDoc() {
+    return documents.find((d) => d.id === activeDocId) || null;
+  }
+  function saveActiveDocState() {
+    const d = activeDoc();
+    if (!d) return;
+    d.model = diagram;
+    d.title = diagram.title;
+    d.viewState.activePageId = state.activePageId;
+    d.history = { stack: history.stack, index: history.index };
+  }
+  function loadDocState(d) {
+    if (!d) return;
+    diagram = d.model;
+    sanitizeDiagram(diagram);
+    if (!D.findPage(diagram, d.viewState.activePageId)) {
+      d.viewState.activePageId = diagram.pages[0] ? diagram.pages[0].id : null;
+    }
+    state.activePageId = d.viewState.activePageId;
+    state.selectedShapeIds.clear();
+    state.selectedConnectorIds.clear();
+    // Swap in this document's undo history.
+    history.stack = (d.history && d.history.stack) || [];
+    history.index = (d.history && typeof d.history.index === 'number') ? d.history.index : -1;
+    const titleInp = $('#diagramTitle');
+    if (titleInp) titleInp.value = diagram.title;
+    renderAll();
+    // Seed history for a tab that has none yet (new or restored tabs).
+    if (!history.stack.length) pushHistory();
+  }
+  function persistAllTabs() {
+    try {
+      const payload = {
+        activeDocId,
+        docs: documents.map((d) => ({
+          id: d.id, title: d.title, model: d.model,
+          viewState: d.viewState, originalFormat: d.originalFormat,
+          dirty: d.dirty,
+        })),
+      };
+      localStorage.setItem(TABS_KEY, JSON.stringify(payload));
+      return true;
+    } catch (e) {
+      console.warn('RodmanVision: tab autosave failed', e);
+      return false;
+    }
+  }
+  function renderTabStrip() {
+    const strip = $('#docTabs');
+    if (!strip) return;
+    const newBtn = $('#newTabBtn');
+    $$('.doc-tab', strip).forEach((t) => t.remove());
+    documents.forEach((d) => {
+      const isActive = d.id === activeDocId;
+      const tab = document.createElement('div');
+      tab.className = 'doc-tab' + (isActive ? ' active' : '');
+      tab.setAttribute('role', 'tab');
+      tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
+      tab.title = d.title || 'Diagram';
+      const label = document.createElement('span');
+      label.className = 'doc-tab-label';
+      label.textContent = d.title || 'Diagram';
+      const close = document.createElement('button');
+      close.type = 'button';
+      close.className = 'doc-tab-close';
+      close.textContent = '✕';
+      close.setAttribute('aria-label', 'Close ' + (d.title || 'Diagram'));
+      close.addEventListener('click', (e) => { e.stopPropagation(); closeTab(d.id); });
+      tab.appendChild(label);
+      tab.appendChild(close);
+      tab.addEventListener('click', () => switchToTab(d.id));
+      if (newBtn) strip.insertBefore(tab, newBtn);
+      else strip.appendChild(tab);
+    });
+  }
+  function createTab(init) {
+    saveActiveDocState();
+    const d = makeDocObject(init);
+    documents.push(d);
+    activeDocId = d.id;
+    loadDocState(d);
+    renderTabStrip();
+    persistAllTabs();
+    // Fit the freshly-shown diagram to the viewport.
+    requestAnimationFrame(() => requestAnimationFrame(() => commands.zoomFit()));
+    return d;
+  }
+  function openDocumentInNewTab(init) { return createTab(init); }
+  function newDocument() { return createTab({}); }
+  function switchToTab(id) {
+    if (id === activeDocId) return;
+    const d = documents.find((x) => x.id === id);
+    if (!d) return;
+    // Flush the outgoing tab synchronously before the autosave fires.
+    clearTimeout(saveTimer);
+    saveActiveDocState();
+    activeDocId = id;
+    loadDocState(d);
+    renderTabStrip();
+    persistAllTabs();
+    requestAnimationFrame(() => requestAnimationFrame(() => commands.zoomFit()));
+  }
+  function closeTab(id) {
+    const idx = documents.findIndex((d) => d.id === id);
+    if (idx < 0) return;
+    const d = documents[idx];
+    const isActive = id === activeDocId;
+    saveActiveDocState();
+    if (d.dirty &&
+        !confirm('Close "' + (d.title || 'Diagram') +
+          '"? Unsaved changes will be lost.')) {
+      return;
+    }
+    clearTimeout(saveTimer);
+    if (documents.length === 1) {
+      const blank = makeDocObject({});
+      documents[0] = blank;
+      activeDocId = blank.id;
+      loadDocState(blank);
+      renderTabStrip();
+      persistAllTabs();
+      return;
+    }
+    documents.splice(idx, 1);
+    if (isActive) {
+      const next = documents[Math.min(idx, documents.length - 1)];
+      activeDocId = next.id;
+      loadDocState(next);
+    }
+    renderTabStrip();
+    persistAllTabs();
+  }
+  function restoreTabs() {
+    let payload = null;
+    try { payload = JSON.parse(localStorage.getItem(TABS_KEY) || 'null'); } catch (e) {}
+    if (payload && Array.isArray(payload.docs) && payload.docs.length) {
+      documents = payload.docs.map((d) => makeDocObject(d));
+      activeDocId = (payload.activeDocId &&
+        documents.some((d) => d.id === payload.activeDocId))
+          ? payload.activeDocId : documents[0].id;
+    } else {
+      // Legacy single-diagram migration — `diagram` already holds D.load().
+      documents = [makeDocObject({ model: diagram })];
+      activeDocId = documents[0].id;
+    }
+    const d = activeDoc();
+    diagram = d.model;
+    state.activePageId = d.viewState.activePageId;
+    // Connect the live history to the active document's (empty) stack;
+    // bootstrap()'s pushHistory() seeds it right after.
+    history.stack = d.history.stack;
+    history.index = d.history.index;
+    renderTabStrip();
+  }
 
   function activePage() {
     return D.findPage(diagram, state.activePageId) || diagram.pages[0];
@@ -136,13 +329,16 @@
     // Coalesce history pushes per "mutation batch" so drag-moves don't
     // record dozens of intermediate states. We push once per save flush.
     historyPushPending = true;
+    const ad = activeDoc();
+    if (ad) ad.dirty = true;
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
       if (historyPushPending) {
         pushHistory();
         historyPushPending = false;
       }
-      const ok = D.save(diagram);
+      saveActiveDocState();
+      const ok = persistAllTabs();
       setSaveIndicator(ok ? 'saved' : 'error');
     }, 400);
   }
@@ -1615,20 +1811,7 @@
   // ---------- Commands ----------
   const commands = {
     // File
-    newDiagram() {
-      if (!confirm('Discard the current diagram and start a new one?')) return;
-      diagram = D.newDiagram();
-      state.activePageId = diagram.pages[0].id;
-      state.selectedShapeIds.clear();
-      state.selectedConnectorIds.clear();
-      $('#diagramTitle').value = diagram.title;
-      scheduleSave();
-      renderAll();
-      // Default zoom on every new document: fit page to viewport.
-      // Double-rAF so renderAll's layout settles before measuring
-      // canvas-scroll's clientWidth.
-      requestAnimationFrame(() => requestAnimationFrame(() => commands.zoomFit()));
-    },
+    newDiagram() { newDocument(); },
     // Wave 2: starter templates. Opens a picker; on selection,
     // creates a fresh diagram and inserts the template's shapes +
     // connectors via the existing applyClaudeDiagram pipeline (which
@@ -1663,7 +1846,8 @@
       if (typeof dlg.showModal === 'function') dlg.showModal();
       else dlg.setAttribute('open', '');
     },
-    openDiagram() { $('#openFileInput').click(); },
+    openDiagram() { openFromFileSystem(); },
+    saveToFile() { saveToFileSystem(); },
     showSaveDialog() {
       const dlg = $('#saveDialog');
       $('#saveDialogName').value = (diagram.title || 'diagram').replace(/[^\w\-]+/g, '_');
@@ -1675,14 +1859,16 @@
     saveAsPng() { saveDiagramAs('png'); },
     saveAsPdf() { saveDiagramAs('pdf'); },
     resetDiagram() {
-      if (!confirm('Wipe local diagram storage and start fresh? This cannot be undone.')) return;
+      if (!confirm('Wipe local diagram storage and start fresh? This cannot be undone. All open tabs will be closed.')) return;
       D.clear();
-      diagram = D.newDiagram();
-      state.activePageId = diagram.pages[0].id;
-      state.selectedShapeIds.clear();
-      state.selectedConnectorIds.clear();
-      $('#diagramTitle').value = diagram.title;
-      bootstrap();
+      try { localStorage.removeItem(TABS_KEY); } catch (e) { /* ignore */ }
+      const d = makeDocObject({});
+      documents = [d];
+      activeDocId = d.id;
+      loadDocState(d);
+      renderTabStrip();
+      persistAllTabs();
+      requestAnimationFrame(() => requestAnimationFrame(() => commands.zoomFit()));
     },
 
     // Clipboard / editing
@@ -3320,6 +3506,9 @@
     // Title
     $('#diagramTitle').addEventListener('input', (e) => {
       diagram.title = e.target.value;
+      const ad = activeDoc();
+      if (ad) ad.title = diagram.title;
+      renderTabStrip();
       scheduleSave();
     });
 
@@ -3432,38 +3621,135 @@
     $('#openFileInput').addEventListener('change', async (e) => {
       const file = e.target.files && e.target.files[0];
       e.target.value = ''; // reset so reopening the same file fires
-      if (!file) return;
-      const ext = (file.name.split('.').pop() || '').toLowerCase();
-      try {
-        if (ext === 'vsdx' || ext === 'vsdm') {
-          const buf = await file.arrayBuffer();
-          const next = await IO.loadVsdx(buf);
-          next.title = next.title || file.name.replace(/\.[^.]+$/, '');
-          sanitizeDiagram(next);
-          diagram = next;
-          state.activePageId = diagram.pages[0].id;
-          state.selectedShapeIds.clear();
-          state.selectedConnectorIds.clear();
-          $('#diagramTitle').value = diagram.title;
-          scheduleSave();
-          renderAll();
-          // Default zoom on every opened document: fit page to viewport.
-          // Double-rAF so layout completes before clientWidth is read.
-          requestAnimationFrame(() => requestAnimationFrame(() => commands.zoomFit()));
-        } else if (ext === 'svg') {
-          // Wrap the imported SVG as a single shape on a new page so the
-          // user can keep editing in our format.
-          const text = await file.text();
-          const blobUrl = URL.createObjectURL(new Blob([text], { type: 'image/svg+xml' }));
-          alert('SVG imported as a reference image — open it in any image editor for source-level edits.');
-          URL.revokeObjectURL(blobUrl);
-        } else {
-          alert('Unsupported file type. Open .vsdx or .vsdm files.');
-        }
-      } catch (err) {
-        alert(`Open failed: ${err.message || err}`);
-      }
+      await loadFileIntoNewTab(file);
     });
+  }
+
+  // Wrap an opened SVG file as a single image shape on a fresh
+  // diagram so the user can keep working with it in our format.
+  function svgToDiagram(text, fileName) {
+    const dataUrl = 'data:image/svg+xml;base64,' +
+      btoa(unescape(encodeURIComponent(text)));
+    let w = 800, h = 600;
+    const vb = text.match(/viewBox\s*=\s*["']([\d.eE\s,+-]+)["']/i);
+    if (vb) {
+      const p = vb[1].trim().split(/[\s,]+/).map(Number);
+      if (p.length === 4 && p[2] > 0 && p[3] > 0) { w = p[2]; h = p[3]; }
+    } else {
+      const wm = text.match(/\bwidth\s*=\s*["']([\d.]+)/i);
+      const hm = text.match(/\bheight\s*=\s*["']([\d.]+)/i);
+      if (wm && hm) { w = parseFloat(wm[1]); h = parseFloat(hm[1]); }
+    }
+    const scale = Math.min(1, 1000 / Math.max(w, h, 1));
+    w = Math.max(20, Math.round(w * scale));
+    h = Math.max(20, Math.round(h * scale));
+    const next = D.newDiagram();
+    next.title = fileName.replace(/\.svg$/i, '');
+    next.pages[0].shapes = [D.newShape({
+      stencil: 'image', src: dataUrl, x: 40, y: 40, w, h,
+      fill: 'none', stroke: 'none',
+    })];
+    return next;
+  }
+
+  // Detect a file's format, parse it, and open it in a new tab.
+  // Shared by the file <input> and the File System Access path.
+  async function loadFileIntoNewTab(file, fsHandle) {
+    if (!file) return;
+    const ext = (file.name.split('.').pop() || '').toLowerCase();
+    try {
+      if (ext === 'vsdx' || ext === 'vsdm') {
+        const next = await IO.loadVsdx(await file.arrayBuffer());
+        next.title = next.title || file.name.replace(/\.[^.]+$/, '');
+        openDocumentInNewTab({ model: next, title: next.title, originalFormat: ext, fsHandle });
+      } else if (ext === 'svg') {
+        const next = svgToDiagram(await file.text(), file.name);
+        openDocumentInNewTab({ model: next, title: next.title, originalFormat: 'svg', fsHandle });
+      } else {
+        alert('Unsupported file type. Open .vsdx, .vsdm or .svg files.');
+      }
+    } catch (err) {
+      alert(`Open failed: ${err.message || err}`);
+    }
+  }
+
+  async function openFromFileSystem() {
+    if (!('showOpenFilePicker' in window)) {
+      $('#openFileInput').click();
+      return;
+    }
+    let handle;
+    try {
+      [handle] = await window.showOpenFilePicker({
+        types: [{
+          description: 'Diagrams',
+          accept: {
+            'application/vnd.ms-visio.drawing': ['.vsdx', '.vsdm'],
+            'image/svg+xml': ['.svg'],
+          },
+        }],
+      });
+    } catch (err) {
+      if (err && err.name === 'AbortError') return;
+      alert('Open failed: ' + (err.message || err));
+      return;
+    }
+    const file = await handle.getFile();
+    await loadFileIntoNewTab(file, handle);
+  }
+
+  // ---------- Save to file (File System Access) ----------
+  async function buildDiagramBlob(format) {
+    switch (format) {
+      case 'svg':
+        return { blob: new Blob([IO.exportSvg(diagram)], { type: 'image/svg+xml' }), ext: 'svg' };
+      case 'png':
+        return { blob: await IO.exportPng(diagram, { scale: 2 }), ext: 'png' };
+      case 'pdf':
+        return { blob: await IO.exportPdf(diagram), ext: 'pdf' };
+      case 'vsdx':
+      case 'vsdm':
+      default:
+        return { blob: IO.saveVsdx(diagram), ext: 'vsdx' };
+    }
+  }
+
+  async function saveToFileSystem() {
+    const d = activeDoc();
+    saveActiveDocState();
+    const fmt = (d && d.originalFormat) || 'vsdx';
+    let built;
+    try { built = await buildDiagramBlob(fmt); }
+    catch (err) { alert('Save failed: ' + (err.message || err)); return; }
+    const suggested = (diagram.title || 'diagram').replace(/[^\w\-]+/g, '_') + '.' + built.ext;
+    if (!('showSaveFilePicker' in window)) {
+      downloadBlob(built.blob, suggested);
+      return;
+    }
+    try {
+      let handle = d && d.fsHandle;
+      if (!handle) {
+        handle = await window.showSaveFilePicker({
+          suggestedName: suggested,
+          types: [{
+            description: built.ext.toUpperCase() + ' file',
+            accept: { [built.blob.type || 'application/octet-stream']: ['.' + built.ext] },
+          }],
+        });
+        if (d) d.fsHandle = handle;
+      }
+      if (handle.requestPermission) {
+        const perm = await handle.requestPermission({ mode: 'readwrite' });
+        if (perm !== 'granted') { alert('Write permission denied'); return; }
+      }
+      const writable = await handle.createWritable();
+      await writable.write(built.blob);
+      await writable.close();
+      setSaveIndicator('saved');
+    } catch (err) {
+      if (err && err.name === 'AbortError') return;
+      alert('Save to file failed: ' + (err.message || err));
+    }
   }
 
   // ---------- Ask Claude ----------
@@ -3828,6 +4114,7 @@
     bindRibbonCommands();
     bindSaveDialog();
     bindOpenFile();
+    $('#newTabBtn')?.addEventListener('click', () => newDocument());
     bindAskClaude();
     bindHelpModal();
     bindFindDialog();
@@ -4024,9 +4311,14 @@
     }
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', bootstrap);
-  } else {
+  function boot() {
+    restoreTabs();
     bootstrap();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot);
+  } else {
+    boot();
   }
 })();
