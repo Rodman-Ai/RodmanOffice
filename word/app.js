@@ -4238,7 +4238,6 @@ ${editor.innerHTML}
   })(setBackstageView);
 
   // Extend file picker for RTF / ODT / EPUB
-  const __existingFilePickerHandler = $('#filePicker').onchange;
   $('#filePicker').addEventListener('change', async (e) => {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
@@ -4249,6 +4248,8 @@ ${editor.innerHTML}
         docTitle.value = file.name.replace(/\.rtf$/i, '');
         addRecent(docTitle.value);
         queueAutosave();
+        rebuildOutline();
+        closeBackstage();
         toast('Imported .rtf', 'success');
       } catch (err) {
         toast('RTF import failed: ' + err.message, 'error');
@@ -4264,6 +4265,8 @@ ${editor.innerHTML}
         docTitle.value = file.name.replace(/\.odt$/i, '');
         addRecent(docTitle.value);
         queueAutosave();
+        rebuildOutline();
+        closeBackstage();
         toast('Imported .odt', 'success');
       } catch (err) {
         toast('ODT import failed: ' + err.message, 'error');
@@ -4279,6 +4282,8 @@ ${editor.innerHTML}
         docTitle.value = file.name.replace(/\.epub$/i, '');
         addRecent(docTitle.value);
         queueAutosave();
+        rebuildOutline();
+        closeBackstage();
         toast('Imported .epub', 'success');
       } catch (err) {
         toast('EPUB import failed: ' + err.message, 'error');
