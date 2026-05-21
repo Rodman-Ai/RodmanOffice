@@ -32,6 +32,11 @@
   // ---------- State ----------
   let deck = D.load() || D.newDeck();
   sanitizeDeck(deck);
+  // Multi-document tabs: `deck` is always a pointer to the active
+  // document's model; `documents` holds every open presentation.
+  const TABS_KEY = 'rodmanslides:tabs';
+  let documents = [];
+  let activeDocId = null;
   let state = {
     selectedSlideId: deck.slides[0].id,
     selectedElementId: null,
@@ -52,9 +57,12 @@
   let quotaWarned = false;
   function scheduleSave() {
     setSaveIndicator('saving');
+    const ad = activeDoc();
+    if (ad) ad.dirty = true;
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
-      const ok = D.save(deck);
+      saveActiveDocState();
+      const ok = persistAllTabs();
       setSaveIndicator(ok ? 'saved' : 'error');
       // localStorage quota is ~5-10 MB per origin. A PDF import
       // with many pages produces base64 PNGs that easily exceed it.
@@ -80,6 +88,185 @@
     if (kind === 'saving') { el.textContent = 'Saving…'; el.style.opacity = 0.7; el.style.color = ''; }
     else if (kind === 'saved') { el.textContent = 'Saved'; el.style.opacity = 0.85; el.style.color = ''; }
     else { el.textContent = 'Not autosaved'; el.style.opacity = 1; el.style.color = '#fca5a5'; }
+  }
+
+  // ---------- Multi-document tabs ----------
+  // One live editing surface; an array of serialized presentations.
+  // `deck` always points at the active document's model, so every
+  // call site that reads/mutates `deck` stays correct unchanged.
+  function genDocId() {
+    return 'doc-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7);
+  }
+  function makeDocObject(init) {
+    init = init || {};
+    let model = init.model || D.newDeck();
+    model = sanitizeDeck(model) || model;
+    const firstSlide = model.slides[0];
+    const wantSlide = init.viewState && init.viewState.selectedSlideId;
+    return {
+      id: init.id || genDocId(),
+      title: init.title || model.title || 'Untitled Presentation',
+      model,
+      viewState: {
+        selectedSlideId: (wantSlide && D.findSlide(model, wantSlide))
+          ? wantSlide
+          : (firstSlide ? firstSlide.id : null),
+      },
+      originalFormat: init.originalFormat || null,
+      fsHandle: init.fsHandle || null,
+      dirty: !!init.dirty,
+    };
+  }
+  function activeDoc() {
+    return documents.find((d) => d.id === activeDocId) || null;
+  }
+  function saveActiveDocState() {
+    const d = activeDoc();
+    if (!d) return;
+    d.model = deck;
+    d.title = deck.title;
+    d.viewState.selectedSlideId = state.selectedSlideId;
+  }
+  function loadDocState(d) {
+    if (!d) return;
+    deck = d.model;
+    sanitizeDeck(deck);
+    if (!D.findSlide(deck, d.viewState.selectedSlideId)) {
+      d.viewState.selectedSlideId = deck.slides[0] ? deck.slides[0].id : null;
+    }
+    state.selectedSlideId = d.viewState.selectedSlideId;
+    clearSelection();
+    bootstrap();
+    // Refresh the notes pane for the new active slide (bootstrap does not).
+    if (state.showNotes && typeof activeSlide === 'function') {
+      const ns = $('#notesArea');
+      if (ns) ns.value = (activeSlide() && activeSlide().notes) || '';
+    }
+  }
+  function persistAllTabs() {
+    try {
+      const payload = {
+        activeDocId,
+        docs: documents.map((d) => ({
+          id: d.id, title: d.title, model: d.model,
+          viewState: d.viewState, originalFormat: d.originalFormat,
+          dirty: d.dirty,
+        })),
+      };
+      localStorage.setItem(TABS_KEY, JSON.stringify(payload));
+      return true;
+    } catch (e) {
+      console.warn('RodmanSlides: tab autosave failed', e);
+      return false;
+    }
+  }
+  function renderTabStrip() {
+    const strip = $('#docTabs');
+    if (!strip) return;
+    const newBtn = $('#newTabBtn');
+    $$('.doc-tab', strip).forEach((t) => t.remove());
+    documents.forEach((d) => {
+      const isActive = d.id === activeDocId;
+      const tab = document.createElement('div');
+      tab.className = 'doc-tab' + (isActive ? ' active' : '');
+      tab.setAttribute('role', 'tab');
+      tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
+      tab.title = d.title || 'Presentation';
+      const label = document.createElement('span');
+      label.className = 'doc-tab-label';
+      label.textContent = d.title || 'Presentation';
+      const close = document.createElement('button');
+      close.type = 'button';
+      close.className = 'doc-tab-close';
+      close.textContent = '✕';
+      close.setAttribute('aria-label', 'Close ' + (d.title || 'Presentation'));
+      close.addEventListener('click', (e) => { e.stopPropagation(); closeTab(d.id); });
+      tab.appendChild(label);
+      tab.appendChild(close);
+      tab.addEventListener('click', () => switchToTab(d.id));
+      if (newBtn) strip.insertBefore(tab, newBtn);
+      else strip.appendChild(tab);
+    });
+  }
+  function createTab(init) {
+    saveActiveDocState();
+    const d = makeDocObject(init);
+    documents.push(d);
+    activeDocId = d.id;
+    loadDocState(d);
+    renderTabStrip();
+    persistAllTabs();
+    return d;
+  }
+  function openDocumentInNewTab(init) {
+    const d = createTab(init);
+    activateRibbonTab('home');
+    return d;
+  }
+  function newDocument() {
+    const d = createTab({});
+    activateRibbonTab('home');
+    return d;
+  }
+  function switchToTab(id) {
+    if (id === activeDocId) return;
+    const d = documents.find((x) => x.id === id);
+    if (!d) return;
+    // Flush the outgoing tab synchronously before the autosave fires.
+    clearTimeout(saveTimer);
+    saveActiveDocState();
+    activeDocId = id;
+    loadDocState(d);
+    renderTabStrip();
+    persistAllTabs();
+  }
+  function closeTab(id) {
+    const idx = documents.findIndex((d) => d.id === id);
+    if (idx < 0) return;
+    const d = documents[idx];
+    const isActive = id === activeDocId;
+    saveActiveDocState();
+    if (d.dirty &&
+        !confirm('Close "' + (d.title || 'Presentation') +
+          '"? Unsaved changes will be lost.')) {
+      return;
+    }
+    clearTimeout(saveTimer);
+    if (documents.length === 1) {
+      const blank = makeDocObject({});
+      documents[0] = blank;
+      activeDocId = blank.id;
+      loadDocState(blank);
+      renderTabStrip();
+      persistAllTabs();
+      return;
+    }
+    documents.splice(idx, 1);
+    if (isActive) {
+      const next = documents[Math.min(idx, documents.length - 1)];
+      activeDocId = next.id;
+      loadDocState(next);
+    }
+    renderTabStrip();
+    persistAllTabs();
+  }
+  function restoreTabs() {
+    let payload = null;
+    try { payload = JSON.parse(localStorage.getItem(TABS_KEY) || 'null'); } catch (e) {}
+    if (payload && Array.isArray(payload.docs) && payload.docs.length) {
+      documents = payload.docs.map((d) => makeDocObject(d));
+      activeDocId = (payload.activeDocId &&
+        documents.some((d) => d.id === payload.activeDocId))
+          ? payload.activeDocId : documents[0].id;
+    } else {
+      // Legacy single-deck migration — `deck` already holds D.load().
+      documents = [makeDocObject({ model: deck })];
+      activeDocId = documents[0].id;
+    }
+    const d = activeDoc();
+    deck = d.model;
+    state.selectedSlideId = d.viewState.selectedSlideId;
+    renderTabStrip();
   }
 
   // ---------- Helpers ----------
@@ -344,6 +531,9 @@
   function setDeckTitleInput() { $('#deckTitle').value = deck.title; }
   $('#deckTitle').addEventListener('input', (e) => {
     deck.title = e.target.value || 'Untitled Presentation';
+    const ad = activeDoc();
+    if (ad) ad.title = deck.title;
+    renderTabStrip();
     scheduleSave();
   });
 
@@ -1507,15 +1697,9 @@
     },
 
     // File / deck
-    newDeck() {
-      if (!confirm('Discard current deck and start a new one?')) return;
-      deck = D.newDeck();
-      state.selectedSlideId = deck.slides[0].id;
-      clearSelection();
-      bootstrap();
-      scheduleSave();
-    },
-    openFile() { $('#openFileInput').click(); },
+    newDeck() { openTemplateGallery(); },
+    openFile() { openFromFileSystem(); },
+    saveToFile() { saveToFileSystem(); },
     openSaveDialog() {
       // Unified Save dialog: pick filename + format. Replaces the
       // 8 File-panel + 2 Record-panel export buttons.
@@ -1566,12 +1750,15 @@
     exportHtml() { exportDeckAs('html'); },
     exportTxt() { exportDeckAs('txt'); },
     resetDeck() {
-      if (!confirm('Wipe local deck storage and start fresh? This cannot be undone.')) return;
+      if (!confirm('Wipe local deck storage and start fresh? This cannot be undone. All open tabs will be closed.')) return;
       D.clear();
-      deck = D.newDeck();
-      state.selectedSlideId = deck.slides[0].id;
-      clearSelection();
-      bootstrap();
+      try { localStorage.removeItem(TABS_KEY); } catch (e) { /* ignore */ }
+      const d = makeDocObject({});
+      documents = [d];
+      activeDocId = d.id;
+      loadDocState(d);
+      renderTabStrip();
+      persistAllTabs();
     },
 
     // Undo/redo not implemented yet — placeholder
@@ -1720,118 +1907,216 @@
   // the previous trio of file inputs / change handlers / ribbon
   // buttons (Open .json… / Import .pptx… / Import .pdf…).
 
-  function loadJsonFile(f) {
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        const obj = JSON.parse(reader.result);
-        if (!D.validate(obj)) { alert('That file does not look like a RodmanSlides deck.'); return; }
-        deck = sanitizeDeck(obj);
-        state.selectedSlideId = deck.slides[0].id;
-        clearSelection();
-        bootstrap();
-        scheduleSave();
-      } catch (err) {
-        alert('Could not parse JSON: ' + err.message);
-      }
-    };
-    reader.readAsText(f);
-  }
-
-  async function loadPptxFile(f) {
-    if (!window.RodmanSlidesIO || !window.RodmanSlidesIO.loadPptx) {
-      alert('PPTX engine failed to load. Reload the page and try again.');
-      return;
-    }
+  // Detect a file's format, parse it, and open it in a new tab.
+  // Shared by the file <input> and the File System Access path.
+  async function loadFileIntoNewTab(file, fsHandle) {
+    if (!file) return;
+    const ext = (file.name.match(/\.([^.]+)$/)?.[1] || '').toLowerCase();
     try {
-      const buf = await f.arrayBuffer();
-      const imported = await window.RodmanSlidesIO.loadPptx(buf);
-      // Merge imported shape into the deck shape the editor expects: keep
-      // the existing theme, take over title + slides.
-      const fresh = D.newDeck();
-      fresh.title = imported.title || f.name.replace(/\.pptx$/i, '');
-      fresh.slides = imported.slides;
-      deck = sanitizeDeck(fresh);
-      state.selectedSlideId = deck.slides[0] ? deck.slides[0].id : null;
-      clearSelection();
-      bootstrap();
-      scheduleSave();
+      if (ext === 'json') {
+        const obj = JSON.parse(await file.text());
+        if (!D.validate(obj)) {
+          alert('That file does not look like a RodmanSlides deck.');
+          return;
+        }
+        openDocumentInNewTab({
+          model: obj, title: obj.title || file.name.replace(/\.json$/i, ''),
+          originalFormat: 'json', fsHandle,
+        });
+      } else if (ext === 'pptx') {
+        if (!window.RodmanSlidesIO || !window.RodmanSlidesIO.loadPptx) {
+          alert('PPTX engine failed to load. Reload the page and try again.');
+          return;
+        }
+        const imported = await window.RodmanSlidesIO.loadPptx(await file.arrayBuffer());
+        const fresh = D.newDeck();
+        fresh.title = imported.title || file.name.replace(/\.pptx$/i, '');
+        fresh.slides = imported.slides;
+        openDocumentInNewTab({
+          model: fresh, title: fresh.title, originalFormat: 'pptx', fsHandle,
+        });
+      } else if (ext === 'pdf') {
+        const fresh = await pdfToDeck(file);
+        if (!fresh) return;
+        openDocumentInNewTab({
+          model: fresh, title: fresh.title, originalFormat: 'pdf', fsHandle,
+        });
+      } else {
+        alert(`Unsupported file type: .${ext}\nSupported: .json, .pptx, .pdf`);
+      }
     } catch (err) {
-      alert('Could not import .pptx: ' + (err.message || err));
+      alert('Could not open this file: ' + (err.message || err));
     }
   }
 
-  // PDF → deck import. Each page rasterises to a canvas via the
-  // shared lib/images/pdf.js engine and lands as a single full-bleed
-  // image element on its own slide. Letterboxed to preserve the
-  // page aspect inside the deck's 1280×720 canvas.
-  async function loadPdfFile(f) {
+  // PDF → deck. Each page rasterises to a canvas via the shared
+  // lib/images/pdf.js engine and lands as a full-bleed image on its
+  // own slide, letterboxed to the deck's 1280×720 canvas.
+  async function pdfToDeck(file) {
     if (!window.RodmanImagePdf || !window.RodmanImagePdf.decodePdfPage) {
       alert('PDF engine failed to load. Reload the page and try again.');
+      return null;
+    }
+    const buf = await file.arrayBuffer();
+    const bytes = new Uint8Array(buf);
+    const pageCount = await window.RodmanImagePdf.pdfPageCount(bytes);
+    if (!pageCount) { alert('No pages found in this PDF.'); return null; }
+    const fresh = D.newDeck();
+    fresh.title = file.name.replace(/\.pdf$/i, '');
+    fresh.slides = [];
+    const deckW = fresh.size.w;
+    const deckH = fresh.size.h;
+    // A 30-page PDF can take 10-30s to rasterise — show progress in
+    // the title-bar indicator and yield between pages so the browser
+    // repaints instead of showing "page not responding".
+    const indicatorEl = $('#saveIndicator');
+    const restoreIndicator = indicatorEl ? indicatorEl.textContent : '';
+    for (let i = 0; i < pageCount; i++) {
+      if (indicatorEl) {
+        indicatorEl.textContent = `Loading PDF… ${i + 1} / ${pageCount}`;
+        indicatorEl.style.opacity = 1;
+        indicatorEl.style.color = '';
+      }
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      const { canvas } = await window.RodmanImagePdf.decodePdfPage(bytes, i, { scale: 2 });
+      const dataUrl = canvas.toDataURL('image/png');
+      const pageAspect = canvas.width / canvas.height;
+      const deckAspect = deckW / deckH;
+      let w, h, x, y;
+      if (pageAspect > deckAspect) {
+        w = deckW; h = Math.round(deckW / pageAspect);
+        x = 0; y = Math.round((deckH - h) / 2);
+      } else {
+        h = deckH; w = Math.round(deckH * pageAspect);
+        x = Math.round((deckW - w) / 2); y = 0;
+      }
+      const slide = D.newSlide({ layout: 'blank', theme: fresh.theme });
+      slide.elements = [D.newImageElement({ x, y, w, h, src: dataUrl })];
+      fresh.slides.push(slide);
+    }
+    if (indicatorEl) indicatorEl.textContent = restoreIndicator;
+    return fresh;
+  }
+
+  async function openFromFileSystem() {
+    if (!('showOpenFilePicker' in window)) {
+      $('#openFileInput').click();
       return;
     }
+    let handle;
     try {
-      const buf = await f.arrayBuffer();
-      const bytes = new Uint8Array(buf);
-      const pageCount = await window.RodmanImagePdf.pdfPageCount(bytes);
-      if (!pageCount) { alert('No pages found in this PDF.'); return; }
-      const fresh = D.newDeck();
-      fresh.title = f.name.replace(/\.pdf$/i, '');
-      fresh.slides = [];
-      const deckW = fresh.size.w;
-      const deckH = fresh.size.h;
-      // Progress feedback: a 30-page PDF can take 10-30s to
-      // rasterise. Reuse the title-bar save indicator to show
-      // "Loading PDF… N / M" and yield to the event loop between
-      // pages so the browser repaints (otherwise the tab freezes
-      // and the browser may show "page not responding").
-      const indicatorEl = $('#saveIndicator');
-      const restoreIndicator = indicatorEl ? indicatorEl.textContent : '';
-      for (let i = 0; i < pageCount; i++) {
-        if (indicatorEl) {
-          indicatorEl.textContent = `Loading PDF… ${i + 1} / ${pageCount}`;
-          indicatorEl.style.opacity = 1;
-          indicatorEl.style.color = '';
-        }
-        // Yield once per iteration so paint + input handlers run.
-        await new Promise((resolve) => setTimeout(resolve, 0));
-        const { canvas } = await window.RodmanImagePdf.decodePdfPage(bytes, i, { scale: 2 });
-        const dataUrl = canvas.toDataURL('image/png');
-        const pageAspect = canvas.width / canvas.height;
-        const deckAspect = deckW / deckH;
-        let w, h, x, y;
-        if (pageAspect > deckAspect) {
-          w = deckW; h = Math.round(deckW / pageAspect);
-          x = 0; y = Math.round((deckH - h) / 2);
-        } else {
-          h = deckH; w = Math.round(deckH * pageAspect);
-          x = Math.round((deckW - w) / 2); y = 0;
-        }
-        const slide = D.newSlide({ layout: 'blank', theme: fresh.theme });
-        slide.elements = [D.newImageElement({ x, y, w, h, src: dataUrl })];
-        fresh.slides.push(slide);
-      }
-      if (indicatorEl) indicatorEl.textContent = restoreIndicator;
-      deck = sanitizeDeck(fresh);
-      state.selectedSlideId = deck.slides[0] ? deck.slides[0].id : null;
-      clearSelection();
-      bootstrap();
-      scheduleSave();
+      [handle] = await window.showOpenFilePicker({
+        types: [{
+          description: 'Presentations',
+          accept: {
+            'application/json': ['.json'],
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation': ['.pptx'],
+            'application/pdf': ['.pdf'],
+          },
+        }],
+      });
     } catch (err) {
-      alert('Could not import .pdf: ' + (err.message || err));
+      if (err && err.name === 'AbortError') return;
+      alert('Open failed: ' + (err.message || err));
+      return;
     }
+    const file = await handle.getFile();
+    await loadFileIntoNewTab(file, handle);
   }
 
   $('#openFileInput').addEventListener('change', async (e) => {
     const f = e.target.files[0];
     e.target.value = '';
-    if (!f) return;
-    const ext = (f.name.match(/\.([^.]+)$/)?.[1] || '').toLowerCase();
-    if (ext === 'json') return loadJsonFile(f);
-    if (ext === 'pptx') return loadPptxFile(f);
-    if (ext === 'pdf')  return loadPdfFile(f);
-    alert(`Unsupported file type: .${ext}\nSupported: .json, .pptx, .pdf`);
+    await loadFileIntoNewTab(f);
   });
+
+  // ---------- Save to file (File System Access) ----------
+  async function buildDeckBlob(format) {
+    if (format === 'json') {
+      return {
+        blob: new Blob([JSON.stringify(deck, null, 2)], { type: 'application/json' }),
+        ext: 'json',
+      };
+    }
+    if (format === 'pdf') {
+      if (!window.RodmanDocs || !window.RodmanDocs.savePdf) throw new Error('PDF engine not loaded');
+      const blob = await window.RodmanDocs.savePdf(deckToHtmlString(), {
+        title: deck.title || 'Presentation',
+      });
+      return { blob, ext: 'pdf' };
+    }
+    // pptx is the default for new decks and any other original format.
+    if (!window.RodmanSlidesIO || !window.RodmanSlidesIO.savePptx) throw new Error('PPTX engine not loaded');
+    return { blob: window.RodmanSlidesIO.savePptx(deck), ext: 'pptx' };
+  }
+
+  async function saveToFileSystem() {
+    const d = activeDoc();
+    saveActiveDocState();
+    const fmt = (d && d.originalFormat) || 'pptx';
+    let built;
+    try { built = await buildDeckBlob(fmt); }
+    catch (err) { alert('Save failed: ' + (err.message || err)); return; }
+    const suggested = (deck.title || 'presentation').replace(/[^\w\-]+/g, '_') + '.' + built.ext;
+    if (!('showSaveFilePicker' in window)) {
+      downloadDeckBlob(built.blob, built.ext);
+      return;
+    }
+    try {
+      let handle = d && d.fsHandle;
+      if (!handle) {
+        handle = await window.showSaveFilePicker({
+          suggestedName: suggested,
+          types: [{
+            description: built.ext.toUpperCase() + ' file',
+            accept: { [built.blob.type || 'application/octet-stream']: ['.' + built.ext] },
+          }],
+        });
+        if (d) d.fsHandle = handle;
+      }
+      if (handle.requestPermission) {
+        const perm = await handle.requestPermission({ mode: 'readwrite' });
+        if (perm !== 'granted') { alert('Write permission denied'); return; }
+      }
+      const writable = await handle.createWritable();
+      await writable.write(built.blob);
+      await writable.close();
+      setSaveIndicator('saved');
+    } catch (err) {
+      if (err && err.name === 'AbortError') return;
+      alert('Save to file failed: ' + (err.message || err));
+    }
+  }
+
+  // ---------- New-presentation template gallery ----------
+  function openTemplateGallery() {
+    const modal = $('#templateModal');
+    const grid = $('#templateGrid');
+    const tpls = window.RodmanSlideTemplates || [];
+    if (!modal || !grid || !tpls.length) { newDocument(); return; }
+    grid.innerHTML = '';
+    tpls.forEach((tpl) => {
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = 'template-card';
+      const name = document.createElement('span');
+      name.className = 'tpl-name';
+      name.textContent = tpl.name;
+      const summary = document.createElement('span');
+      summary.className = 'tpl-summary';
+      summary.textContent = tpl.summary || '';
+      card.appendChild(name);
+      card.appendChild(summary);
+      card.addEventListener('click', () => {
+        modal.hidden = true;
+        let model;
+        try { model = tpl.build(); } catch (e) { model = D.newDeck(); }
+        openDocumentInNewTab({ model });
+      });
+      grid.appendChild(card);
+    });
+    modal.hidden = false;
+  }
 
   // ---------- Notes pane ----------
   $('#notesArea').addEventListener('input', (e) => {
@@ -2322,6 +2607,17 @@
     });
   });
 
+  // ---------- Document tabs wiring ----------
+  $('#newTabBtn')?.addEventListener('click', () => newDocument());
+  $('#templateModalCloseBtn')?.addEventListener('click', () => {
+    const m = $('#templateModal');
+    if (m) m.hidden = true;
+  });
+  $('#templateModal')?.addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) e.currentTarget.hidden = true;
+  });
+
   // ---------- Boot ----------
+  restoreTabs();
   bootstrap();
 })();
