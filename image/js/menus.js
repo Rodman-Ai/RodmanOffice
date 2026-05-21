@@ -113,6 +113,7 @@
       SEP,
       { label: 'Save PNG',     shortcut: 'Ctrl+S',    run: () => clickButton('btn-save') },
       { label: 'Save HD…',     shortcut: 'Shift+Ctrl+S', run: () => shiftClickButton('btn-save') },
+      { label: 'Save to File…',                        run: () => rp('saveToFileSystem') },
       SEP,
       { label: 'Clear Canvas',                        run: () => clickButton('btn-clear') },
       { label: 'Reset All Settings',                  run: () => shiftClickButton('btn-clear') }

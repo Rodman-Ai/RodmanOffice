@@ -2695,43 +2695,117 @@
     // valid identifier (no dashes). Derive a stem from the filename.
     const stem = stamp.replace(/[^A-Za-z0-9_]/g, '_') || 'image';
     try {
-      let blob, filename;
-      switch (ext) {
-        case 'png':  blob = await IO.encodePNG(work);  filename = IO.suggestFilename(stamp, 'png'); break;
-        case 'jpg':  blob = await IO.encodeJPEG(work, quality); filename = IO.suggestFilename(stamp, 'jpg'); break;
-        case 'webp': blob = await IO.encodeWebP(work, quality); filename = IO.suggestFilename(stamp, 'webp'); break;
-        case 'avif': blob = await IO.encodeAVIF(work, quality); filename = IO.suggestFilename(stamp, 'avif'); break;
-        case 'bmp':  blob = IO.encodeBMP(work); filename = IO.suggestFilename(stamp, 'bmp'); break;
-        case 'ico':  blob = await IO.encodeICO(work); filename = IO.suggestFilename(stamp, 'ico'); break;
-        case 'icns': blob = await IO.encodeICNS(work); filename = IO.suggestFilename(stamp, 'icns'); break;
-        case 'cur':  blob = await IO.encodeCUR(work); filename = IO.suggestFilename(stamp, 'cur'); break;
-        case 'tif':  blob = IO.encodeTIFF(work); filename = IO.suggestFilename(stamp, 'tif'); break;
-        case 'tif-multi': blob = IO.encodeMultiTIFF([work]); filename = IO.suggestFilename(stamp, 'tif'); break;
-        case 'psd':  blob = IO.encodePsd(work); filename = IO.suggestFilename(stamp, 'psd'); break;
-        case 'pdf':  blob = await IO.encodePdfFromCanvas(work, { format: 'jpeg', quality }); filename = IO.suggestFilename(stamp, 'pdf'); break;
-        // Part 10 niche image formats.
-        case 'ppm':  blob = IO.encodePPM(work);  filename = IO.suggestFilename(stamp, 'ppm'); break;
-        case 'pgm':  blob = IO.encodePGM(work);  filename = IO.suggestFilename(stamp, 'pgm'); break;
-        case 'pbm':  blob = IO.encodePBM(work);  filename = IO.suggestFilename(stamp, 'pbm'); break;
-        case 'pam':  blob = IO.encodePAM(work);  filename = IO.suggestFilename(stamp, 'pam'); break;
-        case 'tga':  blob = IO.encodeTGA(work);  filename = IO.suggestFilename(stamp, 'tga'); break;
-        case 'pcx':  blob = IO.encodePCX(work);  filename = IO.suggestFilename(stamp, 'pcx'); break;
-        case 'hdr':  blob = IO.encodeHDR(work);  filename = IO.suggestFilename(stamp, 'hdr'); break;
-        case 'xbm':  blob = IO.encodeXBM(work, stem); filename = IO.suggestFilename(stamp, 'xbm'); break;
-        case 'xpm':  blob = IO.encodeXPM(work, stem); filename = IO.suggestFilename(stamp, 'xpm'); break;
-        case 'wbmp': blob = IO.encodeWBMP(work); filename = IO.suggestFilename(stamp, 'wbmp'); break;
-        case 'sgi':  blob = IO.encodeSGI(work);  filename = IO.suggestFilename(stamp, 'sgi'); break;
-        case 'ras':  blob = IO.encodeRAS(work);  filename = IO.suggestFilename(stamp, 'ras'); break;
-        case 'ff':   blob = IO.encodeFarbfeld(work); filename = IO.suggestFilename(stamp, 'ff'); break;
-        case 'cbz':  blob = await IO.encodeCbzFromCanvas(work); filename = IO.suggestFilename(stamp, 'cbz'); break;
-        case 'gif':  blob = await IO.encodeGIF(work); filename = IO.suggestFilename(stamp, 'gif'); break;
-        case 'svg':  blob = await IO.encodeSVG(work); filename = IO.suggestFilename(stamp, 'svg'); break;
-        default: throw new Error('Unknown format: ' + ext);
-      }
-      IO.triggerDownload(blob, filename);
+      const blob = await encodeCanvasToBlob(ext, work, { quality, stem });
+      IO.triggerDownload(blob, IO.suggestFilename(stamp, ext === 'tif-multi' ? 'tif' : ext));
     } catch (e) {
       console.error(e);
       alert('Could not save .' + ext + ': ' + (e && e.message ? e.message : e));
+    }
+  }
+
+  // Encode the given canvas into a Blob for one of the SAVE_AS_FORMATS
+  // extensions. Shared by the Save dialog (download) and Save to File
+  // (File System Access write-back).
+  async function encodeCanvasToBlob(ext, work, opts) {
+    const quality = opts && opts.quality != null ? opts.quality : 0.85;
+    const stem = (opts && opts.stem) || 'image';
+    switch (ext) {
+      case 'png':  return IO.encodePNG(work);
+      case 'jpg': case 'jpeg': return IO.encodeJPEG(work, quality);
+      case 'webp': return IO.encodeWebP(work, quality);
+      case 'avif': return IO.encodeAVIF(work, quality);
+      case 'bmp':  return IO.encodeBMP(work);
+      case 'ico':  return IO.encodeICO(work);
+      case 'icns': return IO.encodeICNS(work);
+      case 'cur':  return IO.encodeCUR(work);
+      case 'tif': case 'tiff': return IO.encodeTIFF(work);
+      case 'tif-multi': return IO.encodeMultiTIFF([work]);
+      case 'psd':  return IO.encodePsd(work);
+      case 'pdf':  return IO.encodePdfFromCanvas(work, { format: 'jpeg', quality });
+      case 'ppm':  return IO.encodePPM(work);
+      case 'pgm':  return IO.encodePGM(work);
+      case 'pbm':  return IO.encodePBM(work);
+      case 'pam':  return IO.encodePAM(work);
+      case 'tga':  return IO.encodeTGA(work);
+      case 'pcx':  return IO.encodePCX(work);
+      case 'hdr':  return IO.encodeHDR(work);
+      case 'xbm':  return IO.encodeXBM(work, stem);
+      case 'xpm':  return IO.encodeXPM(work, stem);
+      case 'wbmp': return IO.encodeWBMP(work);
+      case 'sgi':  return IO.encodeSGI(work);
+      case 'ras':  return IO.encodeRAS(work);
+      case 'ff':   return IO.encodeFarbfeld(work);
+      case 'cbz':  return IO.encodeCbzFromCanvas(work);
+      case 'gif':  return IO.encodeGIF(work);
+      case 'svg':  return IO.encodeSVG(work);
+      default: throw new Error('Unknown format: ' + ext);
+    }
+  }
+
+  // Lightweight transient confirmation (the app has no toast system).
+  function imageToast(msg) {
+    let t = document.getElementById('rp-toast');
+    if (!t) {
+      t = document.createElement('div');
+      t.id = 'rp-toast';
+      t.style.cssText = 'position:fixed;left:50%;bottom:24px;transform:translateX(-50%);' +
+        'background:#1f2430;color:#fff;padding:8px 16px;border-radius:6px;font-size:13px;' +
+        'z-index:9999;pointer-events:none;transition:opacity .3s;box-shadow:0 4px 14px rgba(0,0,0,.4)';
+      document.body.appendChild(t);
+    }
+    t.textContent = msg;
+    t.style.opacity = '1';
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => { t.style.opacity = '0'; }, 1800);
+  }
+
+  // Save the current canvas straight back to disk via the File System
+  // Access API. The first save asks for a location; subsequent saves
+  // reuse the handle stored on the active document.
+  async function saveToFileSystem() {
+    const d = activeDoc();
+    const stem = ((d && d.name) || 'image').replace(/[^\w.\- ]+/g, '_') || 'image';
+    let handle = d && d.fsHandle;
+    if (!handle) {
+      if (!('showSaveFilePicker' in window)) {
+        // No File System Access API — fall back to the Save dialog.
+        openSaveDialog();
+        return;
+      }
+      try {
+        handle = await window.showSaveFilePicker({
+          suggestedName: stem + '.png',
+          types: [
+            { description: 'PNG image',  accept: { 'image/png':  ['.png'] } },
+            { description: 'JPEG image', accept: { 'image/jpeg': ['.jpg', '.jpeg'] } },
+            { description: 'WebP image', accept: { 'image/webp': ['.webp'] } },
+          ],
+        });
+      } catch (e) {
+        if (e && e.name === 'AbortError') return;
+        alert('Save to file failed: ' + (e && e.message ? e.message : e));
+        return;
+      }
+      if (d) d.fsHandle = handle;
+    }
+    let ext = (handle.name.split('.').pop() || 'png').toLowerCase();
+    if (ext === 'jpeg') ext = 'jpg';
+    try {
+      if (handle.requestPermission) {
+        const perm = await handle.requestPermission({ mode: 'readwrite' });
+        if (perm !== 'granted') { alert('Write permission denied'); return; }
+      }
+      const blob = await encodeCanvasToBlob(ext, canvas, {
+        stem: stem.replace(/[^A-Za-z0-9_]/g, '_') || 'image',
+      });
+      const writable = await handle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      imageToast('Saved to ' + handle.name);
+    } catch (e) {
+      if (e && e.name === 'AbortError') return;
+      console.error(e);
+      alert('Save to file failed: ' + (e && e.message ? e.message : e));
     }
   }
 
@@ -9339,6 +9413,8 @@
     // Round 9 — Distort, Rotate View, Guide Layout, Slices, Fill Layers, Stamp
     distortTool, rotateViewCW, rotateViewCCW, resetViewRotation,
     newGuideLayout, exportSlices, clearSlices,
-    addFillLayer, editFillLayer, stampVisible
+    addFillLayer, editFillLayer, stampVisible,
+    // File
+    saveToFileSystem
   };
 })();
