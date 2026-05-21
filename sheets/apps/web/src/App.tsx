@@ -852,6 +852,7 @@ export function App() {
             activeId={api.activeSheet.id}
             onSelect={api.setActiveSheet}
             onAdd={api.addSheet}
+            onDelete={api.deleteSheet}
           />
         </div>
         {panelOpen && (
