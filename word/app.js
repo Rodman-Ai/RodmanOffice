@@ -1199,6 +1199,10 @@
         closeBackstage();
         setTimeout(() => { preparePrint(); window.print(); }, 100);
         break;
+      case 'close-doc':
+        closeBackstage();
+        closeTab(activeDocId);
+        break;
       case 'printpreview':
         closeBackstage();
         showPrintPreview();
@@ -1236,6 +1240,7 @@
           { ico: '📂', label: 'Open from device', action: 'open' },
           { ico: '💾', label: 'Save…', action: 'open-save-dialog' },
           { ico: '🖨', label: 'Print', action: 'print' },
+          { ico: '✕', label: 'Close', action: 'close-doc' },
         ].forEach((q) => {
           const b = document.createElement('button');
           b.className = 'btn primary';
