@@ -1111,22 +1111,61 @@ body.reading-mode.dyslexia .editor {
   line-height: 1;
 }
 .editor .rwd-envelope {
-  min-height: 3.8in;
-  border: 1px dashed var(--ribbon-border);
-  margin: 12px 0;
-  padding: 0.35in;
+  width: var(--env-w, 9.5in);
+  max-width: 100%;
+  aspect-ratio: var(--env-aspect, 76 / 33);
   position: relative;
+  margin: 16px 0;
+  border: 1px dashed var(--ribbon-border);
+  background: #fff;
+  color: #111;
   page-break-after: always;
+  font-family: Calibri, Arial, sans-serif;
 }
+.editor .rwd-envelope[data-size="no10"]    { --env-w: 9.5in;  --env-aspect: 76 / 33; }
+.editor .rwd-envelope[data-size="dl"]      { --env-w: 220mm;  --env-aspect: 2 / 1; }
+.editor .rwd-envelope[data-size="c5"]      { --env-w: 229mm;  --env-aspect: 229 / 162; }
+.editor .rwd-envelope[data-size="c6"]      { --env-w: 162mm;  --env-aspect: 162 / 114; }
+.editor .rwd-envelope[data-size="monarch"] { --env-w: 7.5in;  --env-aspect: 60 / 31; }
 .editor .rwd-envelope-return {
-  font-size: 9pt;
-  max-width: 2.5in;
+  position: absolute;
+  top: 6%;
+  left: 4%;
+  max-width: 38%;
+  font-size: 10pt;
+  line-height: 1.25;
 }
 .editor .rwd-envelope-recipient {
   position: absolute;
-  left: 40%;
-  top: 45%;
-  min-width: 3in;
+  top: 42%;
+  left: 38%;
+  width: 56%;
+  font-size: 12pt;
+  line-height: 1.3;
+}
+.editor .rwd-envelope-stamp {
+  position: absolute;
+  top: 6%;
+  right: 4%;
+  width: 14%;
+  aspect-ratio: 4 / 5;
+  border: 1px dashed var(--ribbon-border);
+  color: var(--muted, #888);
+  font-size: 8pt;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  opacity: 0.6;
+  user-select: none;
+}
+@media print {
+  .editor .rwd-envelope {
+    border: none;
+  }
+  .editor .rwd-envelope-stamp {
+    border: none;
+  }
 }
 .editor table.rwd-label-sheet {
   width: 100%;
