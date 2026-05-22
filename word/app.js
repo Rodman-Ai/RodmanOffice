@@ -108,6 +108,12 @@
 
   const docHeader = document.getElementById('docHeader');
   const docFooter = document.getElementById('docFooter');
+  // The table / image mini-toolbar elements are captured here, early,
+  // because feature-extension blocks far above their old declaration
+  // sites reference them at script-execution time — a later `const`
+  // would be in its temporal dead zone and throw.
+  const tableBar = $('#tableBar');
+  const imageBar = $('#imageBar');
 
   // ---------- Multi-document tab state ----------
   const STORE_TABS = 'rodmanword:tabs';
@@ -5415,7 +5421,11 @@ ${editor.innerHTML}
 
   // #44 Template marketplace UI — extend renderTemplates() to also
   // include user-saved templates with thumbnails.
-  if (typeof TEMPLATES !== 'undefined' && Array.isArray(TEMPLATES)) {
+  // NB: guard on `renderTemplates` (a hoisted function), NOT on the
+  // `TEMPLATES` const — `typeof` on a const still in its temporal
+  // dead zone throws a ReferenceError, which would abort the whole
+  // script here (TEMPLATES is declared much further down).
+  if (typeof renderTemplates === 'function') {
     const __origRender = renderTemplates;
     renderTemplates = function () {
       __origRender();
@@ -9555,7 +9565,7 @@ ${editor.innerHTML}
   // ============================================================
   // FEATURE: Table mini-toolbar
   // ============================================================
-  const tableBar = $('#tableBar');
+  // `tableBar` is declared early (near the top of the IIFE).
 
   function positionFloatBar(bar, anchor) {
     const r = anchor.getBoundingClientRect();
@@ -9789,7 +9799,7 @@ ${editor.innerHTML}
   // ============================================================
   // FEATURE: Image mini-toolbar
   // ============================================================
-  const imageBar = $('#imageBar');
+  // `imageBar` is declared early (near the top of the IIFE).
   let selectedImg = null;
 
   editor.addEventListener('click', (e) => {
