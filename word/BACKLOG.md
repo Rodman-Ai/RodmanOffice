@@ -2,10 +2,25 @@
 
 This backlog tracks Microsoft Word ribbon features visible in the reference
 screenshots that are not yet exposed as working RodmanWord controls. Acrobat is
-intentionally excluded.
+intentionally excluded. The **Competitor analysis** section below also weighs
+the highest-impact gaps versus Google Docs.
 
 Effort key: S = small UI/command wrapper, M = moderate document behavior, L =
 large subsystem or format model work.
+
+## Competitor analysis — top gaps vs Microsoft Word & Google Docs
+
+RodmanWord already covers ~250 features across the full ribbon. Measured
+against both Microsoft Word and Google Docs, these are the five highest-impact
+features it still lacks.
+
+| Feature | Effort | Notes |
+|---|---:|---|
+| Conflict-free real-time co-authoring | L | P2P collab is last-writer-wins — simultaneous edits in different parts of the document are lost (ARCHITECTURE.md) — and shows peer names but no live cursors. Google Docs' core feature. Add a CRDT so edits merge, plus live remote cursors/selections; an optional hosted relay would drop the manual SDP handshake while keeping the static host. |
+| Per-section headers & footers | M | Headers/footers are document-global (`docHeader`/`docFooter`); section breaks exist but don't carry their own. Word supports different first-page and odd/even headers & footers per section — needed for reports, books, theses. |
+| AI writing & proofing assistant ("Editor") | M | Grammar check is 6 regex rules and spelling is the browser default — together "lighter than Word Editor". Reuse the existing Ask Claude client for a full spelling/grammar/clarity/conciseness/tone pass surfaced as inline accept/reject suggestions. Supersedes the older Home-tab "Editor pane parity" row. |
+| Accessibility checker | M | No semantic accessibility checks today (the "Inspect document" tool is privacy/metadata only). Flag missing image alt text, non-sequential heading levels, low-contrast text, tables without header cells, bare-URL link text, and a missing document language, in an actionable issues panel. Supersedes the older Review-tab "Accessibility checker" row. |
+| Comment assignment & action items | M | Threaded comments support @mentions and resolve, but a comment can't be assigned to a person or tracked as a task, and there's no action-items view. Both Word and Docs let you Assign a comment and list outstanding tasks. Add an assignee field, an Assign control, and an action-items pane. |
 
 ## Home
 
@@ -13,7 +28,6 @@ large subsystem or format model work.
 |---|---:|---|
 | Paste dropdown variants | M | Needs paste-special choices such as plain text, merge formatting, and keep source formatting. |
 | Rich Styles gallery previews | M | Current styles are selects; Word uses a horizontal visual gallery. |
-| Editor pane parity | L | Current spelling/grammar tools are lighter than Word Editor. |
 | Add-ins surface | L | Needs extension manifest/security model before add-ins are trustworthy. |
 | Sensitivity labels | L | Requires policy/tenant model, labels, and export metadata. |
 | Request signatures | L | Needs real signing workflow or integration. |
@@ -78,7 +92,6 @@ large subsystem or format model work.
 | Feature | Effort | Notes |
 |---|---:|---|
 | Advanced thesaurus | M | Ribbon opens the selected word in Merriam-Webster; local/service-backed synonym data remains deferred. |
-| Accessibility checker | L | Needs semantic checks and actionable issue panel. |
 | Linked notes / OneNote-style integration | L | Requires external integration or local notes model. |
 | Ink hide/show parity | L | Needs ink/stylus model first. |
 
