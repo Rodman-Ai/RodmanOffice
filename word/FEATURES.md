@@ -29,7 +29,7 @@ of action cards.
 | **Home**       | Quick actions (New, Open, Save, Print) + Recent documents list. |
 | **New**        | Templates gallery (Resume, Cover letter, Report, Memo, Meeting notes, Blank, plus user-saved templates from STORE_USER_TEMPLATES). |
 | **Open**       | Browse from device · Open from File System (FSA API) · Recent. |
-| **Save**       | Single **Save…** tile that opens the unified Save dialog (filename + format select with all 20 supported formats — `.rwd`, `.rwd.enc` encrypted, `.docx`, `.pdf`, `.html`, `.md`, `.txt`, `.odt`, `.rtf`, `.epub`, `.adoc`, `.tex`, `.json`, `.yaml`, `.wiki`, `.rst`, `.org`, `.dbk`, `.fb2`, `.pptx`, `.odp` — plus per-format options like the rwd.enc password, the markdown YAML frontmatter toggle, and PDF re-encode from a source PDF). Plus secondary tiles: Save to file (FSA) and Save as template. |
+| **Save**       | Headline **Save as Word (.docx)** and **Save as PDF** tiles, plus a **More formats…** tile opening the unified Save dialog (filename + format select — `.docx`, `.pdf`, `.html`, `.md`, `.txt`, `.odt`, `.rtf`, `.epub`, `.adoc`, `.tex`, `.json`, `.yaml`, `.wiki`, `.rst`, `.org`, `.dbk`, `.fb2`, `.pptx`, `.odp` — plus per-format options like the markdown YAML frontmatter toggle and PDF re-encode from a source PDF). `.rwd` / `.rwd.enc` are no longer Save targets. Plus secondary tiles: Save to file (FSA, writes the document's original format) and Save as template. |
 | **Print**      | Print / Save as PDF (Ctrl+P) · Print preview. |
 | **Share**      | Share link (URL hash) · Share read-only · Share comment-only · Collaborate (P2P) · Email this doc · Copy Slack-Markdown. |
 | **Cloud sync** | GitHub Gist · WebDAV / Nextcloud. |

@@ -120,6 +120,23 @@
       g.appendChild(title);
     }
 
+    // Image shapes (e.g. an imported SVG) draw their source directly
+    // and skip the stencil path + fill/stroke walk below.
+    if (shape.stencil === 'image' && shape.src) {
+      const img = document.createElementNS(SVG_NS, 'image');
+      img.setAttribute('x', '0');
+      img.setAttribute('y', '0');
+      img.setAttribute('width', String(shape.w));
+      img.setAttribute('height', String(shape.h));
+      img.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+      img.setAttribute('href', shape.src);
+      g.appendChild(img);
+      if (shape.text) renderShapeText(shape, g);
+      renderDataGraphicsOverlay(shape, g);
+      renderShapeIndicators(shape, g);
+      return g;
+    }
+
     const st = STENCILS.getStencil(shape.stencil || 'rectangle');
     const body = st.draw(shape.w, shape.h);
     const fill = shape.fill || '#ffffff';

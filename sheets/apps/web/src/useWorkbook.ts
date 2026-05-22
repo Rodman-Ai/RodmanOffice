@@ -34,6 +34,7 @@ export type WorkbookApi = {
   loadSheet: (sheet: Sheet) => void;
   replaceWorkbook: (wb: Workbook) => void;
   addSheet: () => void;
+  deleteSheet: (id: string) => void;
   setCellOnSheet: (sheetName: string, row: number, col: number, raw: string) => void;
   /** Apply many cell edits as a single undo step. */
   setCellsOnSheetBatch: (sheetName: string, edits: CellEdit[]) => void;
@@ -296,6 +297,27 @@ export function useWorkbook(): WorkbookApi {
     setActiveSheetId(id);
     setVersion((v) => v + 1);
   }, [pushHistory]);
+
+  const deleteSheet = useCallback(
+    (id: string) => {
+      const wb = workbookRef.current;
+      if (wb.sheets.length <= 1) return; // a workbook always keeps one sheet
+      const idx = wb.sheets.findIndex((s) => s.id === id);
+      if (idx < 0) return;
+      pushHistory();
+      const next: Workbook = { ...wb, sheets: wb.sheets.filter((s) => s.id !== id) };
+      // The calc engine is keyed by sheet name; rebuild it from the
+      // remaining sheets so the deleted sheet's cells stop resolving.
+      reloadEngine(next);
+      setWorkbook(next);
+      if (activeSheetId === id) {
+        const neighbour = next.sheets[Math.min(idx, next.sheets.length - 1)]!;
+        setActiveSheetId(neighbour.id);
+      }
+      setVersion((v) => v + 1);
+    },
+    [pushHistory, reloadEngine, activeSheetId]
+  );
 
   const addSheetByName = useCallback(
     (name: string) => {
@@ -743,6 +765,7 @@ export function useWorkbook(): WorkbookApi {
     loadSheet,
     replaceWorkbook,
     addSheet,
+    deleteSheet,
     addSheetByName,
     setCellOnSheet,
     setCellsOnSheetBatch,

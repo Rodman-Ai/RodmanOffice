@@ -36,7 +36,7 @@ one request and is not stored by RodmanWord.
 
 | Tab | What's in it |
 |---|---|
-| **File** | Backstage with Home / New / Open / Save / Print / Share / Cloud sync / Info / Tools / About sections. The Save section has a single **Save…** tile that opens a unified dialog (filename + format select + per-format options) — formerly the separate Save and Export tabs. `Ctrl+S` opens the same dialog. |
+| **File** | Backstage with Home / New / Open / Save / Print / Share / Cloud sync / Info / Tools / About sections. **New** opens a blank document in a new tab — multiple documents stay open in header tabs, each closable. The Save section headlines **Save as Word (.docx)** and **Save as PDF**, with a **More formats…** tile (unified dialog: filename + format select + per-format options) and a **Save to file** tile that writes back to disk in the document's original format via the File System Access API. `Ctrl+S` opens the Save dialog. |
 | **Home** | Clipboard / Font (with colour swatches + recent colours) / Paragraph (lists, alignment, indent, line spacing) / Styles / Editing (Undo, Redo, Find) / Voice (Dictate). |
 | **Insert** | Pages, Tables (incl. Text↔Table), Illustrations (Picture / Gallery / Carousel / Linked / Shapes / Chart), Media (Online Video / Audio / Iframe / QR / Barcode), Links, Comments, Header & Footer, Text (Word art / Drop cap / Pull quote / Code block / Quick parts / Tab stop / Lorem / Date / HR), Symbols, Forms. |
 | **Design** | Document themes, paragraph spacing presets, watermark. |
@@ -53,8 +53,8 @@ Full per-feature catalogue: [`FEATURES.md`](./FEATURES.md).
 
 | Format | Save / export | Open / import | Notes |
 |---|---|---|---|
-| `.rwd` (native JSON) | ✓ | ✓ | |
-| `.rwd.enc` (AES-GCM) | ✓ | ✓ | |
+| `.rwd` (native JSON) | ✓* | ✓ | *Via **Save to file**, not the Save dialog. |
+| `.rwd.enc` (AES-GCM) | ✓* | ✓ | *Via the **Encrypt document** tool, not the Save dialog. |
 | `.docx` (OOXML) | ✓ | ✓ | |
 | `.pdf` | ✓ | ✓ (text only) | See **Compress PDF** below. |
 | `.html` / `.htm` | ✓ | ✓ | |

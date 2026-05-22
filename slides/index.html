@@ -29,6 +29,9 @@
         <span class="app-subtitle">RodmanSlides</span>
       </div>
     </div>
+    <div class="doc-tabs" id="docTabs" role="tablist" aria-label="Open presentations">
+      <button class="doc-tab-new" id="newTabBtn" type="button" title="New presentation" aria-label="New presentation">+</button>
+    </div>
     <div class="title-actions">
       <!-- Keep this visible for per-request BYOK setup; the key field lives in the panel. -->
       <button
@@ -108,6 +111,7 @@
       <div class="group">
         <div class="group-row">
           <button class="ribbon-btn wide" data-cmd="openSaveDialog">💾 Save…</button>
+          <button class="ribbon-btn wide" data-cmd="saveToFile" title="Save directly back to a file on disk">🖫 Save to file…</button>
         </div>
         <div class="group-label">Save</div>
       </div>
@@ -660,6 +664,20 @@
     </div>
   </div>
 
+  <!-- New-presentation template gallery. -->
+  <div class="help-modal" id="templateModal" hidden role="dialog" aria-modal="true" aria-labelledby="templateModalTitle">
+    <div class="help-modal-card">
+      <header>
+        <h3 id="templateModalTitle">New presentation</h3>
+        <button class="icon-btn" id="templateModalCloseBtn" type="button" aria-label="Close">×</button>
+      </header>
+      <div class="help-modal-body">
+        <p style="margin:0 0 12px;font-size:13px;opacity:0.8">Pick a template to start from.</p>
+        <div class="template-grid" id="templateGrid"></div>
+      </div>
+    </div>
+  </div>
+
   <script type="module">
     // Bridge the shared /lib/slides/ PPTX engine onto window.RodmanSlidesIO
     // so the classic-script app.js can import / export .pptx without
@@ -694,6 +712,7 @@
     window.RodmanClaude = claude;
   </script>
   <script src="deck.js" defer></script>
+  <script src="templates.js" defer></script>
   <script src="themes.js" defer></script>
   <script src="render.js" defer></script>
   <script src="present.js" defer></script>

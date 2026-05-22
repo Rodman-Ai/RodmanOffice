@@ -581,32 +581,75 @@ body,
 }
 
 .sheet-tab {
+  display: inline-flex;
+  align-items: center;
   background: transparent;
   border: 1px solid transparent;
   border-bottom: 2px solid transparent;
   border-radius: 3px 3px 0 0;
-  padding: 4px 14px;
-  font-size: 12px;
-  cursor: pointer;
   white-space: nowrap;
   color: var(--text);
 }
-
 .sheet-tab:hover {
   background: var(--hover);
 }
-
 .sheet-tab.active {
   background: var(--page-bg);
   border-color: var(--ribbon-border);
   border-bottom-color: var(--primary);
   color: var(--primary);
+}
+.sheet-tab.active .sheet-tab-select {
   font-weight: 600;
+}
+
+/* The select + close affordances are real <button>s so they are
+   keyboard-focusable and operable. */
+.sheet-tab-select {
+  background: transparent;
+  border: 0;
+  padding: 4px 4px 4px 14px;
+  font: inherit;
+  font-size: 12px;
+  color: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.sheet-tab-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin: 0 5px 0 2px;
+  padding: 0;
+  border: 0;
+  border-radius: 2px;
+  background: transparent;
+  color: inherit;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.5;
+}
+.sheet-tab-close:hover {
+  opacity: 1;
+  background: var(--hover);
 }
 
 .sheet-tab-add {
   font-weight: 700;
   padding: 3px 10px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 3px 3px 0 0;
+  font-size: 12px;
+  color: var(--text);
+  cursor: pointer;
+}
+.sheet-tab-add:hover {
+  background: var(--hover);
 }
 
 /* Side panel */
