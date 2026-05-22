@@ -2544,9 +2544,9 @@
     }
     return IO.decodeFile(f);
   }
-  fileInput.addEventListener('change', async () => {
-    const f = fileInput.files && fileInput.files[0];
-    fileInput.value = '';
+  // Open a file as a fresh image — shared by the File ▸ Open picker
+  // and the drag-a-file-into-the-window handler.
+  async function openImageFile(f) {
     if (!f) return;
     try {
       const { canvas: src, width: iw, height: ih } = await decodeOpenedFile(f);
@@ -2561,6 +2561,11 @@
       console.error(e);
       alert('Could not load that image: ' + (e && e.message ? e.message : e));
     }
+  }
+  fileInput.addEventListener('change', async () => {
+    const f = fileInput.files && fileInput.files[0];
+    fileInput.value = '';
+    await openImageFile(f);
   });
 
   // The standalone "Save as PSD" and "Save as Photoshop PDF"
@@ -6711,20 +6716,17 @@
     return { mask, bounds: { x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1 } };
   }
 
-  // ---- Drag-drop image to load ----
-  canvas.addEventListener('dragover', (e) => { e.preventDefault(); });
-  canvas.addEventListener('drop', async (e) => {
+  // ---- Drag a file into the window to open it ----
+  window.document.addEventListener('dragover', (e) => {
+    if (e.dataTransfer && [...e.dataTransfer.types].includes('Files')) {
+      e.preventDefault();
+    }
+  });
+  window.document.addEventListener('drop', (e) => {
+    const files = e.dataTransfer && e.dataTransfer.files;
+    if (!files || !files.length) return;
     e.preventDefault();
-    const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
-    if (!f || !f.type.startsWith('image/')) return;
-    try {
-      const { canvas: src, width: iw, height: ih } = await IO.decodeFile(f);
-      pushUndo();
-      const r = Math.min(W / iw, H / ih);
-      const dw = iw * r, dh = ih * r;
-      ctx.drawImage(src, (W - dw) / 2, (H - dh) / 2, dw, dh);
-      composite();
-    } catch (_) { /* ignore unreadable drop */ }
+    openImageFile(files[0]);
   });
 
   // ---- Paste from system clipboard (image) ----

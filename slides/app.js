@@ -2628,6 +2628,26 @@
     if (e.target === e.currentTarget) e.currentTarget.hidden = true;
   });
 
+  // ---------- Drag a file into the window to open it ----------
+  // Registered after the stage image-drop block above so that an
+  // image dropped on the stage (which preventDefaults there) is
+  // skipped here via e.defaultPrevented.
+  document.addEventListener('dragover', (e) => {
+    if (e.dataTransfer && [...e.dataTransfer.types].includes('Files')) {
+      e.preventDefault();
+    }
+  });
+  document.addEventListener('drop', (e) => {
+    if (e.defaultPrevented) return;
+    const files = e.dataTransfer && e.dataTransfer.files;
+    if (!files || !files.length) return;
+    e.preventDefault();
+    for (const f of files) {
+      if (f.type.startsWith('image/')) continue;
+      loadFileIntoNewTab(f);
+    }
+  });
+
   // ---------- Boot ----------
   restoreTabs();
   bootstrap();
