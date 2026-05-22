@@ -87,6 +87,11 @@
   };
   window.RW_BUILD = RW_BUILD;
 
+  // ---------- Feature flags ----------
+  // Voice dictation (Web Speech API) is disabled. Flip to true to
+  // restore the Dictate ribbon button and command-palette entry.
+  const FEATURE_VOICE_DICTATION = false;
+
   const $ = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 
@@ -1199,6 +1204,10 @@
         closeBackstage();
         setTimeout(() => { preparePrint(); window.print(); }, 100);
         break;
+      case 'close-doc':
+        closeBackstage();
+        closeTab(activeDocId);
+        break;
       case 'printpreview':
         closeBackstage();
         showPrintPreview();
@@ -1236,6 +1245,7 @@
           { ico: '📂', label: 'Open from device', action: 'open' },
           { ico: '💾', label: 'Save…', action: 'open-save-dialog' },
           { ico: '🖨', label: 'Print', action: 'print' },
+          { ico: '✕', label: 'Close', action: 'close-doc' },
         ].forEach((q) => {
           const b = document.createElement('button');
           b.className = 'btn primary';
@@ -2731,7 +2741,9 @@ ${editor.innerHTML}
     { name: 'Toggle focus mode', shortcut: 'F11', run: () => toggleFocus() },
     { name: 'Toggle reading mode', run: () => $('#readingModeBtn').click() },
     { name: 'Read aloud', run: () => $('#readAloudBtn').click() },
-    { name: 'Voice dictation', run: () => $('#dictateBtn').click() },
+    ...(FEATURE_VOICE_DICTATION
+      ? [{ name: 'Voice dictation', run: () => $('#dictateBtn').click() }]
+      : []),
     { name: 'Word count details', run: () => { renderCountModal(); openModal(countModal); } },
     { name: 'Document properties', run: () => openPropsModal() },
     { name: 'Writing goal…', run: () => { $('#goalTarget').value = writingGoal || 500; openModal(goalModal); } },
@@ -10314,7 +10326,10 @@ ${editor.innerHTML}
   let recognizer = null;
   let dictating = false;
 
-  if (!SR) {
+  if (!FEATURE_VOICE_DICTATION) {
+    // Disabled via feature flag — hide the Dictate button entirely.
+    if (dictateBtn) dictateBtn.hidden = true;
+  } else if (!SR) {
     dictateBtn.title = 'Voice dictation is not supported by this browser.';
     dictateBtn.disabled = true;
     dictateBtn.style.opacity = 0.5;
