@@ -3301,18 +3301,108 @@ ${editor.innerHTML}
     refreshMergeFieldSelect();
     openModal($('#mailMergeModal'));
   });
+  // Envelope sizes — kept in sync with the CSS [data-size] rules and
+  // the printEnvelope() @page rule. Width × height.
+  const ENVELOPE_SIZES = {
+    no10:    '9.5in 4.125in',
+    dl:      '220mm 110mm',
+    c5:      '229mm 162mm',
+    c6:      '162mm 114mm',
+    monarch: '7.5in 3.875in',
+  };
+
   $('#envelopesBtn')?.addEventListener('click', () => {
-    const recipient = prompt('Recipient address:', 'Recipient Name\nStreet Address\nCity, ST 00000');
-    if (recipient === null) return;
-    const sender = prompt('Return address:', 'Sender Name\nStreet Address\nCity, ST 00000') || '';
+    const modal = $('#envelopeModal');
+    if (!modal) return;
+    const sizeSel = $('#envelopeSize');
+    const retInp = $('#envelopeReturn');
+    const delInp = $('#envelopeDelivery');
+    const stampInp = $('#envelopeStamp');
+    const lastSize = localStorage.getItem('rodmanword:envelope:size');
+    if (lastSize && sizeSel.querySelector(`option[value="${lastSize}"]`)) {
+      sizeSel.value = lastSize;
+    } else {
+      sizeSel.value = 'no10';
+    }
+    retInp.value = localStorage.getItem('rodmanword:envelope:return') || '';
+    delInp.value = localStorage.getItem('rodmanword:envelope:delivery') || '';
+    stampInp.checked = (localStorage.getItem('rodmanword:envelope:stamp') ?? '1') !== '0';
+    saveSelection();
+    openModal(modal);
+    setTimeout(() => delInp.focus(), 0);
+  });
+
+  $('#envelopeInsertBtn')?.addEventListener('click', () => {
+    const modal = $('#envelopeModal');
+    const size = $('#envelopeSize').value || 'no10';
+    const sender = $('#envelopeReturn').value.trim();
+    const recipient = $('#envelopeDelivery').value.trim();
+    const stamp = $('#envelopeStamp').checked;
+    if (!recipient) {
+      alert('Delivery address is required.');
+      return;
+    }
+    localStorage.setItem('rodmanword:envelope:size', size);
+    localStorage.setItem('rodmanword:envelope:return', sender);
+    localStorage.setItem('rodmanword:envelope:delivery', recipient);
+    localStorage.setItem('rodmanword:envelope:stamp', stamp ? '1' : '0');
+    const parts = [`<section class="rwd-envelope" data-size="${size}">`];
+    if (sender) {
+      parts.push('<div class="rwd-envelope-return">' +
+        escapeHtml(sender).replace(/\n/g, '<br>') + '</div>');
+    }
+    parts.push('<div class="rwd-envelope-recipient">' +
+      escapeHtml(recipient).replace(/\n/g, '<br>') + '</div>');
+    if (stamp) {
+      parts.push('<div class="rwd-envelope-stamp" contenteditable="false">Place stamp here</div>');
+    }
+    parts.push('</section><p><br></p>');
     restoreSelection();
-    const html =
-      '<section class="rwd-envelope">' +
-      '<div class="rwd-envelope-return">' + escapeHtml(sender).replace(/\n/g, '<br>') + '</div>' +
-      '<div class="rwd-envelope-recipient">' + escapeHtml(recipient).replace(/\n/g, '<br>') + '</div>' +
-      '</section><p><br></p>';
-    document.execCommand('insertHTML', false, html);
+    document.execCommand('insertHTML', false, parts.join(''));
+    closeModal(modal);
     queueAutosave();
+  });
+
+  // Print the envelope at the caret to its real physical dimensions.
+  // Opens a popup whose @page is sized to the envelope so the system
+  // print dialog targets a real envelope rather than the document's
+  // page size.
+  function printEnvelope(envEl) {
+    if (!envEl) return;
+    const size = envEl.dataset.size || 'no10';
+    const dim = ENVELOPE_SIZES[size] || ENVELOPE_SIZES.no10;
+    const ret = envEl.querySelector('.rwd-envelope-return')?.innerHTML || '';
+    const rec = envEl.querySelector('.rwd-envelope-recipient')?.innerHTML || '';
+    const w = window.open('', '_blank');
+    if (!w) { alert('Could not open the print window — please allow popups for this site.'); return; }
+    const doc = `<!doctype html><html><head><meta charset="utf-8">` +
+      `<title>Envelope</title><style>` +
+      `@page { size: ${dim}; margin: 0; }` +
+      `html, body { margin: 0; padding: 0; background: #fff; color: #111; }` +
+      `.env { position: relative; width: 100vw; height: 100vh; font-family: Calibri, Arial, sans-serif; }` +
+      `.env .ret { position: absolute; top: 6%; left: 4%; max-width: 38%; font-size: 10pt; line-height: 1.25; }` +
+      `.env .rec { position: absolute; top: 42%; left: 38%; width: 56%; font-size: 12pt; line-height: 1.3; }` +
+      `</style></head><body><div class="env">` +
+      (ret ? `<div class="ret">${ret}</div>` : '') +
+      `<div class="rec">${rec}</div>` +
+      `</div></body></html>`;
+    w.document.write(doc);
+    w.document.close();
+    w.focus();
+    w.print();
+    setTimeout(() => { try { w.close(); } catch {} }, 500);
+  }
+
+  $('#printEnvelopeBtn')?.addEventListener('click', () => {
+    const sel = window.getSelection();
+    let node = sel && sel.anchorNode;
+    while (node && node.nodeType !== 1) node = node.parentNode;
+    const env = node && node.closest && node.closest('.rwd-envelope');
+    if (!env) {
+      alert('Place the caret inside an envelope first.');
+      return;
+    }
+    printEnvelope(env);
   });
   $('#labelsBtn')?.addEventListener('click', () => {
     const text = prompt('Label text:', 'Name\nAddress\nCity, ST 00000');

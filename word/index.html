@@ -569,7 +569,8 @@
     <div class="ribbon-panel" data-panel="mailings">
       <div class="group">
         <div class="group-row">
-          <button class="ribbon-btn" id="envelopesBtn" title="Insert envelope layout">Envelopes</button>
+          <button class="ribbon-btn" id="envelopesBtn" title="Insert envelope">Envelopes</button>
+          <button class="ribbon-btn" id="printEnvelopeBtn" title="Print the envelope at the caret">Print envelope</button>
           <button class="ribbon-btn" id="labelsBtn" title="Insert label sheet">Labels</button>
           <button class="ribbon-btn" id="mailMergeBtn" title="Mail merge">Start Mail Merge</button>
           <select class="select sm" id="mergeFieldSelect" title="Insert merge field" disabled>
@@ -1982,6 +1983,40 @@
         <input id="paletteInput" type="text" placeholder="Type to search commands…" autofocus />
         <ul id="paletteResults" class="palette-list"></ul>
       </div>
+    </div>
+  </div>
+
+  <!-- Envelope dialog -->
+  <div class="modal" id="envelopeModal" hidden>
+    <div class="modal-card">
+      <header><h3>Insert envelope</h3>
+        <button class="icon-btn" data-close-modal aria-label="Close">✕</button>
+      </header>
+      <div class="modal-body">
+        <label>Size
+          <select id="envelopeSize">
+            <option value="no10">#10 — 9.5″ × 4.125″ (US business)</option>
+            <option value="dl">DL — 220 × 110 mm (European business)</option>
+            <option value="c5">C5 — 229 × 162 mm</option>
+            <option value="c6">C6 — 162 × 114 mm</option>
+            <option value="monarch">Monarch — 7.5″ × 3.875″</option>
+          </select>
+        </label>
+        <label>Return address
+          <textarea id="envelopeReturn" rows="4" placeholder="Sender Name&#10;Street Address&#10;City, ST 00000"></textarea>
+        </label>
+        <label>Delivery address
+          <textarea id="envelopeDelivery" rows="4" placeholder="Recipient Name&#10;Street Address&#10;City, ST 00000"></textarea>
+        </label>
+        <label class="row">
+          <input id="envelopeStamp" type="checkbox" checked />
+          Show stamp placeholder
+        </label>
+      </div>
+      <footer>
+        <button class="btn" data-close-modal>Cancel</button>
+        <button class="btn primary" id="envelopeInsertBtn">Insert</button>
+      </footer>
     </div>
   </div>
 
