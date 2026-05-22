@@ -9556,21 +9556,17 @@ ${editor.innerHTML}
     });
   });
   document.addEventListener('drop', (e) => {
+    // Skip if an inner handler already claimed the drop (the editor
+    // inserts dropped images itself).
+    if (e.defaultPrevented) return;
     const files = e.dataTransfer && e.dataTransfer.files;
     if (!files || !files.length) return;
-    const f = files[0];
-    if (f.type.startsWith('image/')) return; // image-drop handled by editor listener
-    if (!editor.contains(e.target) ||
-        /\.(rwd|html?|txt|md|docx|pdf)$/i.test(f.name) ||
-        f.type === 'application/json' ||
-        f.type === 'application/pdf' ||
-        f.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
-      e.preventDefault();
-      const dt = new DataTransfer();
-      dt.items.add(f);
-      const picker = $('#filePicker');
-      picker.files = dt.files;
-      picker.dispatchEvent(new Event('change'));
+    e.preventDefault();
+    // Open every dropped document in its own tab; images aren't a
+    // Word document format, so they are ignored here.
+    for (const f of files) {
+      if (f.type.startsWith('image/')) continue;
+      loadFileIntoNewTab(f);
     }
   });
 

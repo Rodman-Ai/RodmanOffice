@@ -138,21 +138,49 @@ export function App() {
     }
   }
 
-  const onPickFile = async (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const importFiles = async (fileList: FileList | File[] | null | undefined) => {
+    const files = fileList ? Array.from(fileList) : [];
+    if (!files.length) return;
     setBusy(true);
     try {
       const { importSpreadsheetFile } = await import("./csv");
-      const sheets = await importSpreadsheetFile(file);
-      const [first, ...rest] = sheets;
-      if (first) api.loadSheet(first);
-      for (const s of rest) api.loadSheet(s);
+      for (const file of files) {
+        const sheets = await importSpreadsheetFile(file);
+        for (const s of sheets) api.loadSheet(s);
+      }
     } finally {
       setBusy(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
+
+  const onPickFile = async (e: ChangeEvent<HTMLInputElement>) => {
+    await importFiles(e.target.files);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  // Drag a file into the window to import it. A ref keeps the
+  // window-level listeners pointed at the current importFiles closure
+  // without re-registering them every render.
+  const importFilesRef = useRef(importFiles);
+  importFilesRef.current = importFiles;
+  useEffect(() => {
+    const onDragOver = (e: DragEvent) => {
+      if (e.dataTransfer && Array.from(e.dataTransfer.types).includes("Files")) {
+        e.preventDefault();
+      }
+    };
+    const onDrop = (e: DragEvent) => {
+      if (!e.dataTransfer || !e.dataTransfer.files.length) return;
+      e.preventDefault();
+      void importFilesRef.current(e.dataTransfer.files);
+    };
+    document.addEventListener("dragover", onDragOver);
+    document.addEventListener("drop", onDrop);
+    return () => {
+      document.removeEventListener("dragover", onDragOver);
+      document.removeEventListener("drop", onDrop);
+    };
+  }, []);
 
   const insertFunctionAtSelection = useCallback(
     (name: string) => {
