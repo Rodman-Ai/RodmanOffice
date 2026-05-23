@@ -37,7 +37,7 @@ features it still lacks.
 | Feature | Effort | Notes |
 |---|---:|---|
 | SmartArt | L | Needs diagram model, editing UI, and export behavior. |
-| Advanced icons library | M | Basic icon insertion exists; bundled searchable icon gallery remains deferred. |
+| Advanced icons library | M | Basic icon insertion plus a searchable Clipart picker (Insert ▸ Clipart) sourcing from Iconify icon sets and Wikimedia Commons SVG illustrations now exist; deeper Word-style icon styling/recolor remains deferred. |
 | 3D Models | L | Needs asset handling and renderer/export strategy. |
 | Screenshot insertion | M | Browser capture permissions and fallback UX required. |
 | Full online video provider picker | M | Current video insert is basic. |

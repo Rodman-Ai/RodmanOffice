@@ -283,6 +283,7 @@
       <div class="group">
         <div class="group-row">
           <button class="ribbon-btn wide" data-cmd="insertImage">Pictures...</button>
+          <button class="ribbon-btn wide" data-cmd="insertClipart" title="Search clipart from Wikimedia Commons + Iconify">Clipart...</button>
         </div>
         <div class="group-label">Images</div>
       </div>
@@ -664,6 +665,31 @@
     </div>
   </div>
 
+  <!-- Clipart picker (Wikimedia Commons + Iconify). -->
+  <div class="help-modal" id="clipartModal" hidden role="dialog" aria-modal="true" aria-labelledby="clipartModalTitle">
+    <div class="help-modal-card">
+      <header>
+        <h3 id="clipartModalTitle">Insert clipart</h3>
+        <button class="icon-btn" id="clipartModalCloseBtn" type="button" aria-label="Close">×</button>
+      </header>
+      <div class="help-modal-body">
+        <div class="clipart-tabs" role="tablist">
+          <button class="clipart-tab active" data-clipart-tab="commons" role="tab" aria-selected="true">Illustrations</button>
+          <button class="clipart-tab" data-clipart-tab="iconify" role="tab" aria-selected="false">Icons</button>
+        </div>
+        <input id="clipartQuery" type="search" placeholder="Search for clipart… (e.g. cat, arrow, rocket)" autocomplete="off"
+               style="width:100%;padding:6px 10px;border:1px solid var(--border,#cbd2d8);border-radius:4px;font:inherit;margin-bottom:8px" />
+        <div id="clipartStatus" class="clipart-status">Type to search — illustrations from Wikimedia Commons (CC0 / CC-BY), icons from Iconify.</div>
+        <div id="clipartGrid" class="clipart-grid"></div>
+        <div id="clipartAttribution" class="clipart-attribution" hidden></div>
+      </div>
+      <footer>
+        <button class="ribbon-btn wide" id="clipartCancelBtn" type="button">Cancel</button>
+        <button class="ribbon-btn wide" id="clipartInsertBtn" type="button" disabled>Insert</button>
+      </footer>
+    </div>
+  </div>
+
   <!-- New-presentation template gallery. -->
   <div class="help-modal" id="templateModal" hidden role="dialog" aria-modal="true" aria-labelledby="templateModalTitle">
     <div class="help-modal-card">
@@ -689,6 +715,7 @@
     import * as images from '../lib/images/index.js';
     import * as claude from '../lib/claude/index.js';
     import * as gestures from '../lib/ui/gestures.js';
+    import * as clipart from '../lib/clipart/index.js';
     window.RodmanGestures = gestures;
     window.RodmanSlidesIO = {
       savePptx: slidesio.savePptx,
@@ -710,6 +737,7 @@
       pdfPageCount: images.pdfPageCount,
     };
     window.RodmanClaude = claude;
+    window.RodmanClipart = clipart;
   </script>
   <script src="deck.js" defer></script>
   <script src="templates.js" defer></script>
