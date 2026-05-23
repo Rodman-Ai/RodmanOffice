@@ -3081,6 +3081,169 @@ ${editor.innerHTML}
   });
 
   // ============================================================
+  // FEATURE: Clipart picker (Wikimedia Commons + Iconify)
+  // ============================================================
+  (() => {
+    const btn = $('#insertClipartBtn');
+    const modal = $('#clipartModal');
+    if (!btn || !modal) return;
+    const queryInput = $('#clipartQuery');
+    const grid = $('#clipartGrid');
+    const statusEl = $('#clipartStatus');
+    const attribEl = $('#clipartAttribution');
+    const insertBtn = $('#clipartInsertBtn');
+    const tabs = modal.querySelectorAll('.clipart-tab');
+    const STORE_KEY = 'rodmanword:clipart';
+    let activeTab = 'commons';
+    let selected = null;
+    let inflight = null;
+    let debounceId = 0;
+
+    function setStatus(text, cls) {
+      statusEl.textContent = text;
+      statusEl.className = 'clipart-status ' + (cls || 'muted');
+    }
+    function setSelected(item, tileEl) {
+      selected = item;
+      grid.querySelectorAll('button.selected').forEach((b) => b.classList.remove('selected'));
+      tileEl?.classList.add('selected');
+      insertBtn.disabled = !item;
+      if (item?.attribution) {
+        attribEl.hidden = false;
+        attribEl.textContent = 'Attribution required: ' + item.attribution;
+      } else {
+        attribEl.hidden = true;
+        attribEl.textContent = '';
+      }
+    }
+    function clearGrid() {
+      grid.innerHTML = '';
+      setSelected(null, null);
+    }
+    function activateTab(name) {
+      activeTab = name;
+      tabs.forEach((t) => {
+        const isActive = t.dataset.clipartTab === name;
+        t.classList.toggle('active', isActive);
+        t.setAttribute('aria-selected', isActive ? 'true' : 'false');
+      });
+      grid.classList.toggle('icons-mode', name === 'iconify');
+      runSearch();
+    }
+    async function runSearch() {
+      const q = queryInput.value.trim();
+      if (!q) {
+        clearGrid();
+        setStatus('Type to search — illustrations from Wikimedia Commons (CC0 / CC-BY), icons from Iconify.');
+        return;
+      }
+      if (inflight) inflight.abort();
+      const ctl = new AbortController();
+      inflight = ctl;
+      clearGrid();
+      setStatus('Searching…');
+      try {
+        const lib = window.RodmanClipart;
+        const results = activeTab === 'iconify'
+          ? await lib.searchIconify(q, { signal: ctl.signal, prefixes: lib.ICONIFY_PERMISSIVE_PREFIXES })
+          : await lib.searchCommons(q, { signal: ctl.signal });
+        if (ctl !== inflight) return;
+        if (!results.length) {
+          setStatus('No results.');
+          return;
+        }
+        setStatus(`Showing ${results.length} result${results.length === 1 ? '' : 's'} — only CC0 / CC-BY content is listed.`);
+        for (const item of results) {
+          const tile = document.createElement('button');
+          tile.type = 'button';
+          tile.className = 'clipart-tile';
+          tile.title = item.title + (item.license ? ` — ${item.license}` : '');
+          tile.dataset.id = item.id;
+          const img = document.createElement('img');
+          img.loading = 'lazy';
+          img.alt = item.title;
+          img.src = item.thumbUrl;
+          img.addEventListener('error', () => { tile.classList.add('broken'); });
+          tile.appendChild(img);
+          tile.addEventListener('click', () => setSelected(item, tile));
+          tile.addEventListener('dblclick', async () => {
+            setSelected(item, tile);
+            await doInsert();
+          });
+          grid.appendChild(tile);
+        }
+      } catch (err) {
+        if (err?.name === 'AbortError') return;
+        console.warn('[clipart] search failed', err);
+        setStatus('Search failed — ' + (err?.message || 'network error') + '.', 'error');
+      }
+    }
+    async function doInsert() {
+      if (!selected) return;
+      const item = selected;
+      insertBtn.disabled = true;
+      const prev = statusEl.textContent;
+      setStatus('Fetching SVG…');
+      try {
+        const svg = await window.RodmanClipart.fetchSvgInline(item);
+        const wrapperAttrs = [
+          'class="rwd-clipart"',
+          'contenteditable="false"',
+          `data-source="${escapeHtml(item.source)}"`,
+        ];
+        if (item.attribution) {
+          wrapperAttrs.push(`data-attribution="${escapeHtml(item.attribution)}"`);
+        }
+        let html = `<span ${wrapperAttrs.join(' ')}>${svg}</span>`;
+        if (item.attribution) {
+          html += `<sup class="rwd-clipart-attribution"><a href="${escapeHtml(item.sourceUrl)}" target="_blank" rel="noopener">${escapeHtml(item.attribution)}</a></sup>`;
+        }
+        restoreSelection();
+        document.execCommand('insertHTML', false, html);
+        try {
+          localStorage.setItem(STORE_KEY + ':query', queryInput.value);
+          localStorage.setItem(STORE_KEY + ':tab', activeTab);
+        } catch {}
+        closeModal(modal);
+        queueAutosave();
+      } catch (err) {
+        console.warn('[clipart] insert failed', err);
+        setStatus('Could not fetch SVG — ' + (err?.message || 'network error') + '.', 'error');
+        insertBtn.disabled = false;
+      }
+    }
+
+    btn.addEventListener('click', () => {
+      saveSelection();
+      try {
+        const lastTab = localStorage.getItem(STORE_KEY + ':tab') || 'commons';
+        const lastQuery = localStorage.getItem(STORE_KEY + ':query') || '';
+        queryInput.value = lastQuery;
+        activeTab = (lastTab === 'iconify') ? 'iconify' : 'commons';
+      } catch {
+        activeTab = 'commons';
+        queryInput.value = '';
+      }
+      activateTab(activeTab);
+      openModal(modal);
+      setTimeout(() => queryInput.focus(), 0);
+    });
+    tabs.forEach((t) => t.addEventListener('click', () => activateTab(t.dataset.clipartTab)));
+    queryInput.addEventListener('input', () => {
+      clearTimeout(debounceId);
+      debounceId = setTimeout(runSearch, 300);
+    });
+    queryInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        clearTimeout(debounceId);
+        runSearch();
+      }
+    });
+    insertBtn.addEventListener('click', doInsert);
+  })();
+
+  // ============================================================
   // FEATURE: Watermark
   // ============================================================
   const STORE_WM = 'rodmanword:watermark';

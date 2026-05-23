@@ -1599,6 +1599,7 @@
       renderSlideList(); renderEditor(); scheduleSave();
     },
     insertImage() { $('#imageFileInput').click(); },
+    insertClipart() { openClipartModal(); },
     askClaude() {
       const panel = $('#askClaudePanel');
       if (panel?.hidden) $('#askClaudeBtn')?.click();
@@ -2364,6 +2365,168 @@
   $('#saveFilename')?.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') { e.preventDefault(); performSave(); }
     else if (e.key === 'Escape') { e.preventDefault(); closeSaveModal(); }
+  });
+
+  // ---------- Clipart picker (Wikimedia Commons + Iconify) ----------
+  const CLIPART_STORE = 'rodmanslides:clipart';
+  let clipartTab = 'commons';
+  let clipartSelected = null;
+  let clipartInflight = null;
+  let clipartDebounce = 0;
+
+  function closeClipartModal() {
+    const m = $('#clipartModal');
+    if (m) m.hidden = true;
+    if (clipartInflight) { clipartInflight.abort(); clipartInflight = null; }
+  }
+  function openClipartModal() {
+    const m = $('#clipartModal');
+    if (!m) return;
+    try {
+      const lastTab = localStorage.getItem(CLIPART_STORE + ':tab') || 'commons';
+      const lastQuery = localStorage.getItem(CLIPART_STORE + ':query') || '';
+      $('#clipartQuery').value = lastQuery;
+      clipartTab = (lastTab === 'iconify') ? 'iconify' : 'commons';
+    } catch {
+      clipartTab = 'commons';
+      $('#clipartQuery').value = '';
+    }
+    activateClipartTab(clipartTab);
+    m.hidden = false;
+    setTimeout(() => $('#clipartQuery')?.focus(), 0);
+  }
+  function setClipartStatus(text, cls) {
+    const el = $('#clipartStatus');
+    if (!el) return;
+    el.textContent = text;
+    el.className = 'clipart-status' + (cls ? ' ' + cls : '');
+  }
+  function setClipartSelected(item, tileEl) {
+    clipartSelected = item;
+    document.querySelectorAll('#clipartGrid .clipart-tile.selected').forEach((b) => b.classList.remove('selected'));
+    tileEl?.classList.add('selected');
+    const btn = $('#clipartInsertBtn');
+    if (btn) btn.disabled = !item;
+    const attrib = $('#clipartAttribution');
+    if (!attrib) return;
+    if (item?.attribution) {
+      attrib.hidden = false;
+      attrib.textContent = 'Attribution required: ' + item.attribution;
+    } else {
+      attrib.hidden = true;
+      attrib.textContent = '';
+    }
+  }
+  function clearClipartGrid() {
+    const g = $('#clipartGrid');
+    if (g) g.innerHTML = '';
+    setClipartSelected(null, null);
+  }
+  function activateClipartTab(name) {
+    clipartTab = name;
+    document.querySelectorAll('#clipartModal .clipart-tab').forEach((t) => {
+      const isActive = t.dataset.clipartTab === name;
+      t.classList.toggle('active', isActive);
+      t.setAttribute('aria-selected', isActive ? 'true' : 'false');
+    });
+    $('#clipartGrid')?.classList.toggle('icons-mode', name === 'iconify');
+    runClipartSearch();
+  }
+  async function runClipartSearch() {
+    const q = $('#clipartQuery')?.value.trim() || '';
+    if (!q) {
+      clearClipartGrid();
+      setClipartStatus('Type to search — illustrations from Wikimedia Commons (CC0 / CC-BY), icons from Iconify.');
+      return;
+    }
+    if (clipartInflight) clipartInflight.abort();
+    const ctl = new AbortController();
+    clipartInflight = ctl;
+    clearClipartGrid();
+    setClipartStatus('Searching…');
+    try {
+      const lib = window.RodmanClipart;
+      if (!lib) throw new Error('Clipart library not loaded');
+      const results = clipartTab === 'iconify'
+        ? await lib.searchIconify(q, { signal: ctl.signal, prefixes: lib.ICONIFY_PERMISSIVE_PREFIXES })
+        : await lib.searchCommons(q, { signal: ctl.signal });
+      if (ctl !== clipartInflight) return;
+      const grid = $('#clipartGrid');
+      if (!results.length) {
+        setClipartStatus('No results.');
+        return;
+      }
+      setClipartStatus(`Showing ${results.length} result${results.length === 1 ? '' : 's'} — only CC0 / CC-BY content is listed.`);
+      for (const item of results) {
+        const tile = document.createElement('button');
+        tile.type = 'button';
+        tile.className = 'clipart-tile';
+        tile.title = item.title + (item.license ? ` — ${item.license}` : '');
+        const img = document.createElement('img');
+        img.loading = 'lazy';
+        img.alt = item.title;
+        img.src = item.thumbUrl;
+        img.addEventListener('error', () => { tile.classList.add('broken'); });
+        tile.appendChild(img);
+        tile.addEventListener('click', () => setClipartSelected(item, tile));
+        tile.addEventListener('dblclick', () => {
+          setClipartSelected(item, tile);
+          doClipartInsert();
+        });
+        grid.appendChild(tile);
+      }
+    } catch (err) {
+      if (err?.name === 'AbortError') return;
+      console.warn('[clipart] search failed', err);
+      setClipartStatus('Search failed — ' + (err?.message || 'network error') + '.', 'error');
+    }
+  }
+  async function doClipartInsert() {
+    const item = clipartSelected;
+    if (!item) return;
+    const insertBtn = $('#clipartInsertBtn');
+    if (insertBtn) insertBtn.disabled = true;
+    setClipartStatus('Fetching SVG…');
+    try {
+      const lib = window.RodmanClipart;
+      const svg = await lib.fetchSvgInline(item);
+      const dataUrl = lib.svgToDataUrl(svg);
+      const slide = activeSlide();
+      slide.elements.push(D.newImageElement({
+        x: 320, y: 180, w: 320, h: 320, src: dataUrl,
+      }));
+      const last = slide.elements[slide.elements.length - 1];
+      setSelection([last.id], last.id);
+      try {
+        localStorage.setItem(CLIPART_STORE + ':query', $('#clipartQuery').value);
+        localStorage.setItem(CLIPART_STORE + ':tab', clipartTab);
+      } catch {}
+      closeClipartModal();
+      renderEditor();
+      scheduleSave();
+    } catch (err) {
+      console.warn('[clipart] insert failed', err);
+      setClipartStatus('Could not fetch SVG — ' + (err?.message || 'network error') + '.', 'error');
+      if (insertBtn) insertBtn.disabled = false;
+    }
+  }
+
+  $('#clipartModalCloseBtn')?.addEventListener('click', closeClipartModal);
+  $('#clipartCancelBtn')?.addEventListener('click', closeClipartModal);
+  $('#clipartInsertBtn')?.addEventListener('click', doClipartInsert);
+  $('#clipartModal')?.addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) closeClipartModal();
+  });
+  document.querySelectorAll('#clipartModal .clipart-tab').forEach((t) => {
+    t.addEventListener('click', () => activateClipartTab(t.dataset.clipartTab));
+  });
+  $('#clipartQuery')?.addEventListener('input', () => {
+    clearTimeout(clipartDebounce);
+    clipartDebounce = setTimeout(runClipartSearch, 300);
+  });
+  $('#clipartQuery')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); clearTimeout(clipartDebounce); runClipartSearch(); }
+    else if (e.key === 'Escape') { e.preventDefault(); closeClipartModal(); }
   });
 
   // ---------- Export to PDF (engine writer in lib/docs/pdfio.js) ----------

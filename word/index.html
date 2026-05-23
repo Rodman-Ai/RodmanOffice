@@ -289,6 +289,7 @@
           </div>
           <button class="ribbon-btn" id="chartBtn" title="Chart from data">📊 Chart</button>
           <button class="ribbon-btn" id="insertIconBtn" title="Insert icon">Icons</button>
+          <button class="ribbon-btn" id="insertClipartBtn" title="Search clipart from Wikimedia Commons + Iconify">Clipart</button>
         </div>
         <div class="group-label">Illustrations</div>
       </div>
@@ -2020,6 +2021,31 @@
     </div>
   </div>
 
+  <!-- Clipart picker -->
+  <div class="modal" id="clipartModal" hidden>
+    <div class="modal-card lg">
+      <header><h3>Insert clipart</h3>
+        <button class="icon-btn" data-close-modal aria-label="Close">✕</button>
+      </header>
+      <div class="modal-body">
+        <div class="clipart-tabs" role="tablist">
+          <button class="clipart-tab active" data-clipart-tab="commons" role="tab" aria-selected="true">Illustrations</button>
+          <button class="clipart-tab" data-clipart-tab="iconify" role="tab" aria-selected="false">Icons</button>
+        </div>
+        <label class="row">
+          <input id="clipartQuery" type="search" placeholder="Search for clipart… (e.g. cat, arrow, rocket)" autocomplete="off" />
+        </label>
+        <div id="clipartStatus" class="clipart-status muted">Type to search — illustrations from Wikimedia Commons (CC0 / CC-BY), icons from Iconify.</div>
+        <div id="clipartGrid" class="clipart-grid"></div>
+        <div id="clipartAttribution" class="clipart-attribution muted" hidden></div>
+      </div>
+      <footer>
+        <button class="btn" data-close-modal>Cancel</button>
+        <button class="btn primary" id="clipartInsertBtn" disabled>Insert</button>
+      </footer>
+    </div>
+  </div>
+
   <!-- Compare docs modal -->
   <div class="modal" id="compareModal" hidden>
     <div class="modal-card lg">
@@ -2113,6 +2139,7 @@
     import * as slides from '../lib/slides/index.js';
     import * as images from '../lib/images/index.js';
     import * as claude from '../lib/claude/index.js';
+    import * as clipart from '../lib/clipart/index.js';
     window.RodmanDocx = {
       saveDocx: docs.saveDocx, loadDocx: docs.loadDocx,
       __buildZip: docs.buildZip, __readZip: docs.readZip,
@@ -2134,6 +2161,7 @@
     };
     window.RodmanImagePdf = { compressPdf: images.compressPdf };
     window.RodmanClaude = claude;
+    window.RodmanClipart = clipart;
   </script>
   <script src="app.js" defer></script>
 </body>
