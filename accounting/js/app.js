@@ -1,5 +1,6 @@
 import { register, start, go } from "./router.js";
 import { getState, loadSampleData, Deals, Bills, Contacts, subscribe, subscribePersistence, rawIsEncrypted, unlockVaultAndLoad } from "./store.js";
+import { mountWorkbookCommandBar, setCrumbs } from "./workbook.js";
 import { openQuickAdd } from "./forms.js";
 import { applyTheme } from "./theme.js";
 import { isLockEnabled, isUnlocked, showLockScreen } from "./lock.js";
@@ -219,6 +220,8 @@ start({
     // page title
     const title = TITLES[path] || (baseRoute === "deals" && "Deal") || (baseRoute === "brand" && "Brand") || "RodBooks";
     document.getElementById("pageTitle").textContent = title;
+    // Dynamics-style breadcrumb mirrors the page title.
+    setCrumbs(title);
     // close mobile menu after nav
     document.body.classList.remove("menu-open");
     // track recently visited (skip dashboard root to avoid noise)
@@ -227,6 +230,9 @@ start({
     }
   },
 });
+
+// Wire the Dynamics-style command bar (Export to Excel / CSVs / Import workbook).
+mountWorkbookCommandBar();
 
 // Sidebar nav badges: small counts next to each section.
 function refreshNavBadges() {

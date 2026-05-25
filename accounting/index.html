@@ -77,6 +77,27 @@
         </div>
       </header>
 
+      <div class="dyn-command-bar" role="toolbar" aria-label="Workbook actions">
+        <div class="dyn-command-bar-left">
+          <nav class="dyn-breadcrumb" id="dynCrumbs" aria-label="Breadcrumb"></nav>
+        </div>
+        <div class="dyn-command-bar-right">
+          <button class="dyn-cb-btn" id="cbExportXlsx" title="Download every collection as a multi-sheet .xlsx">
+            <span class="dyn-cb-icon" aria-hidden="true">⇩</span>
+            <span>Export to Excel</span>
+          </button>
+          <button class="dyn-cb-btn" id="cbExportCsvZip" title="Download every collection as a .zip of CSVs">
+            <span class="dyn-cb-icon" aria-hidden="true">⇩</span>
+            <span>Export CSVs</span>
+          </button>
+          <button class="dyn-cb-btn" id="cbImportWorkbook" title="Import an .xlsx or .csv exported from RodBooks">
+            <span class="dyn-cb-icon" aria-hidden="true">⇧</span>
+            <span>Import workbook</span>
+          </button>
+          <input type="file" id="cbImportInput" accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" hidden />
+        </div>
+      </div>
+
       <main id="view" class="view" role="main"></main>
 
       <nav class="tabbar" aria-label="Sections">
@@ -98,6 +119,21 @@
     <div id="modal-root"></div>
     <div id="toast-root" aria-live="polite"></div>
 
+    <script type="module">
+      // Bridge the shared /lib/sheets/ engines onto window.RodmanSheets so the
+      // workbook export/import buttons can call them without app.js becoming
+      // a `lib/`-aware module.
+      import * as sheets from "../lib/sheets/index.js";
+      window.RodmanSheets = {
+        importSpreadsheet: sheets.importSpreadsheet,
+        exportWorkbookAsXLSX: sheets.exportWorkbookAsXLSX,
+        exportSheetAsCSV: sheets.exportSheetAsCSV,
+        buildXlsx: sheets.buildXlsx,
+        parseXlsx: sheets.parseXlsx,
+        parseCsv: sheets.parseCsv,
+        unparseCsv: sheets.unparseCsv,
+      };
+    </script>
     <script type="module" src="js/app.js"></script>
   </body>
 </html>

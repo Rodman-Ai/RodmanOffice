@@ -15,8 +15,8 @@ implemented from scratch under `/lib/`.
 /image/       Vanilla HTML + ESM image editor (RetroPaint inside)
 /converter/   Vanilla HTML + ESM batch file converter
 /accounting/  Vanilla HTML + ESM bookkeeping app
-/crm/         Vanilla HTML + ESM contacts / deals app
-/sheets/      pnpm React + Vite monorepo (the only non-vanilla app)
+/crm/         Next.js 14 + TypeScript + Tailwind (LeoCRM, Google Sheets backend)
+/sheets/      pnpm React + Vite monorepo
 
 /lib/         Shared engines. Every app imports from these:
   /lib/docs/      DOCX, PDF, RTF, ODT, EPUB, MD, HTML, …
