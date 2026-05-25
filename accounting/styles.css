@@ -24,6 +24,20 @@ html, body { margin: 0; padding: 0; height: 100%; }
   --radius-sm: 6px;
   --shadow: 0 8px 24px rgba(0,0,0,.35), 0 1px 0 rgba(255,255,255,.03) inset;
   --safe-bottom: env(safe-area-inset-bottom, 0px);
+  /* Microsoft Dynamics 365 chrome tokens — used by the command bar, breadcrumb,
+     and (eventually) grid surfaces. Mapped to dark-mode values here. */
+  --dyn-sitemap-bg: var(--bg-1);
+  --dyn-sitemap-fg: var(--text);
+  --dyn-sitemap-group: var(--dim);
+  --dyn-command-bar-bg: var(--bg-2);
+  --dyn-command-bar-border: var(--line);
+  --dyn-command-bar-fg: var(--text);
+  --dyn-command-bar-hover: var(--bg-3);
+  --dyn-accent: #0078D4;
+  --dyn-row-hover: var(--bg-2);
+  --dyn-grid-header: var(--bg-2);
+  --dyn-crumb-fg: var(--muted);
+  --dyn-crumb-leaf-fg: var(--text);
 }
 [data-theme="light"] {
   --bg: #f6f7fb;
@@ -38,6 +52,20 @@ html, body { margin: 0; padding: 0; height: 100%; }
   --accent: #16a34a;
   --accent-2: #15803d;
   --shadow: 0 8px 24px rgba(15,23,42,.08), 0 1px 0 rgba(255,255,255,.6) inset;
+  /* Dynamics tokens (light) — match the real Dynamics 365 chrome more closely:
+     navy sitemap, near-white command bar with MS blue accent. */
+  --dyn-sitemap-bg: #1F2937;
+  --dyn-sitemap-fg: #FFFFFF;
+  --dyn-sitemap-group: rgba(255,255,255,0.55);
+  --dyn-command-bar-bg: #FAFAFA;
+  --dyn-command-bar-border: #EDEBE9;
+  --dyn-command-bar-fg: #201F1E;
+  --dyn-command-bar-hover: #F3F2F1;
+  --dyn-accent: #0078D4;
+  --dyn-row-hover: #F3F2F1;
+  --dyn-grid-header: #F3F2F1;
+  --dyn-crumb-fg: #605E5C;
+  --dyn-crumb-leaf-fg: #201F1E;
 }
 
 body {
@@ -59,12 +87,25 @@ a { color: inherit; text-decoration: none; }
   min-height: 100%;
   display: grid;
   grid-template-columns: 240px 1fr;
-  grid-template-rows: 56px 1fr;
+  grid-template-rows: 56px 44px 1fr;
   grid-template-areas:
     "side top"
+    "side cmd"
     "side main";
 }
-.sidebar { grid-area: side; background: var(--bg-1); border-right: 1px solid var(--line); display: flex; flex-direction: column; }
+.sidebar { grid-area: side; background: var(--dyn-sitemap-bg); color: var(--dyn-sitemap-fg); border-right: 1px solid var(--line); display: flex; flex-direction: column; }
+.sidebar .brand,
+.sidebar .brand-title,
+.sidebar .brand-sub { color: var(--dyn-sitemap-fg); }
+.sidebar .nav-group { color: var(--dyn-sitemap-group); }
+.sidebar .nav a { color: rgba(255,255,255,0.82); }
+[data-theme="light"] .sidebar .nav a { color: rgba(255,255,255,0.85); }
+.sidebar .nav a:hover { background: rgba(255,255,255,0.08); color: #fff; }
+.sidebar .nav a.active { background: rgba(255,255,255,0.14); color: #fff; }
+.sidebar .nav a.active .i { color: var(--dyn-accent); opacity: 1; }
+.sidebar .sidebar-foot { border-top: 1px solid rgba(255,255,255,0.1); color: rgba(255,255,255,0.55); }
+.sidebar .rodmanoffice-back { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.18); color: rgba(255,255,255,0.85); }
+.sidebar .rodmanoffice-back:hover { background: rgba(255,255,255,0.18); color: #fff; }
 
 /* RodmanOffice — back-to-launcher button injected at the top of the sidebar. */
 .rodmanoffice-back {
@@ -87,6 +128,53 @@ a { color: inherit; text-decoration: none; }
 .topbar { grid-area: top; background: var(--bg-1); border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 10px; padding: 0 14px; position: sticky; top: 0; z-index: 5; }
 .view { grid-area: main; padding: 18px 22px 28px; max-width: 1400px; }
 .tabbar { display: none; }
+
+/* Microsoft Dynamics-style command bar — sits between the topbar and the
+   active view, hosts the breadcrumb on the left and global workbook
+   actions (Export to Excel, Export CSVs, Import workbook) on the right. */
+.dyn-command-bar {
+  grid-area: cmd;
+  background: var(--dyn-command-bar-bg);
+  color: var(--dyn-command-bar-fg);
+  border-bottom: 1px solid var(--dyn-command-bar-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 16px;
+  position: sticky;
+  top: 56px;
+  z-index: 4;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+.dyn-command-bar-left,
+.dyn-command-bar-right { display: flex; align-items: center; gap: 4px; }
+.dyn-breadcrumb { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--dyn-crumb-fg); }
+.dyn-crumb { font-weight: 400; }
+.dyn-crumb-leaf { color: var(--dyn-crumb-leaf-fg); font-weight: 600; }
+.dyn-crumb-sep { color: var(--dyn-crumb-fg); opacity: 0.6; }
+.dyn-cb-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  height: 32px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  font-size: 13px;
+  color: var(--dyn-command-bar-fg);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.dyn-cb-btn:hover { background: var(--dyn-command-bar-hover); }
+.dyn-cb-btn:active { background: var(--dyn-command-bar-hover); border-color: var(--dyn-command-bar-border); }
+.dyn-cb-icon { font-size: 14px; color: var(--dyn-accent); line-height: 1; }
+@media (max-width: 720px) {
+  .dyn-command-bar { padding: 0 8px; overflow-x: auto; }
+  .dyn-cb-btn span:not(.dyn-cb-icon) { display: none; }
+  .dyn-cb-btn { padding: 0 8px; }
+}
 
 /* Sidebar */
 .brand { display: flex; align-items: center; gap: 10px; padding: 14px 14px 16px; border-bottom: 1px solid var(--line); }
@@ -315,9 +403,10 @@ table.data .truncate { max-width: 220px; overflow: hidden; text-overflow: ellips
 @media (max-width: 860px) {
   #app {
     grid-template-columns: 1fr;
-    grid-template-rows: 56px 1fr auto;
+    grid-template-rows: 56px 44px 1fr auto;
     grid-template-areas:
       "top"
+      "cmd"
       "main"
       "tab";
   }
