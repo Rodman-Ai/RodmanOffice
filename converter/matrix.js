@@ -225,9 +225,24 @@ const SUBTITLE_OUTPUTS = [
   { ext: 'lrc',  mime: 'application/x-lrc',    label: 'LRC lyrics (.lrc)' },
 ];
 
+// Speech-to-text targets. Available from every audio or video source —
+// powered by the whisper.cpp WASM engine in /lib/audio/. Output-only
+// (write) at the moment; "import a transcript" isn't a converter flow.
+// Keys must match FORMATTERS in /lib/audio/formats.js.
+const TRANSCRIPT_OUTPUTS = [
+  { ext: 'transcript_txt',  mime: 'text/plain',                outputExt: 'txt',  label: 'Plain transcript (.txt)' },
+  { ext: 'transcript_srt',  mime: 'application/x-subrip',      outputExt: 'srt',  label: 'Transcript as SubRip captions (.srt)' },
+  { ext: 'transcript_vtt',  mime: 'text/vtt',                  outputExt: 'vtt',  label: 'Transcript as WebVTT captions (.vtt)' },
+  { ext: 'transcript_json', mime: 'application/json',          outputExt: 'json', label: 'Timestamped transcript segments (.json)' },
+];
+
 // Audio targets ride alongside video targets — every video source
 // can drop the video track and emit just the audio.
 VIDEO_OUTPUTS.push(...AUDIO_OUTPUTS);
+
+// Transcripts are reachable from both audio and video sources.
+AUDIO_OUTPUTS.push(...TRANSCRIPT_OUTPUTS);
+VIDEO_OUTPUTS.push(...TRANSCRIPT_OUTPUTS);
 
 export const MATRIX = {
   document: DOC_OUTPUTS,
@@ -238,6 +253,7 @@ export const MATRIX = {
   video: VIDEO_OUTPUTS,
   audio: AUDIO_OUTPUTS,
   subtitle: SUBTITLE_OUTPUTS,
+  transcript: TRANSCRIPT_OUTPUTS,
   unknown: [],
 };
 

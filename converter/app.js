@@ -578,7 +578,54 @@ async function getVideoEngine() {
   return _videoEngine;
 }
 
+// Speech-to-text (whisper.cpp WASM) — lazy-loaded only when the user
+// targets a transcript format. Matrix.js encodes transcript targets as
+// `transcript_<ext>` so they don't collide with the audio codecs.
+const TRANSCRIPT_TARGETS = new Set([
+  'transcript_txt', 'transcript_srt', 'transcript_vtt', 'transcript_json',
+]);
+let _audioEngine = null;
+async function getAudioEngine() {
+  if (!_audioEngine) _audioEngine = await import('../lib/audio/index.js');
+  return _audioEngine;
+}
+async function runTranscript(source, target, onProgress) {
+  const sourceExt = (source.name.split('.').pop() || '').toLowerCase();
+  const inputBytes = source.bytes instanceof Uint8Array
+    ? source.bytes
+    : new Uint8Array(source.bytes);
+  const audio = await getAudioEngine();
+  // matrix `transcript_txt` -> formatter key 'txt'.
+  const targetExt = target.ext.replace(/^transcript_/, '');
+  const bytes = await audio.transcribe(inputBytes, {
+    sourceExt,
+    targetExt,
+    onProgress: (p) => {
+      // Whisper emits stage-tagged events; collapse to a 0..1 fraction
+      // for the existing per-job progress bar.
+      if (!onProgress) return;
+      if (p.stage === 'model' && p.total) {
+        onProgress(Math.min(0.25, 0.25 * (p.loaded / p.total)));
+      } else if (p.stage === 'decode' && typeof p.ratio === 'number') {
+        onProgress(0.25 + 0.15 * p.ratio);
+      } else if (p.stage === 'whisper' && typeof p.ratio === 'number') {
+        onProgress(0.4 + 0.6 * p.ratio);
+      }
+    },
+  });
+  // `transcribe` returns a Uint8Array. Convert to the ArrayBuffer slice
+  // shape the dispatcher's downstream expects.
+  const buf = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+  return { bytes: buf, mime: target.mime };
+}
+
 async function runVideo(source, target, onProgress, options) {
+  // Speech-to-text targets handle their own pipeline (FFmpeg → whisper)
+  // so we never let them reach the audio codec switch below.
+  if (TRANSCRIPT_TARGETS.has(target.ext)) {
+    return runTranscript(source, target, onProgress);
+  }
+
   const sourceExt = (source.name.split('.').pop() || '').toLowerCase();
   const fromExt = sourceExt === 'mpeg' ? 'mpg' : sourceExt;
   const inputBytes = source.bytes instanceof Uint8Array
@@ -635,6 +682,9 @@ async function runVideo(source, target, onProgress, options) {
 // Audio source family → audio target. Reuses the video engine
 // (FFmpeg.wasm) since it handles both video and audio streams.
 async function runAudio(source, target, onProgress, options) {
+  if (TRANSCRIPT_TARGETS.has(target.ext)) {
+    return runTranscript(source, target, onProgress);
+  }
   if (!AUDIO_TARGETS.has(target.ext)) {
     throw new Error(`Unsupported audio output: .${target.ext}`);
   }
