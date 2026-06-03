@@ -2760,27 +2760,6 @@
     }
   });
 
-  // ---------- Drag & drop image onto stage ----------
-  ['dragover', 'drop'].forEach((evt) => {
-    document.addEventListener(evt, (e) => {
-      if (!e.target.closest('#stage') && !e.target.closest('#editorScroll')) return;
-      e.preventDefault();
-      if (evt !== 'drop') return;
-      const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
-      if (!f || !f.type.startsWith('image/')) return;
-      const reader = new FileReader();
-      reader.onload = () => {
-        const slide = activeSlide();
-        slide.elements.push(D.newImageElement({
-          x: 320, y: 180, w: 640, h: 360, src: reader.result,
-        }));
-        setSelection([slide.elements[slide.elements.length - 1].id], slide.elements[slide.elements.length - 1].id);
-        renderEditor(); scheduleSave();
-      };
-      reader.readAsDataURL(f);
-    });
-  });
-
   // ---------- Document tabs wiring ----------
   $('#newTabBtn')?.addEventListener('click', () => newDocument());
   $('#templateModalCloseBtn')?.addEventListener('click', () => {
@@ -2791,25 +2770,65 @@
     if (e.target === e.currentTarget) e.currentTarget.hidden = true;
   });
 
-  // ---------- Drag a file into the window to open it ----------
-  // Registered after the stage image-drop block above so that an
-  // image dropped on the stage (which preventDefaults there) is
-  // skipped here via e.defaultPrevented.
-  document.addEventListener('dragover', (e) => {
-    if (e.dataTransfer && [...e.dataTransfer.types].includes('Files')) {
+  // ---------- Drag & drop: window-level file open + stage image insert ----------
+  // One coherent subsystem replaces the previous two-block setup, which
+  // dropped silently for non-image files over the stage (the stage
+  // handler preventDefaulted every Files drop, and the window-level
+  // drop handler then bailed via `defaultPrevented`).
+  (() => {
+    const overlay = document.getElementById('dropOverlay');
+    const hasFiles = (e) => e.dataTransfer && Array.from(e.dataTransfer.types).includes('Files');
+    let depth = 0;
+    const show = () => overlay?.classList.add('is-active');
+    const hide = () => { depth = 0; overlay?.classList.remove('is-active'); };
+
+    document.addEventListener('dragenter', (e) => {
+      if (!hasFiles(e)) return;
       e.preventDefault();
-    }
-  });
-  document.addEventListener('drop', (e) => {
-    if (e.defaultPrevented) return;
-    const files = e.dataTransfer && e.dataTransfer.files;
-    if (!files || !files.length) return;
-    e.preventDefault();
-    for (const f of files) {
-      if (f.type.startsWith('image/')) continue;
-      loadFileIntoNewTab(f);
-    }
-  });
+      depth++;
+      show();
+    });
+    document.addEventListener('dragover', (e) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+    });
+    document.addEventListener('dragleave', (e) => {
+      if (!hasFiles(e)) return;
+      depth = Math.max(0, depth - 1);
+      if (depth === 0) overlay?.classList.remove('is-active');
+    });
+    document.addEventListener('drop', (e) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      hide();
+      const files = e.dataTransfer.files;
+      if (!files || !files.length) return;
+      for (const f of files) {
+        // Image dropped over the stage → insert as a slide element at
+        // the drop's logical position; the editor's renderer will lay
+        // it out. Anywhere else, images are ignored (slides aren't a
+        // good home for a random-image tab).
+        if (f.type.startsWith('image/')) {
+          const overStage = e.target.closest?.('#stage') || e.target.closest?.('#editorScroll');
+          if (!overStage) continue;
+          const reader = new FileReader();
+          reader.onload = () => {
+            const slide = activeSlide();
+            slide.elements.push(D.newImageElement({
+              x: 320, y: 180, w: 640, h: 360, src: reader.result,
+            }));
+            const last = slide.elements[slide.elements.length - 1];
+            setSelection([last.id], last.id);
+            renderEditor(); scheduleSave();
+          };
+          reader.readAsDataURL(f);
+          continue;
+        }
+        loadFileIntoNewTab(f);
+      }
+    });
+  })();
 
   // ---------- Boot ----------
   restoreTabs();
