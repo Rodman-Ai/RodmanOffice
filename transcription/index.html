@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#4f46e5" />
+  <title>RodmanTranscribe</title>
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="stylesheet" href="styles.css" />
+
+  <!-- Cross-origin isolation bootstrap. Registers the service worker that
+       synthesizes COOP/COEP, then reloads once so this document loads
+       under it and becomes crossOriginIsolated (required for the
+       multi-threaded WASM engine). The sessionStorage guard prevents a
+       reload loop on browsers/hosts where isolation can't be gained. -->
+  <script>
+    (function () {
+      if (!window.isSecureContext || !('serviceWorker' in navigator)) return;
+      navigator.serviceWorker.register('sw.js', { scope: './' }).then(function () {
+        if (window.crossOriginIsolated || sessionStorage.getItem('coiReloaded')) return;
+        var reload = function () {
+          if (sessionStorage.getItem('coiReloaded')) return;
+          sessionStorage.setItem('coiReloaded', '1');
+          window.location.reload();
+        };
+        if (navigator.serviceWorker.controller) reload();
+        else navigator.serviceWorker.addEventListener('controllerchange', reload);
+      }).catch(function () {});
+    })();
+  </script>
+
+  <!-- Pinned prebuilt whisper.cpp WASM via transcribe.js (MIT). The shout
+       glue resolves its sibling .wasm / worker from the same jsdelivr
+       directory automatically. -->
+  <script type="importmap">
+  {
+    "imports": {
+      "@transcribe/transcriber": "https://cdn.jsdelivr.net/npm/@transcribe/transcriber@3.0.1/dist/transcriber.js",
+      "@transcribe/shout": "https://cdn.jsdelivr.net/npm/@transcribe/shout@1.0.7/src/shout/shout.wasm.js"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div class="app">
+    <a class="rodmanoffice-back" href="../" title="Back to RodmanOffice apps" aria-label="Back to RodmanOffice apps">
+      <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M14 7l-5 5 5 5V7z"/></svg>
+      <span>Apps</span>
+    </a>
+
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-logo" aria-hidden="true">
+          <svg viewBox="0 0 64 64" width="34" height="34"><rect width="64" height="64" rx="12" fill="#4f46e5"/><g fill="#fff"><rect x="14" y="27" width="4" height="10" rx="2"/><rect x="22" y="20" width="4" height="24" rx="2"/><rect x="30" y="14" width="4" height="36" rx="2"/><rect x="38" y="22" width="4" height="20" rx="2"/><rect x="46" y="28" width="4" height="8" rx="2"/></g></svg>
+        </div>
+        <div>
+          <div class="brand-title">RodmanTranscribe</div>
+          <div class="brand-sub">whisper.cpp · large-v3 · runs in your browser</div>
+        </div>
+      </div>
+    </header>
+
+    <div id="coiBanner" class="banner banner-warn" hidden>
+      <strong>Preparing the high-performance engine…</strong>
+      <span>This tab needs cross-origin isolation for multi-threaded transcription. If this message stays, your browser may not support it — try a recent Chrome, Edge, or Firefox on desktop.</span>
+    </div>
+
+    <main class="layout">
+      <!-- 1 · Source -->
+      <section class="panel">
+        <h2 class="panel-title"><span class="step">1</span> Source</h2>
+        <div id="dropTarget" class="drop">
+          <div class="drop-inner">
+            <div class="drop-icon" aria-hidden="true">🎙️</div>
+            <p class="drop-headline">Drop audio or video here</p>
+            <p class="drop-sub">or</p>
+            <div class="drop-actions">
+              <button class="btn" id="chooseBtn">Choose file</button>
+              <button class="btn" id="recordBtn">Record mic</button>
+            </div>
+            <p class="drop-formats">MP3 · WAV · M4A · MP4 · MOV · MKV · WEBM · and more</p>
+          </div>
+        </div>
+        <input type="file" id="filePicker" accept="audio/*,video/*" hidden />
+        <div id="recordingBar" class="recording-bar" hidden>
+          <span class="rec-dot" aria-hidden="true"></span>
+          <span>Recording…</span>
+          <span id="recTime" class="rec-time">0:00</span>
+          <button class="btn btn-stop" id="stopRecordBtn">Stop</button>
+        </div>
+        <div id="sourceInfo" class="source-info" hidden>
+          <div class="source-meta">
+            <span id="sourceName" class="source-name"></span>
+            <span id="sourceDur" class="source-dur"></span>
+            <button class="btn btn-ghost" id="clearSourceBtn" title="Remove">✕</button>
+          </div>
+          <canvas id="waveform" class="waveform" height="64"></canvas>
+          <audio id="player" controls preload="metadata"></audio>
+        </div>
+      </section>
+
+      <!-- 2 · Settings -->
+      <section class="panel">
+        <h2 class="panel-title"><span class="step">2</span> Settings</h2>
+        <label class="field">
+          <span>Model</span>
+          <select id="modelSelect"></select>
+        </label>
+        <div class="field-note" id="modelNote"></div>
+        <label class="field">
+          <span>Language</span>
+          <select id="langSelect">
+            <option value="en" selected>English (forced — best quality)</option>
+            <option value="auto">Auto-detect</option>
+          </select>
+        </label>
+        <div class="checks">
+          <label class="check"><input type="checkbox" id="translateChk" /> Translate to English</label>
+          <label class="check"><input type="checkbox" id="enhanceChk" /> Enhance audio (denoise + normalize)</label>
+        </div>
+        <label class="field field-inline">
+          <span>Threads</span>
+          <input type="number" id="threadsInput" min="1" max="16" />
+        </label>
+        <button class="btn btn-primary btn-run" id="runBtn" disabled>Transcribe</button>
+        <div id="status" class="status" hidden>
+          <div class="status-row" id="modelStatus" hidden>
+            <span class="status-label">Model</span>
+            <div class="bar"><div class="bar-fill" id="modelBar"></div></div>
+            <span class="status-detail" id="modelDetail"></span>
+          </div>
+          <div class="status-row" id="runStatus" hidden>
+            <span class="status-label">Transcribe</span>
+            <div class="bar"><div class="bar-fill" id="runBar"></div></div>
+            <span class="status-detail" id="runDetail"></span>
+          </div>
+        </div>
+        <button class="btn btn-ghost btn-tiny" id="manageBtn">Manage downloaded models</button>
+      </section>
+
+      <!-- 3 · Transcript -->
+      <section class="panel transcript-panel">
+        <div class="transcript-toolbar">
+          <h2 class="panel-title"><span class="step">3</span> Transcript</h2>
+          <div class="toolbar-actions">
+            <button class="btn btn-ghost btn-tiny" id="tsToggle" aria-pressed="true">Timestamps</button>
+            <button class="btn btn-ghost btn-tiny" id="findBtn">Find</button>
+            <button class="btn btn-ghost btn-tiny" id="copyBtn">Copy</button>
+            <select id="exportSelect" class="export-select">
+              <option value="txt">.txt</option>
+              <option value="srt">.srt</option>
+              <option value="vtt">.vtt</option>
+              <option value="md">.md</option>
+              <option value="json">.json</option>
+            </select>
+            <button class="btn btn-tiny" id="exportBtn">Export</button>
+          </div>
+        </div>
+        <div id="findBar" class="find-bar" hidden>
+          <input type="text" id="findInput" placeholder="Find…" />
+          <input type="text" id="replaceInput" placeholder="Replace…" />
+          <button class="btn btn-tiny" id="replaceAllBtn">Replace all</button>
+          <button class="btn btn-ghost btn-tiny" id="findCloseBtn">✕</button>
+        </div>
+        <div id="transcript" class="transcript" contenteditable="true" spellcheck="true"
+             data-placeholder="Your transcript will appear here, streaming live as it's recognized."></div>
+        <div id="rtf" class="rtf" hidden></div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Storage manager -->
+  <div id="storageModal" class="modal" hidden>
+    <div class="modal-card">
+      <header><h3>Downloaded models</h3><button class="icon-btn" id="storageCloseBtn" aria-label="Close">✕</button></header>
+      <div class="modal-body" id="storageList"></div>
+      <footer><span class="muted" id="storageTotal"></span></footer>
+    </div>
+  </div>
+
+  <!-- Window-level drop highlight (shared helper). -->
+  <div id="dropOverlay" class="drop-overlay" aria-hidden="true">
+    <div class="drop-overlay-card">
+      <div class="drop-overlay-icon" aria-hidden="true">⇩</div>
+      <div class="drop-overlay-title">Drop a file to transcribe</div>
+      <div class="drop-overlay-sub">audio or video</div>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
