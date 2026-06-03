@@ -9801,27 +9801,51 @@ ${editor.innerHTML}
   // ============================================================
   // IMPROVEMENT: Drag-and-drop file to open
   // ============================================================
-  ['dragover', 'drop'].forEach((evt) => {
-    document.addEventListener(evt, (e) => {
-      if (e.dataTransfer && e.dataTransfer.types.includes('Files')) {
-        e.preventDefault();
+  // Window-level drop target with a fixed-position highlight overlay.
+  // - dragenter/dragover must preventDefault() (so the `drop` event
+  //   fires at all) and gate everything on `'Files'` so internal drags
+  //   (outline reorder, text selection) don't trigger.
+  // - The overlay flickers if we toggle on enter/leave naively — every
+  //   descendant the cursor crosses fires its own enter/leave. A depth
+  //   counter keeps the overlay steady.
+  // - The editor handles image drops itself at the caret position
+  //   (handler above at ~9590); we skip image files here so the two
+  //   don't double-fire.
+  (() => {
+    const overlay = document.getElementById('dropOverlay');
+    const hasFiles = (e) => e.dataTransfer && Array.from(e.dataTransfer.types).includes('Files');
+    let depth = 0;
+    const show = () => overlay?.classList.add('is-active');
+    const hide = () => { depth = 0; overlay?.classList.remove('is-active'); };
+
+    document.addEventListener('dragenter', (e) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      depth++;
+      show();
+    });
+    document.addEventListener('dragover', (e) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+    });
+    document.addEventListener('dragleave', (e) => {
+      if (!hasFiles(e)) return;
+      depth = Math.max(0, depth - 1);
+      if (depth === 0) overlay?.classList.remove('is-active');
+    });
+    document.addEventListener('drop', (e) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      hide();
+      const files = e.dataTransfer.files;
+      if (!files || !files.length) return;
+      for (const f of files) {
+        if (f.type.startsWith('image/')) continue;
+        loadFileIntoNewTab(f);
       }
     });
-  });
-  document.addEventListener('drop', (e) => {
-    // Skip if an inner handler already claimed the drop (the editor
-    // inserts dropped images itself).
-    if (e.defaultPrevented) return;
-    const files = e.dataTransfer && e.dataTransfer.files;
-    if (!files || !files.length) return;
-    e.preventDefault();
-    // Open every dropped document in its own tab; images aren't a
-    // Word document format, so they are ignored here.
-    for (const f of files) {
-      if (f.type.startsWith('image/')) continue;
-      loadFileIntoNewTab(f);
-    }
-  });
+  })();
 
   // ============================================================
   // FEATURE: Table mini-toolbar

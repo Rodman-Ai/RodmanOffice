@@ -2127,6 +2127,15 @@
   <!-- Watermark overlay -->
   <div id="watermarkOverlay" class="watermark-overlay" hidden></div>
 
+  <!-- Window-level drop highlight (shown while a file is dragged over). -->
+  <div id="dropOverlay" class="drop-overlay" aria-hidden="true">
+    <div class="drop-overlay-card">
+      <div class="drop-overlay-icon" aria-hidden="true">⇩</div>
+      <div class="drop-overlay-title">Drop a file to open it</div>
+      <div class="drop-overlay-sub">DOCX · PDF · RTF · ODT · EPUB · MD · HTML · TXT · RWD</div>
+    </div>
+  </div>
+
   <input type="file" id="filePicker" accept=".rwd,.html,.htm,.txt,.md,.rwd.enc,.docx,.pdf,.rtf,.odt,.epub,application/json,application/pdf,application/rtf,application/epub+zip,application/vnd.oasis.opendocument.text,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden />
   <input type="file" id="imagePicker" accept="image/*" hidden />
 
