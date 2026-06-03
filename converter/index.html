@@ -254,8 +254,16 @@
               <span class="fmt-both">TTML</span> ·
               <span class="fmt-both">LRC</span>
             </dd>
+            <dt>Transcripts</dt>
+            <dd>
+              <span class="fmt-write">TXT</span> ·
+              <span class="fmt-write">SRT</span> ·
+              <span class="fmt-write">WebVTT</span> ·
+              <span class="fmt-write">JSON</span>
+            </dd>
           </dl>
           <p class="format-note">First video, audio, or subtitle conversion lazy-downloads the FFmpeg engine (~25 MB). Cached after. Some specialised codecs (DNxHR, ProRes, AMR-NB, Speex, WavPack) require the encoder to be compiled into the vendored core; if it isn't, the job fails with a runtime error.</p>
+          <p class="format-note">Transcript targets (audio or video → TXT/SRT/VTT/JSON) run on the whisper.cpp WASM engine. First use downloads a Whisper model (~57 MB) from HuggingFace and caches it in IndexedDB. Single-threaded WASM SIMD runs roughly 1.5–2× realtime on a desktop, slower on mobile. English-only at the moment.</p>
         </div>
       </div>
     </section>
