@@ -1,5 +1,6 @@
 // RodmanTranscribe — UI controller.
 import * as engine from './engine.js';
+import * as pp from './postprocess.js';
 import { mountWindowDropzone } from '../lib/ui/dropzone.js';
 
 const $ = (s) => document.querySelector(s);
@@ -8,13 +9,18 @@ const APP_DEFAULT_MODEL = 'large-v3-q5_0'; // this app defaults to max quality
 // ---- state ----
 let currentFile = null;
 let playerUrl = null;
-let segments = [];
+let rawSegments = [];    // streamed from the engine, untouched
+let segments = [];       // post-processed (what's rendered/exported)
+let preProofread = null; // snapshot for proofread revert
 let peaks = null;        // cached waveform peaks for cheap playhead redraw
+let pcmChannel = null;   // Float32Array reused for VAD
+let pcmSampleRate = 0;
 let audioDuration = 0;
 let recorder = null;
 let recChunks = [];
 let recTimer = 0;
 let running = false;
+let dictionary = pp.loadDictionary();
 
 const player = $('#player');
 const transcriptEl = $('#transcript');
@@ -78,6 +84,8 @@ function setSource(file) {
 function clearSource(full = true) {
   currentFile = null;
   peaks = null;
+  pcmChannel = null;
+  pcmSampleRate = 0;
   audioDuration = 0;
   if (playerUrl) { URL.revokeObjectURL(playerUrl); playerUrl = null; }
   player.removeAttribute('src');
@@ -159,6 +167,11 @@ async function drawWaveform(file) {
   audioDuration = audio.duration;
   $('#sourceDur').textContent = fmtClock(audioDuration);
   const ch = audio.getChannelData(0);
+  // Stash the decoded mono signal for the post-process VAD pass so we
+  // don't decode a second time. AudioBuffer's data isn't transferable
+  // once the context closes, so make a copy here.
+  pcmChannel = new Float32Array(ch);
+  pcmSampleRate = audio.sampleRate;
   const width = canvas.clientWidth || 600;
   canvas.width = width;
   const buckets = width;
@@ -215,9 +228,12 @@ $('#runBtn').addEventListener('click', runTranscription);
 async function runTranscription() {
   if (!currentFile || running) return;
   running = true;
+  rawSegments = [];
   segments = [];
+  preProofread = null;
   transcriptEl.innerHTML = '';
   $('#rtf').hidden = true;
+  $('#report').hidden = true;
   $('#status').hidden = false;
   $('#runBtn').disabled = true;
   setBar('model', 0, '');
@@ -233,6 +249,7 @@ async function runTranscription() {
       language: $('#langSelect').value,
       translate: $('#translateChk').checked,
       enhance: $('#enhanceChk').checked,
+      suppressNonSpeech: $('#suppressNonSpeechChk').checked,
       threads: parseInt($('#threadsInput').value, 10) || undefined,
       onModel: (p) => {
         const pct = p.total ? p.loaded / p.total : 0;
@@ -241,14 +258,28 @@ async function runTranscription() {
             : `${fmtBytes(p.loaded)} / ${fmtBytes(p.total)}`);
       },
       onPrepare: (r) => setBar('run', 0.02 + (r || 0) * 0.08, 'Preparing audio…'),
-      onSegment: (seg) => { segments.push(seg); appendSegment(seg); },
+      onSegment: (seg) => { rawSegments.push(seg); appendSegment(seg); },
       onProgress: (ratio) => setBar('run', 0.1 + (ratio || 0) * 0.9,
         `${Math.round((ratio || 0) * 100)}%`),
     });
-    if (result.segments.length) {
-      segments = result.segments;
-      renderTranscript();
-    }
+
+    // Prefer the engine's final segments (they often carry more detail than
+    // the streamed ones); fall back to whatever streamed in.
+    rawSegments = result.segments.length ? result.segments : rawSegments;
+
+    // Run the quality pipeline.
+    const energyMap = pcmChannel
+      ? pp.buildEnergyMap(pcmChannel, pcmSampleRate, 0.1)
+      : null;
+    const { segments: processed, report } = pp.runPipeline(rawSegments, {
+      preset: $('#presetSelect').value,
+      terms: dictionary,
+      energyMap,
+    });
+    segments = processed;
+    renderTranscript();
+    showReport(report);
+
     setBar('run', 1, 'Done');
     const elapsed = (performance.now() - started) / 1000;
     if (audioDuration > 0) {
@@ -271,6 +302,21 @@ async function runTranscription() {
   }
 }
 
+// ----- Quality report -----
+function showReport(report) {
+  if (!report) { $('#report').hidden = true; return; }
+  const pct = (n) => `${Math.round((n || 0) * 100)}%`;
+  const parts = [];
+  if (report.avgConfidence != null) parts.push(`<strong>${pct(report.avgConfidence)}</strong> avg confidence`);
+  if (report.lowConfidenceRate > 0) parts.push(`${pct(report.lowConfidenceRate)} low-confidence words`);
+  if (report.droppedSegments > 0) parts.push(`${report.droppedSegments} hallucinated segment${report.droppedSegments === 1 ? '' : 's'} removed`);
+  if (report.dictionaryFixes > 0) parts.push(`${report.dictionaryFixes} dictionary fix${report.dictionaryFixes === 1 ? '' : 'es'}`);
+  if (report.edits > report.dictionaryFixes) parts.push(`${report.edits - report.dictionaryFixes} formatting edits`);
+  if (!parts.length) { $('#report').hidden = true; return; }
+  $('#report').hidden = false;
+  $('#report').innerHTML = '✨ Quality: ' + parts.join(' · ');
+}
+
 function setBar(which, ratio, detail) {
   $(`#${which}Bar`).style.width = Math.max(0, Math.min(1, ratio)) * 100 + '%';
   $(`#${which}Detail`).textContent = detail || '';
@@ -279,9 +325,18 @@ function setBar(which, ratio, detail) {
 // ===================================================================
 // Transcript rendering
 // ===================================================================
+function confClass(p) {
+  if (p == null) return '';
+  if (p >= 0.9) return 'conf-high';
+  if (p >= 0.7) return 'conf-mid';
+  if (p >= 0.5) return 'conf-low';
+  return 'conf-vlow';
+}
 function segNode(seg, idx) {
   const span = document.createElement('span');
   span.className = 'seg';
+  if (typeof seg.conf === 'number') span.dataset.conf = seg.conf.toFixed(3);
+  if (seg.proofread) span.classList.add('proofread');
   span.dataset.t0 = seg.t0;
   span.dataset.idx = idx;
   const ts = document.createElement('button');
@@ -295,7 +350,21 @@ function segNode(seg, idx) {
   });
   const text = document.createElement('span');
   text.className = 'seg-text';
-  text.textContent = seg.text + ' ';
+  // Render per-token probability when available; fall back to the segment's
+  // own confidence so the highlight still tells a story for builds that
+  // don't return tokens.
+  if (Array.isArray(seg.tokens) && seg.tokens.length) {
+    for (const tok of seg.tokens) {
+      const w = document.createElement('span');
+      w.className = 'tok ' + confClass(tok.p);
+      w.title = `${(tok.p * 100).toFixed(0)}%`;
+      w.textContent = tok.text + ' ';
+      text.appendChild(w);
+    }
+  } else {
+    text.textContent = seg.text + ' ';
+    if (typeof seg.conf === 'number') text.classList.add(confClass(seg.conf));
+  }
   span.append(ts, text);
   return span;
 }
@@ -325,6 +394,134 @@ function highlightActive() {
 $('#tsToggle').addEventListener('click', (e) => {
   const on = transcriptEl.classList.toggle('hide-ts');
   e.currentTarget.setAttribute('aria-pressed', on ? 'false' : 'true');
+});
+
+// Confidence highlighting toggle (default off — colour can be distracting).
+$('#confToggle').addEventListener('click', (e) => {
+  const on = transcriptEl.classList.toggle('show-conf');
+  e.currentTarget.setAttribute('aria-pressed', on ? 'true' : 'false');
+});
+
+// Quality preset: re-run the pipeline if we already have raw segments.
+$('#presetSelect').addEventListener('change', () => rerunPipeline());
+
+function rerunPipeline() {
+  if (!rawSegments.length) return;
+  const energyMap = pcmChannel
+    ? pp.buildEnergyMap(pcmChannel, pcmSampleRate, 0.1)
+    : null;
+  const { segments: processed, report } = pp.runPipeline(rawSegments, {
+    preset: $('#presetSelect').value,
+    terms: dictionary,
+    energyMap,
+  });
+  segments = processed;
+  renderTranscript();
+  showReport(report);
+}
+
+// ===================================================================
+// AI proofread (BYOK Claude)
+// ===================================================================
+let proofAbort = null;
+$('#proofreadBtn').addEventListener('click', () => {
+  const bar = $('#proofreadBar');
+  bar.hidden = !bar.hidden;
+  if (!bar.hidden) $('#proofreadKey').focus();
+});
+$('#proofreadCloseBtn').addEventListener('click', () => { $('#proofreadBar').hidden = true; });
+$('#proofreadRunBtn').addEventListener('click', async (e) => {
+  if (!segments.length) { alert('Nothing to proofread yet.'); return; }
+  const key = $('#proofreadKey').value.trim();
+  if (!key) { alert('Paste your Anthropic API key first.'); return; }
+  const btn = e.currentTarget;
+  btn.disabled = true;
+  const original = btn.textContent;
+  proofAbort = new AbortController();
+  preProofread = segments.map((s) => ({ ...s }));
+  try {
+    const cleaned = await engine.proofreadWithClaude(segments, {
+      apiKey: key,
+      signal: proofAbort.signal,
+      onProgress: (r) => { btn.textContent = `Proofreading… ${Math.round(r * 100)}%`; },
+    });
+    segments = cleaned;
+    renderTranscript();
+    $('#proofreadAcceptBtn').hidden = false;
+    $('#proofreadRevertBtn').hidden = false;
+    btn.textContent = 'Re-run';
+  } catch (err) {
+    console.error(err);
+    if (err?.name !== 'AbortError') alert('Proofread failed: ' + (err?.message || err));
+    btn.textContent = original;
+  } finally {
+    btn.disabled = false;
+    proofAbort = null;
+  }
+});
+$('#proofreadAcceptBtn').addEventListener('click', () => {
+  preProofread = null;
+  $('#proofreadAcceptBtn').hidden = true;
+  $('#proofreadRevertBtn').hidden = true;
+  $('#proofreadBar').hidden = true;
+});
+$('#proofreadRevertBtn').addEventListener('click', () => {
+  if (!preProofread) return;
+  segments = preProofread;
+  preProofread = null;
+  renderTranscript();
+  $('#proofreadAcceptBtn').hidden = true;
+  $('#proofreadRevertBtn').hidden = true;
+});
+
+// ===================================================================
+// Custom dictionary modal
+// ===================================================================
+$('#openDictBtn').addEventListener('click', openDictionaryModal);
+$('#dictCloseBtn').addEventListener('click', () => closeDictionaryModal(false));
+$('#dictSaveBtn').addEventListener('click', () => closeDictionaryModal(true));
+
+function openDictionaryModal() {
+  $('#dictModal').hidden = false;
+  renderDictRows();
+}
+function closeDictionaryModal(rerun) {
+  const rows = $('#dictRows').querySelectorAll('.dict-row');
+  const next = [];
+  rows.forEach((r) => {
+    const from = r.querySelector('.d-from').value.trim();
+    const to = r.querySelector('.d-to').value;
+    const cs = r.querySelector('.d-cs').checked;
+    if (from) next.push({ from, to, caseSensitive: cs });
+  });
+  dictionary = next;
+  pp.saveDictionary(dictionary);
+  $('#dictModal').hidden = true;
+  if (rerun && rawSegments.length) rerunPipeline();
+}
+function renderDictRows() {
+  const wrap = $('#dictRows');
+  wrap.innerHTML = '';
+  if (!dictionary.length) dictionary = [{ from: '', to: '', caseSensitive: false }];
+  for (const t of dictionary) wrap.appendChild(dictRow(t));
+}
+function dictRow(t) {
+  const row = document.createElement('div');
+  row.className = 'dict-row';
+  row.innerHTML =
+    `<input class="d-from" type="text" placeholder="From" />` +
+    `<span>→</span>` +
+    `<input class="d-to" type="text" placeholder="To" />` +
+    `<label class="check"><input type="checkbox" class="d-cs" /> Case</label>` +
+    `<button class="btn btn-ghost btn-tiny d-remove" title="Remove">✕</button>`;
+  row.querySelector('.d-from').value = t.from || '';
+  row.querySelector('.d-to').value = t.to || '';
+  row.querySelector('.d-cs').checked = !!t.caseSensitive;
+  row.querySelector('.d-remove').addEventListener('click', () => row.remove());
+  return row;
+}
+$('#dictAddBtn').addEventListener('click', () => {
+  $('#dictRows').appendChild(dictRow({ from: '', to: '', caseSensitive: false }));
 });
 
 // ===================================================================
@@ -363,7 +560,9 @@ $('#exportBtn').addEventListener('click', () => {
   const ext = $('#exportSelect').value;
   const bytes = engine.formatTranscript(segments, ext);
   const base = (currentFile?.name || 'transcript').replace(/\.[^.]+$/, '');
-  downloadBytes(`${base}.${ext}`, bytes, mimeFor(ext));
+  // jsonrich is a JSON file; everything else uses its own extension.
+  const fileExt = ext === 'jsonrich' ? 'rich.json' : ext;
+  downloadBytes(`${base}.${fileExt}`, bytes, mimeFor(ext));
 });
 
 // ===================================================================
@@ -414,7 +613,14 @@ function escapeHtml(s) {
   return String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 }
 function mimeFor(ext) {
-  return { txt: 'text/plain', srt: 'application/x-subrip', vtt: 'text/vtt', md: 'text/markdown', json: 'application/json' }[ext] || 'text/plain';
+  return {
+    txt: 'text/plain',
+    srt: 'application/x-subrip',
+    vtt: 'text/vtt',
+    md: 'text/markdown',
+    json: 'application/json',
+    jsonrich: 'application/json',
+  }[ext] || 'text/plain';
 }
 function downloadBytes(filename, bytes, mime) {
   const blob = new Blob([bytes], { type: mime });

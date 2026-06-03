@@ -157,8 +157,35 @@ audio { width: 100%; }
 }
 .seg-ts:hover { background: var(--accent); color: #fff; }
 .seg-text { }
+
+/* Per-token confidence tinting. Off by default — only visible when the
+   user flips the "Confidence" toggle (which adds .show-conf on .transcript). */
+.tok { transition: background 0.15s; padding: 0 1px; border-radius: 2px; }
+.transcript.show-conf .tok.conf-mid    { background: #fef3c7; } /* amber-100 */
+.transcript.show-conf .tok.conf-low    { background: #fed7aa; } /* orange-200 */
+.transcript.show-conf .tok.conf-vlow   { background: #fecaca; } /* red-200 */
+.transcript.show-conf .seg-text.conf-mid    { background: #fef3c7; }
+.transcript.show-conf .seg-text.conf-low    { background: #fed7aa; }
+.transcript.show-conf .seg-text.conf-vlow   { background: #fecaca; }
+
+.seg.proofread { background: #ecfdf5; box-shadow: 0 0 0 2px #d1fae5; }
+
 .error { color: var(--danger); font-weight: 600; }
 .rtf { margin-top: 8px; font-size: 12px; color: var(--muted); }
+.report {
+  margin-top: 8px; padding: 8px 12px; font-size: 12px;
+  background: #f5f3ff; border: 1px solid #ddd6fe; color: #5b21b6;
+  border-radius: 8px;
+}
+
+/* Custom dictionary modal rows */
+.dict-rows { display: flex; flex-direction: column; gap: 6px; margin: 6px 0 10px; }
+.dict-row { display: grid; grid-template-columns: 1fr 16px 1fr auto auto; align-items: center; gap: 6px; }
+.dict-row input[type="text"] { padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; }
+.dict-row .check { font-size: 12px; color: var(--muted); }
+#openDictBtn { margin-bottom: 10px; }
+.modal-card footer { display: flex; align-items: center; gap: 10px; }
+.modal-card footer .muted { margin-right: auto; }
 
 /* Storage modal */
 .modal { position: fixed; inset: 0; background: rgba(20, 22, 60, 0.4); display: flex; align-items: center; justify-content: center; z-index: 100; }
