@@ -4139,18 +4139,40 @@
     // Drag a file into the window to open it. The canvas only handles
     // stencil drags (application/x-rodman-stencil), never files, so
     // there is no inner handler to coordinate with.
-    document.addEventListener('dragover', (e) => {
-      if (e.dataTransfer && [...e.dataTransfer.types].includes('Files')) {
+    // Window-level DnD: highlight overlay + depth counter to keep it
+    // steady across descendant transitions. Gated on `'Files'` so
+    // stencil-mime drags from the drawer don't trigger.
+    {
+      const overlay = document.getElementById('dropOverlay');
+      const hasFiles = (e) => e.dataTransfer && Array.from(e.dataTransfer.types).includes('Files');
+      let depth = 0;
+      document.addEventListener('dragenter', (e) => {
+        if (!hasFiles(e)) return;
         e.preventDefault();
-      }
-    });
-    document.addEventListener('drop', (e) => {
-      if (e.defaultPrevented) return;
-      const files = e.dataTransfer && e.dataTransfer.files;
-      if (!files || !files.length) return;
-      e.preventDefault();
-      for (const f of files) loadFileIntoNewTab(f);
-    });
+        depth++;
+        overlay?.classList.add('is-active');
+      });
+      document.addEventListener('dragover', (e) => {
+        if (!hasFiles(e)) return;
+        e.preventDefault();
+        if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+      });
+      document.addEventListener('dragleave', (e) => {
+        if (!hasFiles(e)) return;
+        depth = Math.max(0, depth - 1);
+        if (depth === 0) overlay?.classList.remove('is-active');
+      });
+      document.addEventListener('drop', (e) => {
+        if (!hasFiles(e)) return;
+        if (e.defaultPrevented) { depth = 0; overlay?.classList.remove('is-active'); return; }
+        e.preventDefault();
+        depth = 0;
+        overlay?.classList.remove('is-active');
+        const files = e.dataTransfer.files;
+        if (!files || !files.length) return;
+        for (const f of files) loadFileIntoNewTab(f);
+      });
+    }
     bindAskClaude();
     bindHelpModal();
     bindFindDialog();

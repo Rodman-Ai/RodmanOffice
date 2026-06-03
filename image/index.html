@@ -364,6 +364,15 @@
     };
     window.RodmanClaude = claude;
   </script>
+  <!-- Window-level drop highlight (shown while a file is dragged over). -->
+  <div id="dropOverlay" class="drop-overlay" aria-hidden="true">
+    <div class="drop-overlay-card">
+      <div class="drop-overlay-icon" aria-hidden="true">⇩</div>
+      <div class="drop-overlay-title">Drop an image to open it</div>
+      <div class="drop-overlay-sub">PNG · JPG · GIF · WebP · SVG · PDF · PSD</div>
+    </div>
+  </div>
+
   <script src="js/menus.js" defer></script>
   <script src="js/app.js" defer></script>
 </body>

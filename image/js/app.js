@@ -6717,17 +6717,39 @@
   }
 
   // ---- Drag a file into the window to open it ----
-  window.document.addEventListener('dragover', (e) => {
-    if (e.dataTransfer && [...e.dataTransfer.types].includes('Files')) {
+  // Window-level DnD with a depth-counted highlight overlay. Gated on
+  // `'Files'` so internal drags (selection moves, palette swatches)
+  // don't trigger.
+  {
+    const overlay = document.getElementById('dropOverlay');
+    const hasFiles = (e) => e.dataTransfer && Array.from(e.dataTransfer.types).includes('Files');
+    let depth = 0;
+    window.document.addEventListener('dragenter', (e) => {
+      if (!hasFiles(e)) return;
       e.preventDefault();
-    }
-  });
-  window.document.addEventListener('drop', (e) => {
-    const files = e.dataTransfer && e.dataTransfer.files;
-    if (!files || !files.length) return;
-    e.preventDefault();
-    openImageFile(files[0]);
-  });
+      depth++;
+      overlay?.classList.add('is-active');
+    });
+    window.document.addEventListener('dragover', (e) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+    });
+    window.document.addEventListener('dragleave', (e) => {
+      if (!hasFiles(e)) return;
+      depth = Math.max(0, depth - 1);
+      if (depth === 0) overlay?.classList.remove('is-active');
+    });
+    window.document.addEventListener('drop', (e) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      depth = 0;
+      overlay?.classList.remove('is-active');
+      const files = e.dataTransfer.files;
+      if (!files || !files.length) return;
+      openImageFile(files[0]);
+    });
+  }
 
   // ---- Paste from system clipboard (image) ----
   window.addEventListener('paste', async (e) => {
