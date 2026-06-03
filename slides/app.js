@@ -2771,44 +2771,12 @@
   });
 
   // ---------- Drag & drop: window-level file open + stage image insert ----------
-  // One coherent subsystem replaces the previous two-block setup, which
-  // dropped silently for non-image files over the stage (the stage
-  // handler preventDefaulted every Files drop, and the window-level
-  // drop handler then bailed via `defaultPrevented`).
-  (() => {
-    const overlay = document.getElementById('dropOverlay');
-    const hasFiles = (e) => e.dataTransfer && Array.from(e.dataTransfer.types).includes('Files');
-    let depth = 0;
-    const show = () => overlay?.classList.add('is-active');
-    const hide = () => { depth = 0; overlay?.classList.remove('is-active'); };
-
-    document.addEventListener('dragenter', (e) => {
-      if (!hasFiles(e)) return;
-      e.preventDefault();
-      depth++;
-      show();
-    });
-    document.addEventListener('dragover', (e) => {
-      if (!hasFiles(e)) return;
-      e.preventDefault();
-      if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
-    });
-    document.addEventListener('dragleave', (e) => {
-      if (!hasFiles(e)) return;
-      depth = Math.max(0, depth - 1);
-      if (depth === 0) overlay?.classList.remove('is-active');
-    });
-    document.addEventListener('drop', (e) => {
-      if (!hasFiles(e)) return;
-      e.preventDefault();
-      hide();
-      const files = e.dataTransfer.files;
-      if (!files || !files.length) return;
+  // Shared dropzone helper handles overlay + 'Files' gating. Image
+  // files dropped over the stage become a slide element; anywhere
+  // else they're ignored. Non-image files always open in a new tab.
+  window.RodmanDropzone?.mountWindowDropzone({
+    onFiles: (files, e) => {
       for (const f of files) {
-        // Image dropped over the stage → insert as a slide element at
-        // the drop's logical position; the editor's renderer will lay
-        // it out. Anywhere else, images are ignored (slides aren't a
-        // good home for a random-image tab).
         if (f.type.startsWith('image/')) {
           const overStage = e.target.closest?.('#stage') || e.target.closest?.('#editorScroll');
           if (!overStage) continue;
@@ -2827,8 +2795,8 @@
         }
         loadFileIntoNewTab(f);
       }
-    });
-  })();
+    },
+  });
 
   // ---------- Boot ----------
   restoreTabs();

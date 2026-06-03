@@ -2149,6 +2149,7 @@
     import * as images from '../lib/images/index.js';
     import * as claude from '../lib/claude/index.js';
     import * as clipart from '../lib/clipart/index.js';
+    import { mountWindowDropzone } from '../lib/ui/dropzone.js';
     window.RodmanDocx = {
       saveDocx: docs.saveDocx, loadDocx: docs.loadDocx,
       __buildZip: docs.buildZip, __readZip: docs.readZip,
@@ -2171,6 +2172,7 @@
     window.RodmanImagePdf = { compressPdf: images.compressPdf };
     window.RodmanClaude = claude;
     window.RodmanClipart = clipart;
+    window.RodmanDropzone = { mountWindowDropzone };
   </script>
   <script src="app.js" defer></script>
 </body>

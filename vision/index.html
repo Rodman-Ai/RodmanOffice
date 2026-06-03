@@ -687,6 +687,7 @@
     import * as slides from '../lib/slides/index.js';
     import * as claude from '../lib/claude/index.js';
     import * as gestures from '../lib/ui/gestures.js';
+    import { mountWindowDropzone } from '../lib/ui/dropzone.js';
     window.RodmanDiagramsIO = {
       saveVsdx: diagrams.saveVsdx,
       loadVsdx: diagrams.loadVsdx,
@@ -713,6 +714,7 @@
       applyThemeToDiagram: diagrams.applyThemeToDiagram,
     };
     window.RodmanClaude = claude;
+    window.RodmanDropzone = { mountWindowDropzone };
   </script>
   <script src="diagram.js" defer></script>
   <!-- Window-level drop highlight (shown while a file is dragged over). -->

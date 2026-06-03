@@ -315,7 +315,9 @@
     import * as imageio from '../lib/images/index.js';
     import * as claude from '../lib/claude/index.js';
     import * as gestures from '../lib/ui/gestures.js';
+    import { mountWindowDropzone } from '../lib/ui/dropzone.js';
     window.RodmanGestures = gestures;
+    window.RodmanDropzone = { mountWindowDropzone };
     window.IO = {
       decodeFile: imageio.decodeFile,
       decodeBlob: imageio.decodeBlob,

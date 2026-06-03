@@ -716,6 +716,7 @@
     import * as claude from '../lib/claude/index.js';
     import * as gestures from '../lib/ui/gestures.js';
     import * as clipart from '../lib/clipart/index.js';
+    import { mountWindowDropzone } from '../lib/ui/dropzone.js';
     window.RodmanGestures = gestures;
     window.RodmanSlidesIO = {
       savePptx: slidesio.savePptx,
@@ -738,6 +739,7 @@
     };
     window.RodmanClaude = claude;
     window.RodmanClipart = clipart;
+    window.RodmanDropzone = { mountWindowDropzone };
   </script>
   <script src="deck.js" defer></script>
   <script src="templates.js" defer></script>
