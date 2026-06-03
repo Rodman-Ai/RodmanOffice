@@ -2760,27 +2760,6 @@
     }
   });
 
-  // ---------- Drag & drop image onto stage ----------
-  ['dragover', 'drop'].forEach((evt) => {
-    document.addEventListener(evt, (e) => {
-      if (!e.target.closest('#stage') && !e.target.closest('#editorScroll')) return;
-      e.preventDefault();
-      if (evt !== 'drop') return;
-      const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
-      if (!f || !f.type.startsWith('image/')) return;
-      const reader = new FileReader();
-      reader.onload = () => {
-        const slide = activeSlide();
-        slide.elements.push(D.newImageElement({
-          x: 320, y: 180, w: 640, h: 360, src: reader.result,
-        }));
-        setSelection([slide.elements[slide.elements.length - 1].id], slide.elements[slide.elements.length - 1].id);
-        renderEditor(); scheduleSave();
-      };
-      reader.readAsDataURL(f);
-    });
-  });
-
   // ---------- Document tabs wiring ----------
   $('#newTabBtn')?.addEventListener('click', () => newDocument());
   $('#templateModalCloseBtn')?.addEventListener('click', () => {
@@ -2791,24 +2770,32 @@
     if (e.target === e.currentTarget) e.currentTarget.hidden = true;
   });
 
-  // ---------- Drag a file into the window to open it ----------
-  // Registered after the stage image-drop block above so that an
-  // image dropped on the stage (which preventDefaults there) is
-  // skipped here via e.defaultPrevented.
-  document.addEventListener('dragover', (e) => {
-    if (e.dataTransfer && [...e.dataTransfer.types].includes('Files')) {
-      e.preventDefault();
-    }
-  });
-  document.addEventListener('drop', (e) => {
-    if (e.defaultPrevented) return;
-    const files = e.dataTransfer && e.dataTransfer.files;
-    if (!files || !files.length) return;
-    e.preventDefault();
-    for (const f of files) {
-      if (f.type.startsWith('image/')) continue;
-      loadFileIntoNewTab(f);
-    }
+  // ---------- Drag & drop: window-level file open + stage image insert ----------
+  // Shared dropzone helper handles overlay + 'Files' gating. Image
+  // files dropped over the stage become a slide element; anywhere
+  // else they're ignored. Non-image files always open in a new tab.
+  window.RodmanDropzone?.mountWindowDropzone({
+    onFiles: (files, e) => {
+      for (const f of files) {
+        if (f.type.startsWith('image/')) {
+          const overStage = e.target.closest?.('#stage') || e.target.closest?.('#editorScroll');
+          if (!overStage) continue;
+          const reader = new FileReader();
+          reader.onload = () => {
+            const slide = activeSlide();
+            slide.elements.push(D.newImageElement({
+              x: 320, y: 180, w: 640, h: 360, src: reader.result,
+            }));
+            const last = slide.elements[slide.elements.length - 1];
+            setSelection([last.id], last.id);
+            renderEditor(); scheduleSave();
+          };
+          reader.readAsDataURL(f);
+          continue;
+        }
+        loadFileIntoNewTab(f);
+      }
+    },
   });
 
   // ---------- Boot ----------

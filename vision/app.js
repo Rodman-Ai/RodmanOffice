@@ -4139,17 +4139,13 @@
     // Drag a file into the window to open it. The canvas only handles
     // stencil drags (application/x-rodman-stencil), never files, so
     // there is no inner handler to coordinate with.
-    document.addEventListener('dragover', (e) => {
-      if (e.dataTransfer && [...e.dataTransfer.types].includes('Files')) {
-        e.preventDefault();
-      }
-    });
-    document.addEventListener('drop', (e) => {
-      if (e.defaultPrevented) return;
-      const files = e.dataTransfer && e.dataTransfer.files;
-      if (!files || !files.length) return;
-      e.preventDefault();
-      for (const f of files) loadFileIntoNewTab(f);
+    // Window-level DnD via the shared dropzone helper. Stencil drags
+    // from the drawer use a custom MIME, not 'Files', so they pass
+    // through untouched.
+    window.RodmanDropzone?.mountWindowDropzone({
+      onFiles: (files) => {
+        for (const f of files) loadFileIntoNewTab(f);
+      },
     });
     bindAskClaude();
     bindHelpModal();

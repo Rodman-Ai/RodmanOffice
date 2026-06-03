@@ -1944,3 +1944,29 @@ body.mode-photoshop2026 .modal-actions button:hover {
 }
 .newdoc-cell span { font-size: 10px; opacity: 0.7; }
 .newdoc-custom { margin-top: 8px; font-size: 12px; }
+
+/* Window-level drag-and-drop highlight (theme-neutral). */
+.drop-overlay {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(37, 99, 235, 0.14);
+  z-index: 9000;
+  pointer-events: none;
+}
+.drop-overlay.is-active { display: flex; }
+.drop-overlay-card {
+  border: 3px dashed #2563eb;
+  border-radius: 14px;
+  padding: 28px 44px;
+  background: #ffffff;
+  color: #1a1a1a;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.24);
+  text-align: center;
+  min-width: 240px;
+}
+.drop-overlay-icon { font-size: 38px; color: #2563eb; line-height: 1; margin-bottom: 8px; }
+.drop-overlay-title { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+.drop-overlay-sub { font-size: 11px; opacity: 0.7; }

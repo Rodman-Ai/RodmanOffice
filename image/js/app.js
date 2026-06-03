@@ -6717,16 +6717,9 @@
   }
 
   // ---- Drag a file into the window to open it ----
-  window.document.addEventListener('dragover', (e) => {
-    if (e.dataTransfer && [...e.dataTransfer.types].includes('Files')) {
-      e.preventDefault();
-    }
-  });
-  window.document.addEventListener('drop', (e) => {
-    const files = e.dataTransfer && e.dataTransfer.files;
-    if (!files || !files.length) return;
-    e.preventDefault();
-    openImageFile(files[0]);
+  // Shared dropzone helper handles overlay + 'Files' gating.
+  window.RodmanDropzone?.mountWindowDropzone({
+    onFiles: (files) => openImageFile(files[0]),
   });
 
   // ---- Paste from system clipboard (image) ----

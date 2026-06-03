@@ -1388,3 +1388,31 @@ body.format-painter-active .canvas-svg { cursor: crosshair; }
     width: calc(100vw - 16px);
   }
 }
+
+/* Window-level drag-and-drop highlight. pointer-events:none is essential —
+   the overlay must not become a drag target, or it would generate its own
+   dragenter/dragleave storm. */
+.drop-overlay {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(26, 142, 154, 0.12);
+  z-index: 9000;
+  pointer-events: none;
+}
+.drop-overlay.is-active { display: flex; }
+.drop-overlay-card {
+  border: 3px dashed var(--primary);
+  border-radius: 14px;
+  padding: 28px 44px;
+  background: #fff;
+  color: var(--text);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  text-align: center;
+  min-width: 260px;
+}
+.drop-overlay-icon { font-size: 38px; color: var(--primary); line-height: 1; margin-bottom: 8px; }
+.drop-overlay-title { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
+.drop-overlay-sub { font-size: 12px; opacity: 0.7; }

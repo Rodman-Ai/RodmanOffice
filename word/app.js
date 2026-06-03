@@ -9801,26 +9801,18 @@ ${editor.innerHTML}
   // ============================================================
   // IMPROVEMENT: Drag-and-drop file to open
   // ============================================================
-  ['dragover', 'drop'].forEach((evt) => {
-    document.addEventListener(evt, (e) => {
-      if (e.dataTransfer && e.dataTransfer.types.includes('Files')) {
-        e.preventDefault();
+  // The shared dropzone helper handles preventDefault wiring, the
+  // 'Files'-only gate, and the depth-counted overlay toggling. The
+  // editor handles image drops itself at the caret position
+  // (handler above at ~9590); we skip image files here so the two
+  // don't double-fire.
+  window.RodmanDropzone?.mountWindowDropzone({
+    onFiles: (files) => {
+      for (const f of files) {
+        if (f.type.startsWith('image/')) continue;
+        loadFileIntoNewTab(f);
       }
-    });
-  });
-  document.addEventListener('drop', (e) => {
-    // Skip if an inner handler already claimed the drop (the editor
-    // inserts dropped images itself).
-    if (e.defaultPrevented) return;
-    const files = e.dataTransfer && e.dataTransfer.files;
-    if (!files || !files.length) return;
-    e.preventDefault();
-    // Open every dropped document in its own tab; images aren't a
-    // Word document format, so they are ignored here.
-    for (const f of files) {
-      if (f.type.startsWith('image/')) continue;
-      loadFileIntoNewTab(f);
-    }
+    },
   });
 
   // ============================================================

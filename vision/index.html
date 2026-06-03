@@ -687,6 +687,7 @@
     import * as slides from '../lib/slides/index.js';
     import * as claude from '../lib/claude/index.js';
     import * as gestures from '../lib/ui/gestures.js';
+    import { mountWindowDropzone } from '../lib/ui/dropzone.js';
     window.RodmanDiagramsIO = {
       saveVsdx: diagrams.saveVsdx,
       loadVsdx: diagrams.loadVsdx,
@@ -713,8 +714,18 @@
       applyThemeToDiagram: diagrams.applyThemeToDiagram,
     };
     window.RodmanClaude = claude;
+    window.RodmanDropzone = { mountWindowDropzone };
   </script>
   <script src="diagram.js" defer></script>
+  <!-- Window-level drop highlight (shown while a file is dragged over). -->
+  <div id="dropOverlay" class="drop-overlay" aria-hidden="true">
+    <div class="drop-overlay-card">
+      <div class="drop-overlay-icon" aria-hidden="true">⇩</div>
+      <div class="drop-overlay-title">Drop a file to open it</div>
+      <div class="drop-overlay-sub">VSDX · JSON · SVG · CSV</div>
+    </div>
+  </div>
+
   <script src="render.js" defer></script>
   <script src="templates.js" defer></script>
   <script src="app.js" defer></script>

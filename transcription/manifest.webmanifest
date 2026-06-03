@@ -1,0 +1,19 @@
+{
+  "name": "RodmanTranscribe",
+  "short_name": "Transcribe",
+  "description": "Speech-to-text in your browser — whisper.cpp large-v3, no upload, no signup.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#4f46e5",
+  "theme_color": "#4f46e5",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

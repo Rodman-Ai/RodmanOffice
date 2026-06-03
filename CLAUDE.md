@@ -2,9 +2,9 @@
 
 A static, browser-first office suite (Word + Sheets + Slides +
 Diagrams (RodmanVision) + Image editor + Converter + Accounting +
-CRM) that runs from GitHub Pages with no app-specific build step
-for most surfaces. Every file format the suite speaks is
-implemented from scratch under `/lib/`.
+CRM + Transcription) that runs from GitHub Pages with no
+app-specific build step for most surfaces. Every file format the
+suite speaks is implemented from scratch under `/lib/`.
 
 ## Layout
 
@@ -17,6 +17,7 @@ implemented from scratch under `/lib/`.
 /accounting/  Vanilla HTML + ESM bookkeeping app
 /crm/         Next.js 14 + TypeScript + Tailwind (LeoCRM, Google Sheets backend)
 /sheets/      pnpm React + Vite monorepo
+/transcription/ Vanilla HTML + ESM speech-to-text studio (whisper.cpp WASM)
 
 /lib/         Shared engines. Every app imports from these:
   /lib/docs/      DOCX, PDF, RTF, ODT, EPUB, MD, HTML, …
@@ -25,6 +26,7 @@ implemented from scratch under `/lib/`.
   /lib/diagrams/  VSDX read/write + 132-shape stencil library + SVG/PNG/PDF export
   /lib/images/    Canvas encoders for ~25 image formats + PDF + PSD
   /lib/video/     FFmpeg.wasm wrapper for video / audio transcoding
+  /lib/audio/     whisper.cpp speech-to-text — model catalog/cache, formats
   /lib/claude/    Anthropic API client used by every "Ask Claude" panel
 
 /index.html   Top-level launcher tile grid
