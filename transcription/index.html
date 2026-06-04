@@ -20,23 +20,18 @@
   <script>
     // Cross-origin isolation bootstrap. We register the COI service
     // worker, then reload exactly once so this document loads under it.
-    //
-    // iOS Safari is sometimes slow to bring the worker into control on
-    // the first visit: we clear the reload guard the moment isolation
-    // succeeds (so a future stale flag can't trap a returning user), and
-    // we don't set the guard until the reload is actually requested.
+    // `crossOriginIsolated` only becomes true on a fresh load under SW
+    // control — never inside the current document — so we just register
+    // and trigger the reload once. app.js' refreshCoi() clears
+    // `coiReloaded` once the new document confirms isolation.
     (function () {
       if (!window.isSecureContext || !('serviceWorker' in navigator)) return;
       if (window.crossOriginIsolated) {
         sessionStorage.removeItem('coiReloaded');
         return;
       }
+      if (sessionStorage.getItem('coiReloaded')) return; // already tried this session
       navigator.serviceWorker.register('sw.js', { scope: './' }).then(function () {
-        if (window.crossOriginIsolated) {
-          sessionStorage.removeItem('coiReloaded');
-          return;
-        }
-        if (sessionStorage.getItem('coiReloaded')) return; // already tried this session
         var reload = function () {
           sessionStorage.setItem('coiReloaded', '1');
           window.location.reload();
@@ -262,7 +257,7 @@
         <button class="btn btn-tiny" id="dictAddBtn">+ Add row</button>
       </div>
       <footer>
-        <span class="muted" id="dictHint">Saved automatically.</span>
+        <span class="muted">Saved automatically.</span>
         <button class="btn btn-primary btn-tiny" id="dictSaveBtn">Done</button>
       </footer>
     </div>

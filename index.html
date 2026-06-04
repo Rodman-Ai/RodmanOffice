@@ -196,9 +196,10 @@
         <div class="tile-body">
           <div class="tile-name">Transcription</div>
           <ul class="tile-features">
-            <li>Speech-to-text with whisper.cpp — the 1 GB large-v3 model for maximum English accuracy, all in your browser</li>
-            <li>Multi-threaded WebAssembly; drop audio or video, or record from the mic — nothing is uploaded</li>
-            <li>Live streaming transcript with a clickable waveform; export TXT, SRT, VTT, Markdown, JSON</li>
+            <li>Speech-to-text with whisper.cpp — the 1 GB large-v3 model on desktop (mobile picks a lighter model automatically), tuned for maximum English accuracy</li>
+            <li>Quality post-processing pipeline: hallucination removal, VAD gating, custom dictionary, ITN + punctuation, subtitle line-wrap</li>
+            <li>Drop audio or video, record from the mic, edit inline; optional Claude (BYOK) proofread / translate / summary</li>
+            <li>Live streaming transcript with a clickable waveform and density histogram; export TXT, SRT, VTT, Markdown, JSON</li>
           </ul>
         </div>
       </a>

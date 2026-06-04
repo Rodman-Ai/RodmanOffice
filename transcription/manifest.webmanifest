@@ -1,7 +1,7 @@
 {
   "name": "RodmanTranscribe",
   "short_name": "Transcribe",
-  "description": "Speech-to-text in your browser — whisper.cpp large-v3, no upload, no signup.",
+  "description": "Speech-to-text in your browser — whisper.cpp with a quality post-processing pipeline. No upload, no signup.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
