@@ -26,7 +26,15 @@ body {
 button { font: inherit; color: inherit; cursor: pointer; }
 select, input { font: inherit; color: inherit; }
 
-.app { max-width: 1180px; margin: 0 auto; padding: 14px 18px 60px; }
+.app {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding:
+    max(14px, env(safe-area-inset-top))
+    max(18px, env(safe-area-inset-right))
+    calc(60px + env(safe-area-inset-bottom))
+    max(18px, env(safe-area-inset-left));
+}
 
 .rodmanoffice-back {
   display: inline-flex; align-items: center; gap: 6px;
@@ -44,21 +52,29 @@ select, input { font: inherit; color: inherit; }
 
 .banner {
   border-radius: var(--radius); padding: 12px 16px; margin-bottom: 16px;
-  display: flex; flex-direction: column; gap: 2px;
+  display: flex; align-items: center; gap: 12px;
 }
 .banner-warn { background: #fff7ed; border: 1px solid #fed7aa; color: #9a3412; }
 .banner span { font-size: 13px; }
+.banner-text { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+.banner-warn .btn { white-space: nowrap; }
 
 .layout {
   display: grid; gap: 16px;
   grid-template-columns: 1fr 1fr;
   grid-template-areas: "source settings" "transcript transcript";
 }
-.layout > .panel:nth-child(2) { grid-area: source; }
-.layout > .panel:nth-child(3) { grid-area: settings; }
+.panel-source     { grid-area: source; }
+.panel-settings   { grid-area: settings; }
 .transcript-panel { grid-area: transcript; }
 @media (max-width: 820px) {
-  .layout { grid-template-columns: 1fr; grid-template-areas: "source" "settings" "transcript"; }
+  /* On mobile, the natural flow is "pick a file → watch the transcript →
+     tweak settings if needed". Settings goes last so the user lands on
+     the source picker, not a wall of options. */
+  .layout {
+    grid-template-columns: 1fr;
+    grid-template-areas: "source" "transcript" "settings";
+  }
 }
 
 .panel {
@@ -216,3 +232,72 @@ audio { width: 100%; }
 .drop-overlay-icon { font-size: 38px; color: var(--accent); line-height: 1; margin-bottom: 8px; }
 .drop-overlay-title { font-size: 18px; font-weight: 700; }
 .drop-overlay-sub { font-size: 12px; color: var(--muted); }
+
+/* Panel-title row (Source heading + Recent button) */
+.panel-title-row { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.panel-title-row .panel-title { margin: 0; flex: 1; }
+.panel-title-row .btn-tiny { margin-left: auto; }
+
+/* Cancel-state run button */
+.btn-danger { background: #dc2626; border-color: #dc2626; color: #fff; }
+.btn-danger:hover { background: #b91c1c; border-color: #b91c1c; }
+
+/* Hardware hint */
+#hardwareHint .link {
+  background: none; border: none; padding: 0; margin: 0;
+  color: var(--accent); text-decoration: underline; cursor: pointer; font: inherit;
+}
+
+/* Summary + chapters */
+.summary {
+  margin: 8px 0 10px; padding: 10px 12px; font-size: 13px;
+  background: #ecfeff; border: 1px solid #a5f3fc; color: #155e75;
+  border-radius: 8px;
+}
+.summary-tldr { line-height: 1.5; margin-bottom: 6px; }
+.summary-chapters { margin: 0; padding-left: 18px; }
+.summary-chapters li { margin: 2px 0; }
+button.chapter {
+  background: #cffafe; border: 1px solid #a5f3fc; border-radius: 4px;
+  padding: 0 5px; font-variant-numeric: tabular-nums; font-size: 11px; cursor: pointer;
+}
+button.chapter:hover { background: #a5f3fc; }
+
+/* Speaking-density histogram */
+.density {
+  display: block; width: 100%; height: 36px; margin-top: 8px;
+  background: #fafaff; border-radius: 8px; cursor: pointer;
+}
+
+/* Live captions overlay */
+.captions-overlay {
+  position: fixed; left: 0; right: 0;
+  bottom: calc(env(safe-area-inset-bottom, 0) + 16px);
+  margin: 0 auto; max-width: 880px; width: calc(100% - 32px);
+  background: rgba(15, 17, 35, 0.92); color: #fff;
+  padding: 14px 18px; border-radius: 12px; text-align: center;
+  font-size: 18px; line-height: 1.35; pointer-events: none; z-index: 200;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
+}
+@media (max-width: 600px) { .captions-overlay { font-size: 16px; padding: 10px 14px; } }
+
+/* Recent transcripts */
+.recent-row {
+  display: flex; align-items: flex-start; gap: 10px; padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+.recent-row:last-child { border-bottom: none; }
+.recent-info { flex: 1; min-width: 0; }
+.recent-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recent-meta { font-size: 12px; color: var(--muted); }
+.recent-sentence { font-size: 13px; color: var(--text); margin-top: 4px; line-height: 1.4; }
+.recent-actions { display: flex; flex-direction: column; gap: 4px; }
+
+/* iOS / mobile polish — bigger tap targets, looser spacing */
+@media (max-width: 820px) {
+  .btn { min-height: 40px; }
+  .btn-tiny { min-height: 36px; padding: 7px 10px; }
+  .toolbar-actions { gap: 8px; }
+  .modal-card { width: min(560px, 96vw); }
+  .modal-body { padding: 12px 16px; }
+}

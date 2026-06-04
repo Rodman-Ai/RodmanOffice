@@ -212,6 +212,61 @@ Effort key: **S** small (UI/wiring), **M** moderate (new logic), **L** large (ne
 
 ---
 
+## Subsequent PR — iOS UX/UI fixes + 10 more features
+
+### iOS bug fixes
+- **Mobile layout grid-area** — `.panel`s now have explicit
+  `.panel-source / .panel-settings / .transcript-panel` classes; on mobile
+  the order is **Source → Transcript → Settings** so the user lands on
+  the file picker rather than a wall of options. (Replaces a fragile
+  `:nth-child` assignment that left Source unplaced.)
+- **COI bootstrap** — retry-safe: the `coiReloaded` flag clears the
+  moment `crossOriginIsolated` succeeds, and the banner gains a manual
+  Reload button (with iOS-specific copy) when an extra reload is needed.
+- **iOS polish** — `viewport-fit=cover`, safe-area-inset padding,
+  `inputmode="numeric"` on the threads input, `playsinline` on the audio
+  player, larger mobile tap targets, Apple PWA meta tags.
+- **Recording** — feature-detect `MediaRecorder` and pick the first
+  supported mime type (iOS prefers `audio/mp4`); disable the button with
+  a tooltip if the browser can't record.
+
+### 10 new features
+✅ **F1 — Persistent settings.** Preset / model / language / translate /
+  enhance / threads saved to `localStorage` on change.
+✅ **F2 — Save & resume transcripts (Recent drawer).** IndexedDB-backed
+  history of the last 10 transcripts with source name, duration, first
+  sentence, and a one-tap reopen. Streams to disk as segments arrive.
+✅ **F3 — Hardware-aware defaults.** Mobile / iOS / `deviceMemory ≤ 4`
+  defaults to `base.en-q5_1` + fewer threads, with a one-tap "use
+  large-v3 anyway" link. Desktop with ≥ 8 GB still defaults to large-v3.
+✅ **F4 — Send to RodmanWord.** Markdown handoff via
+  `localStorage['rodmanword:incoming']`; Word's boot-time reader opens
+  it as a new doc and clears the key.
+✅ **F5 — Web Share / copy.** Web Share API for text + file (where
+  supported), with a clipboard fallback.
+✅ **F6 — Translate via Claude (BYOK).** 9-language picker; preserves
+  segment order, count, and timing; accept/revert.
+✅ **F7 — Summary + chapters via Claude (BYOK).** TL;DR + 3–8
+  timestamped chapter headings; chapter clicks seek the player.
+✅ **F8 — Live captions overlay during playback.** Toggleable fixed
+  bottom strip showing the active segment in large type.
+✅ **F9 — Speaking-density histogram.** A 36 px-tall canvas reusing the
+  RMS energy map computed for VAD; click a bar to seek.
+✅ **F10 — Cancel a running job.** `AbortController` threaded through
+  `engine.transcribe`; the run button becomes "Cancel" while running.
+
+### New backlog items uncovered
+113. PWA `share_target` manifest entry so iOS Share can send media to
+     RodmanTranscribe (S).
+114. PWA `file_handlers` for `.mp3 / .mp4 / .wav` etc. (M, desktop-mostly).
+115. Save audio + transcript together to the OPFS / "downloads" for full
+     resume (M).
+116. Background-tab Wake Lock + ServiceWorker keepalive for long jobs (M).
+117. Multi-language Claude proofread guardrails per language (S).
+118. SDH (sound-effect annotations) for the captions overlay (S).
+
+---
+
 ## What ships in this PR
 
 Top-10 features above (marked ✅). New `transcription/postprocess.js`

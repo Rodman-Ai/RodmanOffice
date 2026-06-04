@@ -1,36 +1,89 @@
 // RodmanTranscribe — UI controller.
 import * as engine from './engine.js';
 import * as pp from './postprocess.js';
+import * as history from './history.js';
+import * as share from './share.js';
 import { mountWindowDropzone } from '../lib/ui/dropzone.js';
 
 const $ = (s) => document.querySelector(s);
-const APP_DEFAULT_MODEL = 'large-v3-q5_0'; // this app defaults to max quality
+
+// ---- environment ----
+const UA = (typeof navigator !== 'undefined' && navigator.userAgent) || '';
+const IS_IOS = /iPad|iPhone|iPod/.test(UA) ||
+  (UA.includes('Mac') && typeof navigator !== 'undefined' && navigator.maxTouchPoints > 1);
+const IS_MOBILE = IS_IOS || /Android/i.test(UA);
+const HC = (typeof navigator !== 'undefined' && navigator.hardwareConcurrency) || 4;
+const RAM_GB = (typeof navigator !== 'undefined' && navigator.deviceMemory) || null;
+
+// Devices that can't comfortably hold a 1 GB model in WASM heap. Defaults
+// to base.en on these; a one-tap "use large-v3 anyway" link still works.
+const LOW_RAM = IS_MOBILE || (RAM_GB !== null && RAM_GB <= 4);
+const APP_DEFAULT_MODEL = LOW_RAM ? 'base.en-q5_1' : 'large-v3-q5_0';
+const APP_DEFAULT_THREADS = Math.min(HC, IS_MOBILE ? 4 : 8);
 
 // ---- state ----
 let currentFile = null;
+let currentTranscriptId = null;
 let playerUrl = null;
 let rawSegments = [];    // streamed from the engine, untouched
 let segments = [];       // post-processed (what's rendered/exported)
 let preProofread = null; // snapshot for proofread revert
+let preTranslate = null; // snapshot for translate revert
 let peaks = null;        // cached waveform peaks for cheap playhead redraw
 let pcmChannel = null;   // Float32Array reused for VAD
 let pcmSampleRate = 0;
+let energyMap = null;    // {bucketSec, buckets} — computed once per source
 let audioDuration = 0;
 let recorder = null;
 let recChunks = [];
 let recTimer = 0;
 let running = false;
+let runAbort = null;     // AbortController for cancelling a run
+let claudeAbort = null;  // AbortController for proofread/translate/summary
+let claudeBusy = false;
 let dictionary = pp.loadDictionary();
+let saveDebounce = 0;
 
 const player = $('#player');
 const transcriptEl = $('#transcript');
 
 // ===================================================================
-// Cross-origin isolation banner
+// Cross-origin isolation banner — iOS-aware
 // ===================================================================
 function refreshCoi() {
-  $('#coiBanner').hidden = engine.isCrossOriginIsolated();
+  const isolated = engine.isCrossOriginIsolated();
+  $('#coiBanner').hidden = isolated;
+  if (isolated) {
+    try { sessionStorage.removeItem('coiReloaded'); } catch { /* ignore */ }
+    return;
+  }
+  // We're NOT isolated. Two cases:
+  //   1. Page hasn't reloaded under the SW yet — the inline bootstrap
+  //      script will do that automatically; show the "preparing" copy.
+  //   2. We already reloaded once this session and still aren't isolated
+  //      (an iOS Safari edge case where the SW didn't take control on
+  //      the first try). Surface a manual Reload button and helpful copy.
+  let alreadyTried = false;
+  try { alreadyTried = !!sessionStorage.getItem('coiReloaded'); } catch { /* ignore */ }
+  const title = $('#coiTitle');
+  const body = $('#coiBody');
+  const btn = $('#coiReloadBtn');
+  if (alreadyTried) {
+    title.textContent = 'Tap Reload to enable the transcription engine.';
+    body.textContent = IS_IOS
+      ? 'Safari sometimes needs an extra reload to enter the isolated tab where multi-threaded WebAssembly runs.'
+      : 'Your browser needs an extra reload to enter the isolated tab where multi-threaded WebAssembly runs.';
+    btn.hidden = false;
+  } else {
+    title.textContent = 'Preparing the high-performance engine…';
+    body.textContent = 'This tab needs cross-origin isolation for multi-threaded transcription.';
+    btn.hidden = true;
+  }
 }
+$('#coiReloadBtn')?.addEventListener('click', () => {
+  try { sessionStorage.removeItem('coiReloaded'); } catch { /* ignore */ }
+  window.location.reload();
+});
 refreshCoi();
 window.addEventListener('load', () => setTimeout(refreshCoi, 200));
 
@@ -64,6 +117,25 @@ async function updateModelNote() {
     (cached ? '<span class="ok">downloaded</span>'
             : 'downloads on first use') +
     (big ? ' · <span class="warn">large — desktop with 8 GB+ RAM recommended</span>' : '');
+}
+
+// Hardware-aware hint shown above the model picker on mobile / low-RAM
+// devices. Offers a one-tap escape hatch to large-v3 anyway.
+function showHardwareHint() {
+  const hint = $('#hardwareHint');
+  if (!hint) return;
+  if (!LOW_RAM) { hint.hidden = true; return; }
+  const big = $('#modelSelect').value === 'large-v3-q5_0';
+  hint.hidden = big;
+  hint.innerHTML =
+    `This device works best with the smaller English model. ` +
+    `<button type="button" class="link" id="hwUseBig">Use large-v3 anyway</button>`;
+  $('#hwUseBig')?.addEventListener('click', () => {
+    $('#modelSelect').value = 'large-v3-q5_0';
+    saveSettings();
+    updateModelNote();
+    showHardwareHint();
+  });
 }
 
 // ===================================================================
@@ -121,20 +193,51 @@ mountWindowDropzone({
 // ===================================================================
 // Microphone recording
 // ===================================================================
+// Pick the first MediaRecorder mime type the browser can produce. iOS
+// Safari prefers audio/mp4; Chrome/Firefox prefer webm/opus.
+function pickRecorderMime() {
+  if (typeof MediaRecorder === 'undefined') return null;
+  const candidates = [
+    'audio/mp4',
+    'audio/mp4;codecs=mp4a.40.2',
+    'audio/webm;codecs=opus',
+    'audio/webm',
+    'audio/ogg;codecs=opus',
+    'audio/ogg',
+  ];
+  for (const c of candidates) {
+    try { if (MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(c)) return c; } catch { /* ignore */ }
+  }
+  return ''; // let MediaRecorder pick
+}
+const RECORDER_MIME = pickRecorderMime();
+if (typeof MediaRecorder === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+  const btn = $('#recordBtn');
+  if (btn) {
+    btn.disabled = true;
+    btn.title = 'Your browser doesn’t support in-page recording. Use “Choose file” instead.';
+  }
+}
+
 $('#recordBtn').addEventListener('click', async () => {
-  if (!navigator.mediaDevices?.getUserMedia) {
-    alert('Microphone recording is not supported in this browser.');
+  if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+    // Button is already disabled in this case — defensive.
     return;
   }
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     recChunks = [];
-    recorder = new MediaRecorder(stream);
+    recorder = RECORDER_MIME ? new MediaRecorder(stream, { mimeType: RECORDER_MIME })
+                             : new MediaRecorder(stream);
     recorder.ondataavailable = (e) => { if (e.data.size) recChunks.push(e.data); };
     recorder.onstop = () => {
       stream.getTracks().forEach((t) => t.stop());
-      const blob = new Blob(recChunks, { type: recorder.mimeType || 'audio/webm' });
-      const ext = (recorder.mimeType || 'audio/webm').includes('ogg') ? 'ogg' : 'webm';
+      const mime = recorder.mimeType || 'audio/webm';
+      const blob = new Blob(recChunks, { type: mime });
+      const ext =
+        mime.includes('mp4')  ? 'm4a' :
+        mime.includes('ogg')  ? 'ogg' :
+        mime.includes('webm') ? 'webm' : 'audio';
       setSource(new File([blob], `recording.${ext}`, { type: blob.type }));
     };
     recorder.start();
@@ -228,18 +331,25 @@ $('#runBtn').addEventListener('click', runTranscription);
 async function runTranscription() {
   if (!currentFile || running) return;
   running = true;
+  runAbort = new AbortController();
   rawSegments = [];
   segments = [];
   preProofread = null;
+  preTranslate = null;
+  currentTranscriptId = null;
   transcriptEl.innerHTML = '';
   $('#rtf').hidden = true;
   $('#report').hidden = true;
+  $('#summary').hidden = true;
   $('#status').hidden = false;
-  $('#runBtn').disabled = true;
   setBar('model', 0, '');
   setBar('run', 0, 'Starting…');
   $('#modelStatus').hidden = false;
   $('#runStatus').hidden = false;
+  // Toggle the run button into a Cancel state.
+  const runBtn = $('#runBtn');
+  runBtn.textContent = 'Cancel';
+  runBtn.classList.add('btn-danger');
   const started = performance.now();
 
   try {
@@ -251,6 +361,7 @@ async function runTranscription() {
       enhance: $('#enhanceChk').checked,
       suppressNonSpeech: $('#suppressNonSpeechChk').checked,
       threads: parseInt($('#threadsInput').value, 10) || undefined,
+      signal: runAbort.signal,
       onModel: (p) => {
         const pct = p.total ? p.loaded / p.total : 0;
         setBar('model', pct,
@@ -258,7 +369,10 @@ async function runTranscription() {
             : `${fmtBytes(p.loaded)} / ${fmtBytes(p.total)}`);
       },
       onPrepare: (r) => setBar('run', 0.02 + (r || 0) * 0.08, 'Preparing audio…'),
-      onSegment: (seg) => { rawSegments.push(seg); appendSegment(seg); },
+      onSegment: (seg) => {
+        rawSegments.push(seg); appendSegment(seg);
+        if (rawSegments.length % 8 === 0) autoSaveTranscript();
+      },
       onProgress: (ratio) => setBar('run', 0.1 + (ratio || 0) * 0.9,
         `${Math.round((ratio || 0) * 100)}%`),
     });
@@ -267,8 +381,8 @@ async function runTranscription() {
     // the streamed ones); fall back to whatever streamed in.
     rawSegments = result.segments.length ? result.segments : rawSegments;
 
-    // Run the quality pipeline.
-    const energyMap = pcmChannel
+    // Compute the energy map once and stash it for re-renders / density.
+    energyMap = pcmChannel
       ? pp.buildEnergyMap(pcmChannel, pcmSampleRate, 0.1)
       : null;
     const { segments: processed, report } = pp.runPipeline(rawSegments, {
@@ -279,6 +393,8 @@ async function runTranscription() {
     segments = processed;
     renderTranscript();
     showReport(report);
+    renderDensity();
+    autoSaveTranscript({ immediate: true });
 
     setBar('run', 1, 'Done');
     const elapsed = (performance.now() - started) / 1000;
@@ -291,14 +407,34 @@ async function runTranscription() {
     }
     updateModelNote();
   } catch (err) {
-    console.error(err);
-    setBar('run', 0, '');
-    $('#runDetail').textContent = '';
-    transcriptEl.innerHTML =
-      `<div class="error">⚠ ${escapeHtml(err?.message || String(err))}</div>`;
+    if (err?.name === 'AbortError') {
+      setBar('run', 0, 'Cancelled');
+      // Keep whatever has streamed so far — user can save or re-run.
+      if (rawSegments.length) {
+        energyMap = pcmChannel ? pp.buildEnergyMap(pcmChannel, pcmSampleRate, 0.1) : null;
+        const { segments: processed, report } = pp.runPipeline(rawSegments, {
+          preset: $('#presetSelect').value,
+          terms: dictionary,
+          energyMap,
+        });
+        segments = processed;
+        renderTranscript();
+        showReport(report);
+        renderDensity();
+      }
+    } else {
+      console.error(err);
+      setBar('run', 0, '');
+      $('#runDetail').textContent = '';
+      transcriptEl.innerHTML =
+        `<div class="error">⚠ ${escapeHtml(err?.message || String(err))}</div>`;
+    }
   } finally {
     running = false;
-    $('#runBtn').disabled = false;
+    runAbort = null;
+    runBtn.textContent = 'Transcribe';
+    runBtn.classList.remove('btn-danger');
+    runBtn.disabled = false;
   }
 }
 
@@ -407,9 +543,10 @@ $('#presetSelect').addEventListener('change', () => rerunPipeline());
 
 function rerunPipeline() {
   if (!rawSegments.length) return;
-  const energyMap = pcmChannel
-    ? pp.buildEnergyMap(pcmChannel, pcmSampleRate, 0.1)
-    : null;
+  // Refresh the map so newly-loaded sources (with their own pcmChannel) benefit.
+  if (pcmChannel && !energyMap) {
+    energyMap = pp.buildEnergyMap(pcmChannel, pcmSampleRate, 0.1);
+  }
   const { segments: processed, report } = pp.runPipeline(rawSegments, {
     preset: $('#presetSelect').value,
     terms: dictionary,
@@ -418,61 +555,316 @@ function rerunPipeline() {
   segments = processed;
   renderTranscript();
   showReport(report);
+  renderDensity();
+  autoSaveTranscript();
 }
 
 // ===================================================================
-// AI proofread (BYOK Claude)
+// Unified Claude (BYOK) bar — proofread / translate / summary
 // ===================================================================
-let proofAbort = null;
-$('#proofreadBtn').addEventListener('click', () => {
+let claudeMode = 'proofread'; // 'proofread' | 'translate' | 'summary'
+
+function openClaudeBar(mode) {
+  claudeMode = mode;
   const bar = $('#proofreadBar');
-  bar.hidden = !bar.hidden;
-  if (!bar.hidden) $('#proofreadKey').focus();
-});
+  bar.hidden = false;
+  const langSel = $('#translateLang');
+  const runBtn = $('#proofreadRunBtn');
+  langSel.hidden = (mode !== 'translate');
+  runBtn.textContent =
+    mode === 'translate' ? 'Translate' :
+    mode === 'summary'   ? 'Summarize' : 'Proofread';
+  $('#proofreadKey').focus();
+}
+$('#proofreadBtn').addEventListener('click', () => openClaudeBar('proofread'));
+$('#translateBtn').addEventListener('click', () => openClaudeBar('translate'));
+$('#summaryBtn').addEventListener('click', () => openClaudeBar('summary'));
 $('#proofreadCloseBtn').addEventListener('click', () => { $('#proofreadBar').hidden = true; });
+
 $('#proofreadRunBtn').addEventListener('click', async (e) => {
-  if (!segments.length) { alert('Nothing to proofread yet.'); return; }
+  if (!segments.length) { alert('Nothing to send yet — transcribe something first.'); return; }
   const key = $('#proofreadKey').value.trim();
   if (!key) { alert('Paste your Anthropic API key first.'); return; }
   const btn = e.currentTarget;
   btn.disabled = true;
   const original = btn.textContent;
-  proofAbort = new AbortController();
-  preProofread = segments.map((s) => ({ ...s }));
+  claudeAbort = new AbortController();
+  claudeBusy = true;
   try {
-    const cleaned = await engine.proofreadWithClaude(segments, {
-      apiKey: key,
-      signal: proofAbort.signal,
-      onProgress: (r) => { btn.textContent = `Proofreading… ${Math.round(r * 100)}%`; },
-    });
-    segments = cleaned;
-    renderTranscript();
-    $('#proofreadAcceptBtn').hidden = false;
-    $('#proofreadRevertBtn').hidden = false;
-    btn.textContent = 'Re-run';
+    if (claudeMode === 'translate') {
+      preTranslate = segments.map((s) => ({ ...s }));
+      const lang = $('#translateLang').value;
+      const out = await engine.translateWithClaude(segments, {
+        apiKey: key,
+        targetLanguage: lang,
+        signal: claudeAbort.signal,
+        onProgress: (r) => { btn.textContent = `Translating… ${Math.round(r * 100)}%`; },
+      });
+      segments = out;
+      renderTranscript();
+      $('#proofreadAcceptBtn').hidden = false;
+      $('#proofreadRevertBtn').hidden = false;
+      btn.textContent = 'Re-run';
+      autoSaveTranscript();
+    } else if (claudeMode === 'summary') {
+      btn.textContent = 'Summarizing…';
+      const payload = await engine.summarizeWithClaude(segments, {
+        apiKey: key, signal: claudeAbort.signal,
+      });
+      renderSummary(payload);
+      btn.textContent = original;
+    } else {
+      preProofread = segments.map((s) => ({ ...s }));
+      const cleaned = await engine.proofreadWithClaude(segments, {
+        apiKey: key,
+        signal: claudeAbort.signal,
+        onProgress: (r) => { btn.textContent = `Proofreading… ${Math.round(r * 100)}%`; },
+      });
+      segments = cleaned;
+      renderTranscript();
+      $('#proofreadAcceptBtn').hidden = false;
+      $('#proofreadRevertBtn').hidden = false;
+      btn.textContent = 'Re-run';
+      autoSaveTranscript();
+    }
   } catch (err) {
     console.error(err);
-    if (err?.name !== 'AbortError') alert('Proofread failed: ' + (err?.message || err));
+    if (err?.name !== 'AbortError') alert('Claude call failed: ' + (err?.message || err));
     btn.textContent = original;
   } finally {
     btn.disabled = false;
-    proofAbort = null;
+    claudeAbort = null;
+    claudeBusy = false;
   }
 });
 $('#proofreadAcceptBtn').addEventListener('click', () => {
   preProofread = null;
+  preTranslate = null;
   $('#proofreadAcceptBtn').hidden = true;
   $('#proofreadRevertBtn').hidden = true;
   $('#proofreadBar').hidden = true;
 });
 $('#proofreadRevertBtn').addEventListener('click', () => {
-  if (!preProofread) return;
-  segments = preProofread;
+  const snap = preTranslate || preProofread;
+  if (!snap) return;
+  segments = snap;
   preProofread = null;
+  preTranslate = null;
   renderTranscript();
   $('#proofreadAcceptBtn').hidden = true;
   $('#proofreadRevertBtn').hidden = true;
+  autoSaveTranscript();
 });
+
+function renderSummary(payload) {
+  const el = $('#summary');
+  if (!payload || (!payload.tldr && !payload.chapters?.length)) {
+    el.hidden = true; el.innerHTML = ''; return;
+  }
+  const parts = [];
+  if (payload.tldr) parts.push(`<div class="summary-tldr">${escapeHtml(payload.tldr)}</div>`);
+  if (payload.chapters?.length) {
+    parts.push('<ul class="summary-chapters">' +
+      payload.chapters.map((c) =>
+        `<li><button class="chapter" data-t="${escapeHtml(c.t)}">${escapeHtml(c.t)}</button> ${escapeHtml(c.title)}</li>`
+      ).join('') + '</ul>');
+  }
+  el.innerHTML = parts.join('');
+  el.hidden = false;
+  el.querySelectorAll('.chapter').forEach((b) => b.addEventListener('click', () => {
+    const t = parseClockToSec(b.dataset.t);
+    if (Number.isFinite(t)) { player.currentTime = t; player.play().catch(() => {}); }
+  }));
+}
+function parseClockToSec(s) {
+  const m = /^(?:(\d+):)?(\d+):(\d+)$/.exec(String(s || '').trim());
+  if (!m) return NaN;
+  return (+m[1] || 0) * 3600 + (+m[2]) * 60 + (+m[3]);
+}
+
+// ===================================================================
+// Send to RodmanWord / Share (Features 4 + 5)
+// ===================================================================
+$('#sendWordBtn').addEventListener('click', () => {
+  if (!segments.length) { alert('Nothing to send yet.'); return; }
+  const md = new TextDecoder().decode(engine.formatTranscript(segments, 'md'));
+  const title = (currentFile?.name || 'Transcript').replace(/\.[^.]+$/, '');
+  const ok = share.sendToWord({ title, markdown: md });
+  if (!ok) alert('Could not hand the transcript to RodmanWord. Open /word/ manually and paste it.');
+});
+$('#shareBtn').addEventListener('click', async () => {
+  if (!segments.length) { alert('Nothing to share yet.'); return; }
+  const title = (currentFile?.name || 'Transcript').replace(/\.[^.]+$/, '');
+  const ext = $('#exportSelect').value;
+  const file = engine.formatTranscript(segments, ext);
+  const fileName = `${title}.${ext === 'jsonrich' ? 'rich.json' : ext}`;
+  // Best UX: when the active export is plain text, share that as the
+  // body too; otherwise build a TXT body alongside the file.
+  const text = ext === 'txt' || ext === 'md'
+    ? new TextDecoder().decode(file)
+    : segments.map((s) => s.text).join(' ').trim();
+  const result = await share.shareTranscript({
+    title, text,
+    file, fileName, mime: mimeFor(ext),
+  });
+  if (result.method === 'clipboard') flash($('#shareBtn'), 'Copied');
+  else if (result.method === 'unsupported') alert('Share isn’t supported in this browser. Use Copy or Export.');
+});
+
+// ===================================================================
+// Cancel a running job (Feature 10)
+// ===================================================================
+$('#runBtn').addEventListener('click', (e) => {
+  if (running) {
+    runAbort?.abort();
+    e.stopImmediatePropagation();
+  }
+}, true); // capture-phase so we run BEFORE the existing run handler
+
+// ===================================================================
+// Captions overlay (Feature 8)
+// ===================================================================
+$('#captionsToggle').addEventListener('click', (e) => {
+  const on = e.currentTarget.getAttribute('aria-pressed') !== 'true';
+  e.currentTarget.setAttribute('aria-pressed', on ? 'true' : 'false');
+  $('#captionsOverlay').hidden = !on;
+  syncCaption();
+});
+function syncCaption() {
+  const overlay = $('#captionsOverlay');
+  if (overlay.hidden) return;
+  const t = player.currentTime;
+  for (let i = 0; i < segments.length; i++) {
+    if (t >= segments[i].t0 && (i + 1 >= segments.length || t < segments[i + 1].t0)) {
+      overlay.textContent = segments[i].text;
+      return;
+    }
+  }
+  overlay.textContent = '';
+}
+player.addEventListener('timeupdate', syncCaption);
+
+// ===================================================================
+// Speaking-density histogram (Feature 9)
+// ===================================================================
+function renderDensity() {
+  const canvas = $('#density');
+  if (!energyMap || audioDuration <= 0) { canvas.hidden = true; return; }
+  canvas.hidden = false;
+  const w = canvas.clientWidth || 600;
+  canvas.width = w;
+  const h = canvas.height;
+  const g = canvas.getContext('2d');
+  g.clearRect(0, 0, w, h);
+  const N = Math.min(120, w); // up to ~120 buckets across the canvas
+  const stride = Math.max(1, Math.floor(energyMap.buckets.length / N));
+  const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#4f46e5';
+  let max = 0.01;
+  const cells = new Float32Array(N);
+  for (let i = 0; i < N; i++) {
+    let s = 0, n = 0;
+    for (let j = i * stride; j < (i + 1) * stride && j < energyMap.buckets.length; j++) {
+      s += energyMap.buckets[j]; n++;
+    }
+    cells[i] = n ? s / n : 0;
+    if (cells[i] > max) max = cells[i];
+  }
+  const cw = w / N;
+  for (let i = 0; i < N; i++) {
+    const v = cells[i] / max;
+    const barH = Math.max(2, v * (h - 4));
+    g.fillStyle = accent;
+    g.globalAlpha = 0.25 + v * 0.7;
+    g.fillRect(i * cw, h - barH, Math.max(1, cw - 1), barH);
+  }
+  g.globalAlpha = 1;
+}
+$('#density').addEventListener('click', (e) => {
+  if (!audioDuration) return;
+  const r = e.currentTarget.getBoundingClientRect();
+  player.currentTime = ((e.clientX - r.left) / r.width) * audioDuration;
+  player.play().catch(() => {});
+});
+window.addEventListener('resize', () => renderDensity());
+
+// ===================================================================
+// Auto-save + Recent transcripts (Feature 2)
+// ===================================================================
+function autoSaveTranscript({ immediate = false } = {}) {
+  if (!segments.length || !currentFile) return;
+  const run = async () => {
+    try {
+      const id = await history.save({
+        id: currentTranscriptId,
+        sourceName: currentFile.name,
+        durationSec: audioDuration,
+        modelId: $('#modelSelect').value,
+        preset: $('#presetSelect').value,
+        segments,
+      });
+      if (id) currentTranscriptId = id;
+    } catch (err) { /* IndexedDB unavailable, skip silently */ }
+  };
+  clearTimeout(saveDebounce);
+  if (immediate) run();
+  else saveDebounce = setTimeout(run, 800);
+}
+
+async function refreshRecent() {
+  let list = [];
+  try { list = await history.list(); } catch { /* fall through */ }
+  const wrap = $('#recentList');
+  if (!wrap) return;
+  if (!list.length) {
+    wrap.innerHTML = `<p class="muted">No saved transcripts yet. After you transcribe a clip, it appears here so you can come back to it later.</p>`;
+  } else {
+    wrap.innerHTML = list.map((row) => `
+      <div class="recent-row">
+        <div class="recent-info">
+          <div class="recent-name">${escapeHtml(row.sourceName)}</div>
+          <div class="recent-meta">${fmtClock(row.durationSec)} · ${escapeHtml(engine.MODELS[row.modelId]?.label || row.modelId || '')} · ${new Date(row.savedAt).toLocaleString()}</div>
+          <div class="recent-sentence">${escapeHtml(row.firstSentence || '')}</div>
+        </div>
+        <div class="recent-actions">
+          <button class="btn btn-tiny" data-recent-open="${escapeHtml(row.id)}">Open</button>
+          <button class="btn btn-ghost btn-tiny" data-recent-delete="${escapeHtml(row.id)}">Delete</button>
+        </div>
+      </div>`).join('');
+    wrap.querySelectorAll('[data-recent-open]').forEach((b) => b.addEventListener('click', () => openRecent(b.dataset.recentOpen)));
+    wrap.querySelectorAll('[data-recent-delete]').forEach((b) => b.addEventListener('click', async () => {
+      await history.remove(b.dataset.recentDelete);
+      refreshRecent();
+    }));
+  }
+  $('#recentTotal').textContent = list.length ? `${list.length} saved` : '';
+}
+$('#recentBtn').addEventListener('click', async () => {
+  $('#recentModal').hidden = false;
+  await refreshRecent();
+});
+$('#recentCloseBtn').addEventListener('click', () => { $('#recentModal').hidden = true; });
+$('#recentClearBtn').addEventListener('click', async () => {
+  if (!confirm('Delete all saved transcripts? This can’t be undone.')) return;
+  await history.clear();
+  refreshRecent();
+});
+
+async function openRecent(id) {
+  const row = await history.load(id);
+  if (!row) return;
+  currentTranscriptId = row.id;
+  rawSegments = row.segments.slice();
+  segments = row.segments.slice();
+  audioDuration = row.durationSec || 0;
+  $('#sourceName').textContent = row.sourceName;
+  $('#sourceDur').textContent = fmtClock(audioDuration);
+  $('#sourceInfo').hidden = false;
+  $('#dropTarget').classList.add('has-source');
+  energyMap = null; // we don't keep raw PCM in history; density hides until next decode
+  renderTranscript();
+  renderDensity();
+  $('#recentModal').hidden = true;
+}
 
 // ===================================================================
 // Custom dictionary modal
@@ -636,7 +1028,53 @@ function flash(btn, text) {
   setTimeout(() => { btn.textContent = old; }, 1200);
 }
 
+// ===================================================================
+// Persistent settings (Feature 1)
+// ===================================================================
+const SETTINGS_KEY = 'rodman:transcribe:settings';
+const SETTINGS_FIELDS = {
+  '#presetSelect':         'value',
+  '#modelSelect':          'value',
+  '#langSelect':           'value',
+  '#translateChk':         'checked',
+  '#enhanceChk':           'checked',
+  '#suppressNonSpeechChk': 'checked',
+  '#threadsInput':         'value',
+};
+function saveSettings() {
+  const out = {};
+  for (const [sel, prop] of Object.entries(SETTINGS_FIELDS)) {
+    const el = $(sel);
+    if (el) out[sel] = el[prop];
+  }
+  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(out)); } catch { /* ignore */ }
+}
+function loadSettings() {
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch { return null; }
+}
+function applySettings(saved) {
+  if (!saved) return;
+  for (const [sel, prop] of Object.entries(SETTINGS_FIELDS)) {
+    const el = $(sel);
+    if (el && saved[sel] !== undefined) {
+      // Only apply known model ids — saved model might predate a catalog change.
+      if (sel === '#modelSelect' && !engine.MODELS[saved[sel]]) continue;
+      el[prop] = saved[sel];
+    }
+  }
+}
+for (const sel of Object.keys(SETTINGS_FIELDS)) {
+  $(sel)?.addEventListener('change', saveSettings);
+}
+
 // ---- init ----
-$('#threadsInput').value = Math.min(navigator.hardwareConcurrency || 4, 8);
+$('#threadsInput').value = APP_DEFAULT_THREADS;
 populateModels();
+applySettings(loadSettings());   // override defaults if user has saved settings
 updateModelNote();
+showHardwareHint();
+refreshRecent();

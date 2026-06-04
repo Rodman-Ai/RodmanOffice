@@ -11966,4 +11966,29 @@ ${editor.innerHTML}
     });
   }
 
+  // ============================================================
+  // Receive a transcript / document from RodmanTranscribe (or any
+  // sibling app that drops a payload into localStorage['rodmanword:incoming']).
+  // One-shot: the key is removed after a successful open so a refresh
+  // doesn't re-open the same doc.
+  // ============================================================
+  try {
+    const raw = localStorage.getItem('rodmanword:incoming');
+    if (raw) {
+      const payload = JSON.parse(raw);
+      if (payload && (payload.markdown || payload.html)) {
+        const html = payload.html
+          ? sanitizeImported(payload.html)
+          : sanitizeImported(tinyMdToHtml(String(payload.markdown || '')));
+        openDocumentInNewTab({
+          title: String(payload.title || 'Transcript').slice(0, 120),
+          html,
+        });
+      }
+      localStorage.removeItem('rodmanword:incoming');
+    }
+  } catch (e) {
+    try { localStorage.removeItem('rodmanword:incoming'); } catch {}
+  }
+
 })();

@@ -189,17 +189,25 @@ export async function transcribe(o) {
     );
   }
 
+  const signal = o.signal;
+  const throwIfAborted = () => { if (signal?.aborted) throw new DOMException('Aborted', 'AbortError'); };
+  throwIfAborted();
+
   const { FileTranscriber, createModule } = await loadEngine();
+  throwIfAborted();
   const modelId = o.modelId || DEFAULT_MODEL_ID;
   const modelUrl = await getModelBlobUrl(modelId, o.onModel);
+  throwIfAborted();
 
   const audioFile = await prepareAudio(o.file, {
     enhance: !!o.enhance,
     onProgress: o.onPrepare,
   });
+  throwIfAborted();
 
   const live = [];
   const onSegment = (seg) => {
+    if (signal?.aborted) return; // stop appending; the cleanup runs in finally
     const [norm] = normalizeSegments([seg]);
     if (norm) { live.push(norm); o.onSegment?.(norm); }
   };
@@ -216,8 +224,18 @@ export async function transcribe(o) {
     print_segment: onSegment,
   });
 
+  // If we get aborted while transcribe.js is running, the cleanest thing
+  // we can do from JS is tear the transcriber down — transcribe.js
+  // doesn't document an abort path. The downstream UI uses the abort
+  // signal to stop rendering further segments either way.
+  const onAbort = () => {
+    try { transcriber.destroy?.(); } catch { /* noop */ }
+  };
+  signal?.addEventListener?.('abort', onAbort, { once: true });
+
   try {
     await transcriber.init();
+    throwIfAborted();
     const result = await transcriber.transcribe(audioFile, {
       lang: o.language || 'en',
       translate: !!o.translate,
@@ -230,11 +248,13 @@ export async function transcribe(o) {
       ...(o.maxTokens ? { max_tokens: o.maxTokens } : {}),
       ...(o.maxLen ? { max_len: o.maxLen } : {}),
     });
+    throwIfAborted();
     // Prefer the engine's final result; fall back to streamed segments.
     let segments = normalizeSegments(result);
     if (!segments.length && live.length) segments = live;
     return { segments };
   } finally {
+    signal?.removeEventListener?.('abort', onAbort);
     try { transcriber.destroy?.(); } catch { /* noop */ }
     URL.revokeObjectURL(modelUrl);
   }
@@ -299,6 +319,94 @@ export async function proofreadWithClaude(segments, { apiKey, model, onProgress,
     onProgress?.((chunkIdx + 1) / total);
   }
   return out;
+}
+
+// ----------------------------------------------------------------------
+// Claude (BYOK) translate
+// ----------------------------------------------------------------------
+const TRANSLATE_SYSTEM = `You are a careful transcript translator.
+You receive a numbered list of transcript segments and return a JSON
+array of strings, one per input segment, with the same order and the
+same number of items. Translate the text into the requested language.
+Do NOT add, remove, reorder, or rephrase content. Preserve speaker
+meaning exactly. Return ONLY the JSON array.`;
+
+export async function translateWithClaude(segments, { apiKey, model, targetLanguage, onProgress, signal } = {}) {
+  if (!segments?.length) return segments;
+  if (!apiKey) throw new Error('Anthropic API key required.');
+  if (!targetLanguage) throw new Error('Pick a target language.');
+  const { sendClaudeMessage } = await import('../lib/claude/index.js');
+  const out = segments.map((s) => ({ ...s }));
+  const CHUNK = 30;
+  const total = Math.ceil(segments.length / CHUNK);
+  for (let chunkIdx = 0; chunkIdx < total; chunkIdx++) {
+    if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+    const start = chunkIdx * CHUNK;
+    const slice = segments.slice(start, start + CHUNK);
+    const listing = slice.map((s, i) => `${i + 1}. ${s.text.replace(/\n/g, ' ')}`).join('\n');
+    const { text } = await sendClaudeMessage({
+      apiKey, model, maxTokens: 4096,
+      system: TRANSLATE_SYSTEM,
+      messages: [{
+        role: 'user',
+        content: `Translate the following ${slice.length} segments to ${targetLanguage}. Return a JSON array of ${slice.length} strings.\n\n${listing}`,
+      }],
+      signal,
+    });
+    let translated;
+    try {
+      const m = text.match(/\[[\s\S]*\]/);
+      translated = m ? JSON.parse(m[0]) : JSON.parse(text);
+    } catch { onProgress?.((chunkIdx + 1) / total); continue; }
+    if (!Array.isArray(translated) || translated.length !== slice.length) {
+      onProgress?.((chunkIdx + 1) / total); continue;
+    }
+    for (let i = 0; i < slice.length; i++) {
+      if (typeof translated[i] === 'string' && translated[i].trim()) {
+        out[start + i] = { ...out[start + i], text: translated[i].trim(), translated: true };
+      }
+    }
+    onProgress?.((chunkIdx + 1) / total);
+  }
+  return out;
+}
+
+// ----------------------------------------------------------------------
+// Claude (BYOK) summary + chapters
+// ----------------------------------------------------------------------
+export async function summarizeWithClaude(segments, { apiKey, model, signal } = {}) {
+  if (!segments?.length) return { tldr: '', chapters: [] };
+  if (!apiKey) throw new Error('Anthropic API key required.');
+  const { sendClaudeMessage } = await import('../lib/claude/index.js');
+  // Render the transcript with rough HH:MM:SS prefixes so chapter
+  // timestamps can be grounded.
+  const stamp = (s) => {
+    const t = Math.max(0, Math.floor(s));
+    const h = Math.floor(t / 3600);
+    const m = Math.floor((t % 3600) / 60);
+    const sec = t % 60;
+    const pad = (n) => String(n).padStart(2, '0');
+    return (h ? `${pad(h)}:` : '') + `${pad(m)}:${pad(sec)}`;
+  };
+  const body = segments.map((s) => `[${stamp(s.t0)}] ${s.text}`).join('\n');
+  const { text } = await sendClaudeMessage({
+    apiKey, model, maxTokens: 2048,
+    system: `Return strict JSON: {"tldr": "<2–4 sentence summary>", "chapters": [{"t":"HH:MM:SS","title":"…"}]}. Pick 3–8 chapter cuts at natural topic shifts. Do not invent content; only describe what's in the transcript.`,
+    messages: [{ role: 'user', content: `Transcript:\n${body}\n\nReturn JSON only.` }],
+    signal,
+  });
+  let payload = { tldr: '', chapters: [] };
+  try {
+    const m = text.match(/\{[\s\S]*\}/);
+    const parsed = m ? JSON.parse(m[0]) : JSON.parse(text);
+    if (typeof parsed.tldr === 'string') payload.tldr = parsed.tldr.trim();
+    if (Array.isArray(parsed.chapters)) {
+      payload.chapters = parsed.chapters
+        .filter((c) => c && typeof c.t === 'string' && typeof c.title === 'string')
+        .map((c) => ({ t: c.t.trim(), title: c.title.trim() }));
+    }
+  } catch { /* return defaults */ }
+  return payload;
 }
 
 /** Format a segment list to the requested target extension. */
