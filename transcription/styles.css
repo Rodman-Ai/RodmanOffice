@@ -15,7 +15,12 @@
   --shadow: 0 1px 3px rgba(20, 22, 60, 0.08), 0 8px 24px rgba(20, 22, 60, 0.05);
 }
 * { box-sizing: border-box; }
-html, body { margin: 0; height: 100%; }
+/* `overflow-x: clip` on html+body stops iOS Safari from auto-shrinking
+   the layout when any descendant briefly reports an intrinsic width
+   wider than the viewport (the cause of the "starts zoomed in" bug
+   on first paint). Prefer `clip` over `hidden` so the body doesn't
+   become a scroll container. */
+html, body { margin: 0; height: 100%; overflow-x: clip; }
 body {
   background: var(--bg);
   color: var(--text);
@@ -80,6 +85,10 @@ select, input { font: inherit; color: inherit; }
 .panel {
   background: var(--panel); border: 1px solid var(--line);
   border-radius: var(--radius); box-shadow: var(--shadow); padding: 16px;
+  /* Grid items default to min-content min-width — without this the
+     widest descendant (e.g. a long <select> option label) widens the
+     whole track and the page reports an intrinsic width > viewport. */
+  min-width: 0;
 }
 .panel-title { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; font-size: 15px; }
 .step {
@@ -116,10 +125,15 @@ select, input { font: inherit; color: inherit; }
 audio { width: 100%; }
 
 /* Settings */
-.field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+.field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; min-width: 0; }
 .field > span { font-size: 12px; font-weight: 600; color: var(--muted); }
 .field select, .field input {
   padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff;
+  /* Long <option> labels (e.g. "English · large-v3-q5_0 · max quality
+     — 1.08 GB") otherwise stretch the select to its intrinsic content
+     width on iOS Safari, which then triggers fit-to-content zoom on
+     first paint. */
+  max-width: 100%; min-width: 0;
 }
 .field-inline { flex-direction: row; align-items: center; justify-content: space-between; }
 .field-inline input { width: 80px; }
@@ -300,4 +314,11 @@ button.chapter:hover { background: #a5f3fc; }
   .toolbar-actions { gap: 8px; }
   .modal-card { width: min(560px, 96vw); }
   .modal-body { padding: 12px 16px; }
+  /* 16 px is the iOS Safari threshold below which focusing a form
+     control auto-zooms the page. The desktop default is 14 px (set
+     via `select, input { font: inherit }`); we only bump on mobile. */
+  .field select, .field input, .field-inline input,
+  .find-bar input, #proofreadKey, .dict-row input[type="text"] {
+    font-size: 16px;
+  }
 }
