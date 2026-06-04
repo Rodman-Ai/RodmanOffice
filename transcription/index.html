@@ -2,8 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#4f46e5" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Transcribe" />
   <title>RodmanTranscribe</title>
   <link rel="icon" href="icon.svg" type="image/svg+xml" />
   <link rel="manifest" href="manifest.webmanifest" />
@@ -15,12 +18,26 @@
        multi-threaded WASM engine). The sessionStorage guard prevents a
        reload loop on browsers/hosts where isolation can't be gained. -->
   <script>
+    // Cross-origin isolation bootstrap. We register the COI service
+    // worker, then reload exactly once so this document loads under it.
+    //
+    // iOS Safari is sometimes slow to bring the worker into control on
+    // the first visit: we clear the reload guard the moment isolation
+    // succeeds (so a future stale flag can't trap a returning user), and
+    // we don't set the guard until the reload is actually requested.
     (function () {
       if (!window.isSecureContext || !('serviceWorker' in navigator)) return;
+      if (window.crossOriginIsolated) {
+        sessionStorage.removeItem('coiReloaded');
+        return;
+      }
       navigator.serviceWorker.register('sw.js', { scope: './' }).then(function () {
-        if (window.crossOriginIsolated || sessionStorage.getItem('coiReloaded')) return;
+        if (window.crossOriginIsolated) {
+          sessionStorage.removeItem('coiReloaded');
+          return;
+        }
+        if (sessionStorage.getItem('coiReloaded')) return; // already tried this session
         var reload = function () {
-          if (sessionStorage.getItem('coiReloaded')) return;
           sessionStorage.setItem('coiReloaded', '1');
           window.location.reload();
         };
@@ -62,14 +79,20 @@
     </header>
 
     <div id="coiBanner" class="banner banner-warn" hidden>
-      <strong>Preparing the high-performance engine…</strong>
-      <span>This tab needs cross-origin isolation for multi-threaded transcription. If this message stays, your browser may not support it — try a recent Chrome, Edge, or Firefox on desktop.</span>
+      <div class="banner-text">
+        <strong id="coiTitle">Preparing the high-performance engine…</strong>
+        <span id="coiBody">This tab needs cross-origin isolation for multi-threaded transcription.</span>
+      </div>
+      <button class="btn btn-tiny" id="coiReloadBtn" type="button" hidden>Reload</button>
     </div>
 
     <main class="layout">
       <!-- 1 · Source -->
-      <section class="panel">
-        <h2 class="panel-title"><span class="step">1</span> Source</h2>
+      <section class="panel panel-source">
+        <div class="panel-title-row">
+          <h2 class="panel-title"><span class="step">1</span> Source</h2>
+          <button class="btn btn-ghost btn-tiny" id="recentBtn" type="button" title="Recent transcripts">Recent</button>
+        </div>
         <div id="dropTarget" class="drop">
           <div class="drop-inner">
             <div class="drop-icon" aria-hidden="true">🎙️</div>
@@ -77,7 +100,7 @@
             <p class="drop-sub">or</p>
             <div class="drop-actions">
               <button class="btn" id="chooseBtn">Choose file</button>
-              <button class="btn" id="recordBtn">Record mic</button>
+              <button class="btn" id="recordBtn" type="button">Record mic</button>
             </div>
             <p class="drop-formats">MP3 · WAV · M4A · MP4 · MOV · MKV · WEBM · and more</p>
           </div>
@@ -96,12 +119,12 @@
             <button class="btn btn-ghost" id="clearSourceBtn" title="Remove">✕</button>
           </div>
           <canvas id="waveform" class="waveform" height="64"></canvas>
-          <audio id="player" controls preload="metadata"></audio>
+          <audio id="player" controls preload="metadata" playsinline></audio>
         </div>
       </section>
 
       <!-- 2 · Settings -->
-      <section class="panel">
+      <section class="panel panel-settings">
         <h2 class="panel-title"><span class="step">2</span> Settings</h2>
         <label class="field">
           <span>Quality preset</span>
@@ -115,6 +138,7 @@
           <span>Model</span>
           <select id="modelSelect"></select>
         </label>
+        <div class="field-note" id="hardwareHint" hidden></div>
         <div class="field-note" id="modelNote"></div>
         <label class="field">
           <span>Language</span>
@@ -131,7 +155,7 @@
         <button class="btn btn-ghost btn-tiny" id="openDictBtn">📖 Custom dictionary</button>
         <label class="field field-inline">
           <span>Threads</span>
-          <input type="number" id="threadsInput" min="1" max="16" />
+          <input type="number" id="threadsInput" min="1" max="16" inputmode="numeric" pattern="\d*" />
         </label>
         <button class="btn btn-primary btn-run" id="runBtn" disabled>Transcribe</button>
         <div id="status" class="status" hidden>
@@ -156,9 +180,14 @@
           <div class="toolbar-actions">
             <button class="btn btn-ghost btn-tiny" id="tsToggle" aria-pressed="true">Timestamps</button>
             <button class="btn btn-ghost btn-tiny" id="confToggle" aria-pressed="false">Confidence</button>
+            <button class="btn btn-ghost btn-tiny" id="captionsToggle" aria-pressed="false" title="Show live captions during playback">Captions</button>
             <button class="btn btn-ghost btn-tiny" id="findBtn">Find</button>
             <button class="btn btn-ghost btn-tiny" id="copyBtn">Copy</button>
+            <button class="btn btn-ghost btn-tiny" id="shareBtn" type="button">Share</button>
+            <button class="btn btn-ghost btn-tiny" id="sendWordBtn" type="button" title="Open in RodmanWord">→ Word</button>
             <button class="btn btn-ghost btn-tiny" id="proofreadBtn">AI proofread</button>
+            <button class="btn btn-ghost btn-tiny" id="translateBtn" type="button">AI translate</button>
+            <button class="btn btn-ghost btn-tiny" id="summaryBtn" type="button">AI summary</button>
             <select id="exportSelect" class="export-select">
               <option value="txt">.txt</option>
               <option value="srt">.srt (line-wrapped)</option>
@@ -177,18 +206,47 @@
           <button class="btn btn-ghost btn-tiny" id="findCloseBtn">✕</button>
         </div>
         <div id="proofreadBar" class="find-bar" hidden>
-          <input type="password" id="proofreadKey" placeholder="Anthropic API key (sk-ant-…) — used once, not stored" autocomplete="off" />
-          <button class="btn btn-primary btn-tiny" id="proofreadRunBtn">Run proofread</button>
+          <input type="password" id="proofreadKey" placeholder="Anthropic API key (sk-ant-…) — used per session, not stored" autocomplete="off" />
+          <select id="translateLang" hidden>
+            <option value="Spanish">Spanish</option>
+            <option value="French">French</option>
+            <option value="German">German</option>
+            <option value="Portuguese">Portuguese</option>
+            <option value="Italian">Italian</option>
+            <option value="Japanese">Japanese</option>
+            <option value="Mandarin Chinese">Mandarin</option>
+            <option value="Hindi">Hindi</option>
+            <option value="Arabic">Arabic</option>
+          </select>
+          <button class="btn btn-primary btn-tiny" id="proofreadRunBtn">Run</button>
           <button class="btn btn-tiny" id="proofreadAcceptBtn" hidden>Keep</button>
           <button class="btn btn-tiny" id="proofreadRevertBtn" hidden>Revert</button>
           <button class="btn btn-ghost btn-tiny" id="proofreadCloseBtn">✕</button>
         </div>
+        <div id="summary" class="summary" hidden></div>
         <div id="transcript" class="transcript" contenteditable="true" spellcheck="true"
              data-placeholder="Your transcript will appear here, streaming live as it's recognized."></div>
         <div id="report" class="report" hidden></div>
         <div id="rtf" class="rtf" hidden></div>
+        <canvas id="density" class="density" height="36" hidden title="Speaking density — click to seek"></canvas>
+        <div id="captionsOverlay" class="captions-overlay" hidden></div>
       </section>
     </main>
+  </div>
+
+  <!-- Recent transcripts -->
+  <div id="recentModal" class="modal" hidden>
+    <div class="modal-card">
+      <header>
+        <h3>Recent transcripts</h3>
+        <button class="icon-btn" id="recentCloseBtn" aria-label="Close">✕</button>
+      </header>
+      <div class="modal-body" id="recentList"></div>
+      <footer>
+        <span class="muted" id="recentTotal"></span>
+        <button class="btn btn-ghost btn-tiny" id="recentClearBtn" type="button">Clear all</button>
+      </footer>
+    </div>
   </div>
 
   <!-- Custom dictionary -->
