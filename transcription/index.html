@@ -104,6 +104,14 @@
       <section class="panel">
         <h2 class="panel-title"><span class="step">2</span> Settings</h2>
         <label class="field">
+          <span>Quality preset</span>
+          <select id="presetSelect">
+            <option value="max" selected>Max — full pipeline</option>
+            <option value="balanced">Balanced</option>
+            <option value="fast">Fast — minimal cleanup</option>
+          </select>
+        </label>
+        <label class="field">
           <span>Model</span>
           <select id="modelSelect"></select>
         </label>
@@ -117,8 +125,10 @@
         </label>
         <div class="checks">
           <label class="check"><input type="checkbox" id="translateChk" /> Translate to English</label>
-          <label class="check"><input type="checkbox" id="enhanceChk" /> Enhance audio (denoise + normalize)</label>
+          <label class="check"><input type="checkbox" id="enhanceChk" checked /> Enhance audio (denoise + loudness)</label>
+          <label class="check"><input type="checkbox" id="suppressNonSpeechChk" checked /> Suppress non-speech tokens</label>
         </div>
+        <button class="btn btn-ghost btn-tiny" id="openDictBtn">📖 Custom dictionary</button>
         <label class="field field-inline">
           <span>Threads</span>
           <input type="number" id="threadsInput" min="1" max="16" />
@@ -145,14 +155,17 @@
           <h2 class="panel-title"><span class="step">3</span> Transcript</h2>
           <div class="toolbar-actions">
             <button class="btn btn-ghost btn-tiny" id="tsToggle" aria-pressed="true">Timestamps</button>
+            <button class="btn btn-ghost btn-tiny" id="confToggle" aria-pressed="false">Confidence</button>
             <button class="btn btn-ghost btn-tiny" id="findBtn">Find</button>
             <button class="btn btn-ghost btn-tiny" id="copyBtn">Copy</button>
+            <button class="btn btn-ghost btn-tiny" id="proofreadBtn">AI proofread</button>
             <select id="exportSelect" class="export-select">
               <option value="txt">.txt</option>
-              <option value="srt">.srt</option>
-              <option value="vtt">.vtt</option>
+              <option value="srt">.srt (line-wrapped)</option>
+              <option value="vtt">.vtt (line-wrapped)</option>
               <option value="md">.md</option>
               <option value="json">.json</option>
+              <option value="jsonrich">.json (with confidence)</option>
             </select>
             <button class="btn btn-tiny" id="exportBtn">Export</button>
           </div>
@@ -163,11 +176,38 @@
           <button class="btn btn-tiny" id="replaceAllBtn">Replace all</button>
           <button class="btn btn-ghost btn-tiny" id="findCloseBtn">✕</button>
         </div>
+        <div id="proofreadBar" class="find-bar" hidden>
+          <input type="password" id="proofreadKey" placeholder="Anthropic API key (sk-ant-…) — used once, not stored" autocomplete="off" />
+          <button class="btn btn-primary btn-tiny" id="proofreadRunBtn">Run proofread</button>
+          <button class="btn btn-tiny" id="proofreadAcceptBtn" hidden>Keep</button>
+          <button class="btn btn-tiny" id="proofreadRevertBtn" hidden>Revert</button>
+          <button class="btn btn-ghost btn-tiny" id="proofreadCloseBtn">✕</button>
+        </div>
         <div id="transcript" class="transcript" contenteditable="true" spellcheck="true"
              data-placeholder="Your transcript will appear here, streaming live as it's recognized."></div>
+        <div id="report" class="report" hidden></div>
         <div id="rtf" class="rtf" hidden></div>
       </section>
     </main>
+  </div>
+
+  <!-- Custom dictionary -->
+  <div id="dictModal" class="modal" hidden>
+    <div class="modal-card">
+      <header>
+        <h3>Custom dictionary</h3>
+        <button class="icon-btn" id="dictCloseBtn" aria-label="Close">✕</button>
+      </header>
+      <div class="modal-body">
+        <p class="muted">Terms here get replaced in every transcript. Useful for names, brands, jargon. Whole-word match; case-insensitive unless ticked.</p>
+        <div id="dictRows" class="dict-rows"></div>
+        <button class="btn btn-tiny" id="dictAddBtn">+ Add row</button>
+      </div>
+      <footer>
+        <span class="muted" id="dictHint">Saved automatically.</span>
+        <button class="btn btn-primary btn-tiny" id="dictSaveBtn">Done</button>
+      </footer>
+    </div>
   </div>
 
   <!-- Storage manager -->
