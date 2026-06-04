@@ -219,6 +219,34 @@ if (typeof MediaRecorder === 'undefined' || !navigator.mediaDevices?.getUserMedi
   }
 }
 
+// Central teardown — used by the user-clicked Stop button AND by every
+// edge case (track ended by the browser, MediaRecorder error, tab
+// backgrounded on iOS that silently kills the stream, beforeunload).
+// Idempotent: safe to call any number of times.
+let recStream = null;
+function stopRecording(reason) {
+  clearInterval(recTimer);
+  recTimer = 0;
+  $('#recordingBar').hidden = true;
+  if (recorder) {
+    try {
+      if (recorder.state !== 'inactive') recorder.stop();
+    } catch { /* ignore */ }
+    // After this point we don't care about further events from this recorder.
+    recorder.ondataavailable = null;
+    recorder.onstop = null;
+    recorder.onerror = null;
+  }
+  if (recStream) {
+    recStream.getTracks().forEach((t) => {
+      try { t.onended = null; } catch { /* ignore */ }
+      try { t.stop(); } catch { /* ignore */ }
+    });
+  }
+  recStream = null;
+}
+window.addEventListener('beforeunload', () => stopRecording('unload'));
+
 $('#recordBtn').addEventListener('click', async () => {
   if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
     // Button is already disabled in this case — defensive.
@@ -226,20 +254,30 @@ $('#recordBtn').addEventListener('click', async () => {
   }
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    recStream = stream;
     recChunks = [];
     recorder = RECORDER_MIME ? new MediaRecorder(stream, { mimeType: RECORDER_MIME })
                              : new MediaRecorder(stream);
     recorder.ondataavailable = (e) => { if (e.data.size) recChunks.push(e.data); };
     recorder.onstop = () => {
-      stream.getTracks().forEach((t) => t.stop());
-      const mime = recorder.mimeType || 'audio/webm';
+      const mime = recorder?.mimeType || 'audio/webm';
       const blob = new Blob(recChunks, { type: mime });
+      // Teardown first so we don't leak the stream if setSource fails.
+      stopRecording('stopped');
+      if (blob.size === 0) return;
       const ext =
         mime.includes('mp4')  ? 'm4a' :
         mime.includes('ogg')  ? 'ogg' :
         mime.includes('webm') ? 'webm' : 'audio';
       setSource(new File([blob], `recording.${ext}`, { type: blob.type }));
     };
+    recorder.onerror = (e) => {
+      console.warn('[record] MediaRecorder error', e?.error || e);
+      stopRecording('error');
+    };
+    // If the browser/system ends the track (iOS background, user revokes
+    // permission, headphone unplug), tear everything down immediately.
+    stream.getAudioTracks().forEach((t) => { t.onended = () => stopRecording('track-ended'); });
     recorder.start();
     $('#recordingBar').hidden = false;
     const t0 = Date.now();
@@ -249,12 +287,16 @@ $('#recordBtn').addEventListener('click', async () => {
     }, 250);
   } catch (err) {
     alert('Could not access the microphone: ' + (err?.message || err));
+    stopRecording('start-failed');
   }
 });
 $('#stopRecordBtn').addEventListener('click', () => {
-  if (recorder && recorder.state !== 'inactive') recorder.stop();
-  clearInterval(recTimer);
-  $('#recordingBar').hidden = true;
+  // If recorder.stop() succeeds, recorder.onstop runs stopRecording('stopped');
+  // otherwise call it ourselves so the bar always clears.
+  if (recorder && recorder.state !== 'inactive') {
+    try { recorder.stop(); return; } catch { /* fall through */ }
+  }
+  stopRecording('manual');
 });
 
 // ===================================================================
@@ -326,7 +368,12 @@ player.addEventListener('timeupdate', () => { renderWaveform(); highlightActive(
 // Run transcription
 // ===================================================================
 $('#modelSelect').addEventListener('change', updateModelNote);
-$('#runBtn').addEventListener('click', runTranscription);
+$('#runBtn').addEventListener('click', () => {
+  // While a job is in flight, the same button is the Cancel button. The
+  // run pipeline observes runAbort.signal and shuts down cleanly.
+  if (running) { try { runAbort?.abort(); } catch { /* ignore */ } return; }
+  runTranscription();
+});
 
 async function runTranscription() {
   if (!currentFile || running) return;
@@ -340,7 +387,9 @@ async function runTranscription() {
   transcriptEl.innerHTML = '';
   $('#rtf').hidden = true;
   $('#report').hidden = true;
+  $('#report').innerHTML = '';
   $('#summary').hidden = true;
+  $('#summary').innerHTML = '';
   $('#status').hidden = false;
   setBar('model', 0, '');
   setBar('run', 0, 'Starting…');
@@ -440,7 +489,7 @@ async function runTranscription() {
 
 // ----- Quality report -----
 function showReport(report) {
-  if (!report) { $('#report').hidden = true; return; }
+  if (!report) { $('#report').hidden = true; $('#report').innerHTML = ''; return; }
   const pct = (n) => `${Math.round((n || 0) * 100)}%`;
   const parts = [];
   if (report.avgConfidence != null) parts.push(`<strong>${pct(report.avgConfidence)}</strong> avg confidence`);
@@ -448,7 +497,7 @@ function showReport(report) {
   if (report.droppedSegments > 0) parts.push(`${report.droppedSegments} hallucinated segment${report.droppedSegments === 1 ? '' : 's'} removed`);
   if (report.dictionaryFixes > 0) parts.push(`${report.dictionaryFixes} dictionary fix${report.dictionaryFixes === 1 ? '' : 'es'}`);
   if (report.edits > report.dictionaryFixes) parts.push(`${report.edits - report.dictionaryFixes} formatting edits`);
-  if (!parts.length) { $('#report').hidden = true; return; }
+  if (!parts.length) { $('#report').hidden = true; $('#report').innerHTML = ''; return; }
   $('#report').hidden = false;
   $('#report').innerHTML = '✨ Quality: ' + parts.join(' · ');
 }
@@ -507,10 +556,58 @@ function segNode(seg, idx) {
 function appendSegment(seg) {
   transcriptEl.appendChild(segNode(seg, segments.length - 1));
 }
+
+/**
+ * Pure helper: given a list of segment DOM nodes and the current segments
+ * array, return a new segments array with each segment's text replaced
+ * by the corresponding `.seg-text` textContent (whitespace collapsed).
+ * Timings, confidence, and tokens are preserved. Exported so a node-side
+ * unit test can exercise it with a synthetic node list.
+ */
+export function applyDomEditsToSegments(nodes, segs) {
+  if (!segs?.length || !nodes?.length) return { segments: segs || [], changed: false };
+  const next = segs.slice();
+  let changed = false;
+  for (const n of nodes) {
+    const idxAttr = n.dataset?.idx ?? n.getAttribute?.('data-idx');
+    const idx = parseInt(idxAttr, 10);
+    if (!Number.isInteger(idx) || idx < 0 || idx >= next.length) continue;
+    const t = n.querySelector?.('.seg-text');
+    if (!t) continue;
+    const text = (t.textContent || '').replace(/\s+/g, ' ').trim();
+    if (text && text !== next[idx].text) {
+      next[idx] = { ...next[idx], text, edited: true };
+      changed = true;
+    }
+  }
+  return { segments: next, changed };
+}
+
+/**
+ * Read user edits from #transcript back into segments[]. Idempotent.
+ *
+ * Why this exists: the transcript pane is contenteditable but our state
+ * lives in `segments[]`. Any code path that re-renders (Find→Replace,
+ * preset switch, Claude proofread/translate, Recent reopen, fresh run)
+ * would otherwise blow user typing away silently.
+ */
+function pullEditsFromDom() {
+  if (!segments.length) return;
+  const nodes = transcriptEl.querySelectorAll('.seg[data-idx]');
+  const result = applyDomEditsToSegments(nodes, segments);
+  if (result.changed) {
+    segments = result.segments;
+    autoSaveTranscript();
+  }
+}
+
 function renderTranscript() {
+  pullEditsFromDom();
   transcriptEl.innerHTML = '';
   segments.forEach((seg, i) => transcriptEl.appendChild(segNode(seg, i)));
 }
+transcriptEl.addEventListener('blur', pullEditsFromDom);
+window.addEventListener('beforeunload', () => { try { pullEditsFromDom(); } catch { /* ignore */ } });
 function highlightActive() {
   const t = player.currentTime;
   let activeIdx = -1;
@@ -543,6 +640,7 @@ $('#presetSelect').addEventListener('change', () => rerunPipeline());
 
 function rerunPipeline() {
   if (!rawSegments.length) return;
+  pullEditsFromDom();
   // Refresh the map so newly-loaded sources (with their own pcmChannel) benefit.
   if (pcmChannel && !energyMap) {
     energyMap = pp.buildEnergyMap(pcmChannel, pcmSampleRate, 0.1);
@@ -579,15 +677,25 @@ function openClaudeBar(mode) {
 $('#proofreadBtn').addEventListener('click', () => openClaudeBar('proofread'));
 $('#translateBtn').addEventListener('click', () => openClaudeBar('translate'));
 $('#summaryBtn').addEventListener('click', () => openClaudeBar('summary'));
-$('#proofreadCloseBtn').addEventListener('click', () => { $('#proofreadBar').hidden = true; });
+function closeClaudeBar({ abort = true } = {}) {
+  if (abort) try { claudeAbort?.abort(); } catch { /* ignore */ }
+  $('#proofreadBar').hidden = true;
+}
+$('#proofreadCloseBtn').addEventListener('click', () => closeClaudeBar({ abort: true }));
 
 $('#proofreadRunBtn').addEventListener('click', async (e) => {
+  const btn = e.currentTarget;
+  // If a Claude call is already in flight, this button doubles as Stop.
+  if (claudeBusy) {
+    try { claudeAbort?.abort(); } catch { /* ignore */ }
+    return;
+  }
   if (!segments.length) { alert('Nothing to send yet — transcribe something first.'); return; }
   const key = $('#proofreadKey').value.trim();
   if (!key) { alert('Paste your Anthropic API key first.'); return; }
-  const btn = e.currentTarget;
-  btn.disabled = true;
+  pullEditsFromDom();
   const original = btn.textContent;
+  btn.classList.add('btn-danger');
   claudeAbort = new AbortController();
   claudeBusy = true;
   try {
@@ -632,6 +740,7 @@ $('#proofreadRunBtn').addEventListener('click', async (e) => {
     if (err?.name !== 'AbortError') alert('Claude call failed: ' + (err?.message || err));
     btn.textContent = original;
   } finally {
+    btn.classList.remove('btn-danger');
     btn.disabled = false;
     claudeAbort = null;
     claudeBusy = false;
@@ -687,6 +796,7 @@ function parseClockToSec(s) {
 // ===================================================================
 $('#sendWordBtn').addEventListener('click', () => {
   if (!segments.length) { alert('Nothing to send yet.'); return; }
+  pullEditsFromDom();
   const md = new TextDecoder().decode(engine.formatTranscript(segments, 'md'));
   const title = (currentFile?.name || 'Transcript').replace(/\.[^.]+$/, '');
   const ok = share.sendToWord({ title, markdown: md });
@@ -694,6 +804,7 @@ $('#sendWordBtn').addEventListener('click', () => {
 });
 $('#shareBtn').addEventListener('click', async () => {
   if (!segments.length) { alert('Nothing to share yet.'); return; }
+  pullEditsFromDom();
   const title = (currentFile?.name || 'Transcript').replace(/\.[^.]+$/, '');
   const ext = $('#exportSelect').value;
   const file = engine.formatTranscript(segments, ext);
@@ -710,16 +821,6 @@ $('#shareBtn').addEventListener('click', async () => {
   if (result.method === 'clipboard') flash($('#shareBtn'), 'Copied');
   else if (result.method === 'unsupported') alert('Share isn’t supported in this browser. Use Copy or Export.');
 });
-
-// ===================================================================
-// Cancel a running job (Feature 10)
-// ===================================================================
-$('#runBtn').addEventListener('click', (e) => {
-  if (running) {
-    runAbort?.abort();
-    e.stopImmediatePropagation();
-  }
-}, true); // capture-phase so we run BEFORE the existing run handler
 
 // ===================================================================
 // Captions overlay (Feature 8)
@@ -932,6 +1033,7 @@ $('#replaceAllBtn').addEventListener('click', () => {
   const from = $('#findInput').value;
   const to = $('#replaceInput').value;
   if (!from) return;
+  pullEditsFromDom();
   const re = new RegExp(from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
   segments = segments.map((s) => ({ ...s, text: s.text.replace(re, to) }));
   renderTranscript();
@@ -949,6 +1051,7 @@ $('#copyBtn').addEventListener('click', async () => {
 
 $('#exportBtn').addEventListener('click', () => {
   if (!segments.length) { alert('Nothing to export yet.'); return; }
+  pullEditsFromDom();
   const ext = $('#exportSelect').value;
   const bytes = engine.formatTranscript(segments, ext);
   const base = (currentFile?.name || 'transcript').replace(/\.[^.]+$/, '');

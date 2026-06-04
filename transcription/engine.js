@@ -81,10 +81,11 @@ async function tryFfmpegChain(bytes, ext, filters, onProgress) {
   return runFfmpeg(bytes, { inputName, outputName, args, onProgress });
 }
 
-export async function prepareAudio(file, { enhance = false, onProgress } = {}) {
+export async function prepareAudio(file, { enhance = false, onProgress, signal } = {}) {
   const ext = (file.name.split('.').pop() || '').toLowerCase();
   const isVideo = VIDEO_EXTS.has(ext);
   if (!isVideo && !enhance) return file;
+  if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
 
   const bytes = new Uint8Array(await file.arrayBuffer());
   const chains = enhance
@@ -97,10 +98,12 @@ export async function prepareAudio(file, { enhance = false, onProgress } = {}) {
 
   let lastErr = null;
   for (const chain of chains) {
+    if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
     try {
       const out = await tryFfmpegChain(bytes, ext, chain, onProgress);
       return new File([out], 'audio.wav', { type: 'audio/wav' });
     } catch (err) {
+      if (err?.name === 'AbortError') throw err;
       lastErr = err;
       // Try the next, less ambitious chain.
     }
@@ -201,15 +204,26 @@ export async function transcribe(o) {
 
   const audioFile = await prepareAudio(o.file, {
     enhance: !!o.enhance,
+    signal,
     onProgress: o.onPrepare,
   });
   throwIfAborted();
 
   const live = [];
+  // Different transcribe.js builds fire the streaming hook under different
+  // names (onSegment / onNewSegment / print_segment). We register the same
+  // function under all of them, then dedup re-fires of the same segment by
+  // a cheap `t0|t1|text-prefix` key so the live pane doesn't show triples.
+  const seenKeys = new Set();
   const onSegment = (seg) => {
     if (signal?.aborted) return; // stop appending; the cleanup runs in finally
     const [norm] = normalizeSegments([seg]);
-    if (norm) { live.push(norm); o.onSegment?.(norm); }
+    if (!norm) return;
+    const key = `${norm.t0.toFixed(3)}|${norm.t1.toFixed(3)}|${norm.text.slice(0, 32)}`;
+    if (seenKeys.has(key)) return;
+    seenKeys.add(key);
+    live.push(norm);
+    o.onSegment?.(norm);
   };
 
   const transcriber = new FileTranscriber({
