@@ -115,7 +115,7 @@ precaches them.
 | **Audio enhancement** | FFmpeg `highpass=f=80 → afftdn → loudnorm`, with safe fallbacks | Settings → Enhance audio |
 | **Recording (mic)** | `MediaRecorder` with iOS-correct mime selection (`audio/mp4` first); robust teardown on errors, track-ended, beforeunload | Source panel → Record mic |
 | **Drag-and-drop** | Window-level drop overlay (shared `lib/ui/dropzone.js`) | Anywhere on the page |
-| **Send to RodmanWord** | Hand the transcript to `/word/` as a new doc via `localStorage['rodmanword:incoming']` | Transcript toolbar → → Word |
+| **Send to RodmanWord** | Hand the transcript to `/word/` as a new doc via `localStorage['rodmanword:incoming']` | Transcript toolbar → "→ Word" |
 | **Web Share** | Web Share API for text and files; clipboard fallback | Transcript toolbar → Share |
 | **AI proofread** (BYOK Claude) | Chunked, strict guardrails ("no add/remove/reorder/rephrase"); accept/revert; cancel mid-call | Transcript toolbar → AI proofread |
 | **AI translate** (BYOK Claude) | 9-language picker; preserves segment order/count/timing; accept/revert | Transcript toolbar → AI translate |
