@@ -561,10 +561,9 @@ function appendSegment(seg) {
  * Pure helper: given a list of segment DOM nodes and the current segments
  * array, return a new segments array with each segment's text replaced
  * by the corresponding `.seg-text` textContent (whitespace collapsed).
- * Timings, confidence, and tokens are preserved. Exported so a node-side
- * unit test can exercise it with a synthetic node list.
+ * Timings, confidence, and tokens are preserved.
  */
-export function applyDomEditsToSegments(nodes, segs) {
+function applyDomEditsToSegments(nodes, segs) {
   if (!segs?.length || !nodes?.length) return { segments: segs || [], changed: false };
   const next = segs.slice();
   let changed = false;
@@ -662,6 +661,11 @@ function rerunPipeline() {
 // ===================================================================
 let claudeMode = 'proofread'; // 'proofread' | 'translate' | 'summary'
 
+function claudeRunLabel(mode) {
+  return mode === 'translate' ? 'Translate'
+       : mode === 'summary'   ? 'Summarize'
+       :                        'Proofread';
+}
 function openClaudeBar(mode) {
   claudeMode = mode;
   const bar = $('#proofreadBar');
@@ -669,9 +673,7 @@ function openClaudeBar(mode) {
   const langSel = $('#translateLang');
   const runBtn = $('#proofreadRunBtn');
   langSel.hidden = (mode !== 'translate');
-  runBtn.textContent =
-    mode === 'translate' ? 'Translate' :
-    mode === 'summary'   ? 'Summarize' : 'Proofread';
+  runBtn.textContent = claudeRunLabel(mode);
   $('#proofreadKey').focus();
 }
 $('#proofreadBtn').addEventListener('click', () => openClaudeBar('proofread'));
@@ -694,8 +696,16 @@ $('#proofreadRunBtn').addEventListener('click', async (e) => {
   const key = $('#proofreadKey').value.trim();
   if (!key) { alert('Paste your Anthropic API key first.'); return; }
   pullEditsFromDom();
-  const original = btn.textContent;
+  const progressEl = $('#proofreadProgress');
+  const setProgress = (text) => {
+    if (!text) { progressEl.hidden = true; progressEl.textContent = ''; }
+    else { progressEl.hidden = false; progressEl.textContent = text; }
+  };
+  // Flip the button to "Stop" for the whole flight so the user has an
+  // obvious abort affordance. Live progress goes to the adjacent span.
   btn.classList.add('btn-danger');
+  btn.textContent = 'Stop';
+  setProgress('Starting…');
   claudeAbort = new AbortController();
   claudeBusy = true;
   try {
@@ -706,42 +716,44 @@ $('#proofreadRunBtn').addEventListener('click', async (e) => {
         apiKey: key,
         targetLanguage: lang,
         signal: claudeAbort.signal,
-        onProgress: (r) => { btn.textContent = `Translating… ${Math.round(r * 100)}%`; },
+        onProgress: (r) => setProgress(`Translating… ${Math.round(r * 100)}%`),
       });
       segments = out;
       renderTranscript();
       $('#proofreadAcceptBtn').hidden = false;
       $('#proofreadRevertBtn').hidden = false;
-      btn.textContent = 'Re-run';
       autoSaveTranscript();
     } else if (claudeMode === 'summary') {
-      btn.textContent = 'Summarizing…';
+      setProgress('Summarizing…');
       const payload = await engine.summarizeWithClaude(segments, {
         apiKey: key, signal: claudeAbort.signal,
       });
       renderSummary(payload);
-      btn.textContent = original;
     } else {
       preProofread = segments.map((s) => ({ ...s }));
       const cleaned = await engine.proofreadWithClaude(segments, {
         apiKey: key,
         signal: claudeAbort.signal,
-        onProgress: (r) => { btn.textContent = `Proofreading… ${Math.round(r * 100)}%`; },
+        onProgress: (r) => setProgress(`Proofreading… ${Math.round(r * 100)}%`),
       });
       segments = cleaned;
       renderTranscript();
       $('#proofreadAcceptBtn').hidden = false;
       $('#proofreadRevertBtn').hidden = false;
-      btn.textContent = 'Re-run';
       autoSaveTranscript();
     }
   } catch (err) {
     console.error(err);
     if (err?.name !== 'AbortError') alert('Claude call failed: ' + (err?.message || err));
-    btn.textContent = original;
   } finally {
     btn.classList.remove('btn-danger');
     btn.disabled = false;
+    // After a successful proofread/translate the user can Re-run; for
+    // summary and any error we go back to the mode's default label.
+    const showReRun = (claudeMode === 'proofread' || claudeMode === 'translate')
+      && !$('#proofreadAcceptBtn').hidden;
+    btn.textContent = showReRun ? 'Re-run' : claudeRunLabel(claudeMode);
+    setProgress('');
     claudeAbort = null;
     claudeBusy = false;
   }
@@ -751,11 +763,16 @@ $('#proofreadAcceptBtn').addEventListener('click', () => {
   preTranslate = null;
   $('#proofreadAcceptBtn').hidden = true;
   $('#proofreadRevertBtn').hidden = true;
-  $('#proofreadBar').hidden = true;
+  // User has chosen — aborts any still-running re-run, hides the bar,
+  // and clears claudeBusy/claudeAbort via the helper.
+  closeClaudeBar({ abort: true });
 });
 $('#proofreadRevertBtn').addEventListener('click', () => {
   const snap = preTranslate || preProofread;
   if (!snap) return;
+  // Abort any in-flight re-run before restoring; otherwise its result
+  // would land on top of the reverted segments.
+  try { claudeAbort?.abort(); } catch { /* ignore */ }
   segments = snap;
   preProofread = null;
   preTranslate = null;

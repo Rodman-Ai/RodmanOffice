@@ -318,7 +318,8 @@ button.chapter:hover { background: #a5f3fc; }
      control auto-zooms the page. The desktop default is 14 px (set
      via `select, input { font: inherit }`); we only bump on mobile. */
   .field select, .field input, .field-inline input,
-  .find-bar input, #proofreadKey, .dict-row input[type="text"] {
+  .find-bar input, .find-bar select, #proofreadKey, #translateLang,
+  .export-select, .dict-row input[type="text"] {
     font-size: 16px;
   }
 }
