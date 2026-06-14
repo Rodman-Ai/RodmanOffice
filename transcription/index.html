@@ -24,21 +24,30 @@
     // control — never inside the current document — so we just register
     // and trigger the reload once. app.js' refreshCoi() clears
     // `coiReloaded` once the new document confirms isolation.
-    (function () {
+    (async function () {
       if (!window.isSecureContext || !('serviceWorker' in navigator)) return;
       if (window.crossOriginIsolated) {
         sessionStorage.removeItem('coiReloaded');
         return;
       }
       if (sessionStorage.getItem('coiReloaded')) return; // already tried this session
-      navigator.serviceWorker.register('sw.js', { scope: './' }).then(function () {
-        var reload = function () {
-          sessionStorage.setItem('coiReloaded', '1');
-          window.location.reload();
-        };
-        if (navigator.serviceWorker.controller) reload();
-        else navigator.serviceWorker.addEventListener('controllerchange', reload);
-      }).catch(function () {});
+      try {
+        await navigator.serviceWorker.register('sw.js', { scope: './' });
+        // Wait until a worker is actually active in this scope. `ready`
+        // is far more reliable than listening for `controllerchange`,
+        // which can fire before our listener is attached (so the reload
+        // never happens and the tab is stuck un-isolated — the symptom
+        // we saw). Once there's an active worker, reloading guarantees
+        // the next navigation is served by it WITH the COOP/COEP headers
+        // that make the tab crossOriginIsolated.
+        await Promise.race([
+          navigator.serviceWorker.ready,
+          new Promise(function (r) { setTimeout(r, 4000); }), // don't hang if activation stalls
+        ]);
+        if (window.crossOriginIsolated) { sessionStorage.removeItem('coiReloaded'); return; }
+        sessionStorage.setItem('coiReloaded', '1');
+        window.location.reload();
+      } catch (e) { /* app.js shows a manual Reload button */ }
     })();
   </script>
 
