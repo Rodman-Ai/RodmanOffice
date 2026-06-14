@@ -463,8 +463,10 @@ async function runTranscription() {
   $('#summary').innerHTML = '';
   $('#status').hidden = false;
   setBar('model', 0, '');
+  setBar('prepare', 0, '');
   setBar('run', 0, 'Starting…');
   $('#modelStatus').hidden = false;
+  $('#prepareStatus').hidden = true; // shown on first onPrepare call
   $('#runStatus').hidden = false;
   resetStages();
   // Toggle the run button into a Cancel state.
@@ -489,7 +491,12 @@ async function runTranscription() {
           p.stage === 'cache' ? 'from cache'
             : `${fmtBytes(p.loaded)} / ${fmtBytes(p.total)}`);
       },
-      onPrepare: (r) => setBar('run', 0.02 + (r || 0) * 0.08, 'Preparing audio…'),
+      onPrepare: (r) => {
+        // Dedicated bar so users can tell enhance/FFmpeg apart from the
+        // actual transcribe pass.
+        $('#prepareStatus').hidden = false;
+        setBar('prepare', r || 0, `${Math.round((r || 0) * 100)}%`);
+      },
       onStage: (stage) => {
         onEngineStage(stage);
         // Without these the bar sits at "Starting…" through the multi-second
