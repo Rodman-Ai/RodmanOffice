@@ -7,6 +7,16 @@ import { mountWindowDropzone } from '../lib/ui/dropzone.js';
 
 const $ = (s) => document.querySelector(s);
 
+// Visible build marker. Bump on every deploy — it shows in the header
+// subheading and the console so you can confirm at a glance whether the
+// browser is running fresh code (vs. a stale service-worker cache).
+const APP_VERSION = 'v2026.06.14.1';
+try {
+  console.info(`RodmanTranscribe ${APP_VERSION}`);
+  const verEl = document.getElementById('appVersion');
+  if (verEl) verEl.textContent = APP_VERSION;
+} catch { /* non-fatal */ }
+
 // ---- environment ----
 const UA = (typeof navigator !== 'undefined' && navigator.userAgent) || '';
 const IS_IOS = /iPad|iPhone|iPod/.test(UA) ||
@@ -498,9 +508,10 @@ async function runTranscription() {
         setBar('prepare', r || 0, `${Math.round((r || 0) * 100)}%`);
       },
       onStage: (stage) => {
-        onEngineStage(stage);
-        // Without these the bar sits at "Starting…" through the multi-second
-        // engine + model + WASM compile phase, and users assume it's hung.
+        // Update the bar label FIRST so a stages-list render error can't
+        // strand the bar at "Starting…". Without these the bar sits at
+        // "Starting…" through the multi-second engine + model + WASM
+        // compile phase, and users assume it's hung.
         const label = {
           'loading-engine':       'Loading engine…',
           'downloading-model':    'Loading model…',
@@ -509,6 +520,7 @@ async function runTranscription() {
           'transcribing':         'Transcribing…',
         }[stage];
         if (label) setBar('run', undefined, label);
+        try { onEngineStage(stage); } catch { /* stages list is cosmetic */ }
       },
       onSegment: (seg) => {
         rawSegments.push(seg); appendSegment(seg);
