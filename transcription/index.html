@@ -226,6 +226,20 @@
         <div id="captionsOverlay" class="captions-overlay" hidden></div>
       </section>
     </main>
+
+    <!-- Diagnostics: a live log of every step + any errors, so a stuck
+         run can be pinpointed. Hidden until the first run (or an error). -->
+    <section id="debugPanel" class="debug-panel" hidden>
+      <div class="debug-head">
+        <strong>Diagnostics</strong>
+        <span class="muted" id="debugMeta"></span>
+        <span class="debug-actions">
+          <button class="btn btn-tiny" id="debugCopyBtn" type="button">Copy</button>
+          <button class="btn btn-tiny" id="debugClearBtn" type="button">Clear</button>
+        </span>
+      </div>
+      <ol id="debugLines" class="debug-lines"></ol>
+    </section>
   </div>
 
   <!-- Recent transcripts -->
