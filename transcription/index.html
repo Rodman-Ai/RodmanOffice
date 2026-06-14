@@ -44,11 +44,13 @@
 
   <!-- Pinned prebuilt whisper.cpp WASM via transcribe.js (MIT). The shout
        glue resolves its sibling .wasm / worker from the same jsdelivr
-       directory automatically. -->
+       directory automatically. The transcriber package has no dist/
+       folder — `src/index.js` is the package main; jsdelivr serves
+       relative imports inside it directly off the same /src/ path. -->
   <script type="importmap">
   {
     "imports": {
-      "@transcribe/transcriber": "https://cdn.jsdelivr.net/npm/@transcribe/transcriber@3.0.1/dist/transcriber.js",
+      "@transcribe/transcriber": "https://cdn.jsdelivr.net/npm/@transcribe/transcriber@3.0.1/src/index.js",
       "@transcribe/shout": "https://cdn.jsdelivr.net/npm/@transcribe/shout@1.0.7/src/shout/shout.wasm.js"
     }
   }
