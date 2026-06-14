@@ -10,7 +10,7 @@ const $ = (s) => document.querySelector(s);
 // Visible build marker. Bump on every deploy — it shows in the header
 // subheading and the console so you can confirm at a glance whether the
 // browser is running fresh code (vs. a stale service-worker cache).
-const APP_VERSION = 'PR #114';
+const APP_VERSION = 'PR #115';
 try {
   console.info(`RodmanTranscribe ${APP_VERSION}`);
   const verEl = document.getElementById('appVersion');
@@ -511,18 +511,21 @@ const STAGE_ORDER = Object.keys(STAGE_LABELS);
 
 let stageState = null;
 function resetStages() {
-  const el = $('#stages');
   stageState = { entries: [], t0: performance.now(), tick: null };
+  const el = $('#stages');
+  if (!el) return; // inline list is optional — Diagnostics covers it
   el.innerHTML = '';
   el.hidden = false;
 }
 function hideStages() {
   if (stageState?.tick) { clearInterval(stageState.tick); stageState.tick = null; }
   stageState = null;
-  $('#stages').hidden = true;
+  const el = $('#stages');
+  if (el) el.hidden = true;
 }
 function renderStages() {
   const el = $('#stages');
+  if (!el || !stageState) return;
   const now = performance.now();
   el.innerHTML = stageState.entries.map((s) => {
     const cls = s.endedAt ? 'done' : s.failed ? 'failed' : 'active';
