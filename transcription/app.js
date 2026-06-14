@@ -10,12 +10,63 @@ const $ = (s) => document.querySelector(s);
 // Visible build marker. Bump on every deploy — it shows in the header
 // subheading and the console so you can confirm at a glance whether the
 // browser is running fresh code (vs. a stale service-worker cache).
-const APP_VERSION = 'PR #113';
+const APP_VERSION = 'PR #114';
 try {
   console.info(`RodmanTranscribe ${APP_VERSION}`);
   const verEl = document.getElementById('appVersion');
   if (verEl) verEl.textContent = APP_VERSION;
 } catch { /* non-fatal */ }
+
+// ===================================================================
+// Diagnostics log — a visible, timestamped trace of every step plus any
+// errors, so a stuck/failed run can be pinpointed without devtools.
+// ===================================================================
+const DBG_T0 = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+function dbgEsc(s) {
+  return String(s).replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
+}
+function dbg(msg, kind = 'info') {
+  const t = (((typeof performance !== 'undefined' ? performance.now() : Date.now()) - DBG_T0) / 1000).toFixed(2);
+  try {
+    const panel = document.getElementById('debugPanel');
+    const ol = document.getElementById('debugLines');
+    if (panel) panel.hidden = false;
+    if (ol) {
+      const li = document.createElement('li');
+      li.innerHTML = `<span class="t">[+${t}s]</span> <span class="${kind}">${dbgEsc(msg)}</span>`;
+      ol.appendChild(li);
+      ol.scrollTop = ol.scrollHeight;
+      while (ol.children.length > 400) ol.removeChild(ol.firstChild);
+    }
+  } catch { /* ignore */ }
+  try {
+    const fn = kind === 'err' ? 'error' : kind === 'warn' ? 'warn' : 'log';
+    console[fn](`[rt +${t}s] ${msg}`);
+  } catch { /* ignore */ }
+}
+// Catch errors that DON'T surface as awaited rejections — e.g. failures
+// thrown from WASM pthread workers, which otherwise vanish silently.
+window.addEventListener('error', (e) => {
+  dbg(`window error: ${e.message || e.type} @ ${e.filename || '?'}:${e.lineno || 0}:${e.colno || 0}`, 'err');
+});
+window.addEventListener('unhandledrejection', (e) => {
+  const r = e.reason;
+  dbg(`unhandled rejection: ${r && r.stack ? r.stack : (r && r.message) || r}`, 'err');
+});
+try {
+  dbg(`${APP_VERSION} loaded · secureContext=${window.isSecureContext} · crossOriginIsolated=${engine.isCrossOriginIsolated()} · controller=${!!(navigator.serviceWorker && navigator.serviceWorker.controller)}`, 'info');
+} catch { /* ignore */ }
+document.getElementById('debugCopyBtn')?.addEventListener('click', () => {
+  const text = Array.from(document.querySelectorAll('#debugLines li')).map((li) => li.textContent).join('\n');
+  navigator.clipboard?.writeText(text).then(
+    () => dbg('(diagnostics copied to clipboard)', 'info'),
+    () => dbg('(clipboard blocked — select the text manually)', 'warn'),
+  );
+});
+document.getElementById('debugClearBtn')?.addEventListener('click', () => {
+  const ol = document.getElementById('debugLines');
+  if (ol) ol.innerHTML = '';
+});
 
 // ---- environment ----
 const UA = (typeof navigator !== 'undefined' && navigator.userAgent) || '';
@@ -442,13 +493,17 @@ $('#runBtn').addEventListener('click', () => {
 // ===================================================================
 const STAGE_LABELS = {
   'loading-engine':       'Loading the speech engine (one-time, runs on your device)',
+  'engine-loaded':        '  · engine code loaded',
   'downloading-model':    'Loading the model into memory',
+  'model-loaded':         '  · model loaded',
   'preparing-audio':      'Preparing audio',
   'audio-passthrough':    '  · using the audio as-is (no enhancement)',
   'audio-read':           '  · reading the file',
   'ffmpeg-run':           '  · cleaning up audio (denoise + normalize)',
   'ffmpeg-fallback':      '  · cleaning up audio (fallback settings)',
-  'initialising-engine':  'Warming up the neural network (compiling WASM)',
+  'audio-ready':          '  · audio ready',
+  'initialising-engine':  'Warming up the neural network (compiling WASM + threads)',
+  'engine-initialised':   '  · engine initialised',
   'transcribing':         'Transcribing — entirely on your device, nothing uploaded',
   'first-segment':        '  · first words recognized',
 };
@@ -510,7 +565,11 @@ async function runTranscription() {
   if (!currentFile || running) return;
   // On-demand cross-origin isolation: if the tab isn't isolated yet, set
   // that up first (one reload). ensureIsolation() handles the messaging.
-  if (!engine.isCrossOriginIsolated()) { await ensureIsolation(); return; }
+  if (!engine.isCrossOriginIsolated()) {
+    dbg('not cross-origin isolated → ensureIsolation() (will reload)', 'warn');
+    await ensureIsolation(); return;
+  }
+  dbg(`run start · file="${currentFile.name}" ${(currentFile.size / 1e6).toFixed(1)}MB · model=${$('#modelSelect').value} · threads=${$('#threadsInput').value} · enhance=${$('#enhanceChk').checked}`, 'info');
   running = true;
   runAbort = new AbortController();
   rawSegments = [];
@@ -537,6 +596,7 @@ async function runTranscription() {
   runBtn.textContent = 'Cancel';
   runBtn.classList.add('btn-danger');
   const started = performance.now();
+  let modelLogged = false;
 
   try {
     const result = await engine.transcribe({
@@ -553,6 +613,10 @@ async function runTranscription() {
         setBar('model', pct,
           p.stage === 'cache' ? 'from cache'
             : `${fmtBytes(p.loaded)} / ${fmtBytes(p.total)}`);
+        if (!modelLogged && (p.stage === 'cache' || p.loaded === 0)) {
+          modelLogged = true;
+          dbg(`model: ${p.stage === 'cache' ? 'served from cache' : 'downloading ' + fmtBytes(p.total)}`, 'info');
+        }
       },
       onPrepare: (r) => {
         // Dedicated bar so users can tell enhance/FFmpeg apart from the
@@ -561,6 +625,7 @@ async function runTranscription() {
         setBar('prepare', r || 0, `${Math.round((r || 0) * 100)}%`);
       },
       onStage: (stage) => {
+        dbg(`stage: ${stage}`, 'stage');
         // Update the bar label FIRST so a stages-list render error can't
         // strand the bar at "Starting…". Without these the bar sits at
         // "Starting…" through the multi-second engine + model + WASM
@@ -604,6 +669,7 @@ async function runTranscription() {
 
     setBar('run', 1, 'Done');
     finishStages();
+    dbg(`done · ${segments.length} segments in ${((performance.now() - started) / 1000).toFixed(1)}s`, 'stage');
     const elapsed = (performance.now() - started) / 1000;
     if (audioDuration > 0) {
       const rtf = elapsed / audioDuration;
@@ -615,6 +681,7 @@ async function runTranscription() {
     updateModelNote();
   } catch (err) {
     if (err?.name === 'AbortError') {
+      dbg('cancelled by user', 'warn');
       setBar('run', 0, 'Cancelled');
       finishStages({ failed: true });
       // Keep whatever has streamed so far — user can save or re-run.
@@ -632,7 +699,9 @@ async function runTranscription() {
       }
     } else {
       console.error(err);
-      setBar('run', 0, '');
+      dbg(`ERROR: ${err?.message || err}`, 'err');
+      if (err?.stack) dbg(err.stack, 'err');
+      setBar('run', 0, 'Failed');
       $('#runDetail').textContent = '';
       finishStages({ failed: true });
       transcriptEl.innerHTML =

@@ -204,10 +204,12 @@ export async function transcribe(o) {
 
   o.onStage?.('loading-engine');
   const { FileTranscriber, createModule } = await loadEngine();
+  o.onStage?.('engine-loaded');
   throwIfAborted();
   const modelId = o.modelId || DEFAULT_MODEL_ID;
   o.onStage?.('downloading-model');
   const modelFile = await getModelFile(modelId, o.onModel);
+  o.onStage?.('model-loaded');
   throwIfAborted();
 
   o.onStage?.('preparing-audio');
@@ -217,6 +219,7 @@ export async function transcribe(o) {
     onProgress: o.onPrepare,
     onStage: o.onStage,
   });
+  o.onStage?.('audio-ready');
   throwIfAborted();
 
   const live = [];
@@ -262,6 +265,7 @@ export async function transcribe(o) {
   try {
     o.onStage?.('initialising-engine');
     await transcriber.init();
+    o.onStage?.('engine-initialised');
     throwIfAborted();
     o.onStage?.('transcribing');
     let result;
