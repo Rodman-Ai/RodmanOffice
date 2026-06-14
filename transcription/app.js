@@ -10,7 +10,7 @@ const $ = (s) => document.querySelector(s);
 // Visible build marker. Bump on every deploy — it shows in the header
 // subheading and the console so you can confirm at a glance whether the
 // browser is running fresh code (vs. a stale service-worker cache).
-const APP_VERSION = 'PR #115';
+const APP_VERSION = 'PR #116';
 try {
   console.info(`RodmanTranscribe ${APP_VERSION}`);
   const verEl = document.getElementById('appVersion');
@@ -502,6 +502,7 @@ const STAGE_LABELS = {
   'ffmpeg-run':           '  · cleaning up audio (denoise + normalize)',
   'ffmpeg-fallback':      '  · cleaning up audio (fallback settings)',
   'audio-ready':          '  · audio ready',
+  'decoding-audio':       'Decoding audio (windowing long recording)',
   'initialising-engine':  'Warming up the neural network (compiling WASM + threads)',
   'engine-initialised':   '  · engine initialised',
   'transcribing':         'Transcribing — entirely on your device, nothing uploaded',
@@ -604,6 +605,7 @@ async function runTranscription() {
   try {
     const result = await engine.transcribe({
       file: currentFile,
+      durationSec: audioDuration,
       modelId: $('#modelSelect').value,
       language: $('#langSelect').value,
       translate: $('#translateChk').checked,
@@ -637,9 +639,10 @@ async function runTranscription() {
           'loading-engine':       'Loading speech engine…',
           'downloading-model':    'Loading model…',
           'preparing-audio':      'Preparing audio…',
+          'decoding-audio':       'Decoding audio…',
           'initialising-engine':  'Warming up engine…',
           'transcribing':         'Transcribing…',
-        }[stage];
+        }[stage] || (stage.startsWith('transcribing') ? 'Transcribing…' : null);
         if (label) setBar('run', undefined, label);
         try { onEngineStage(stage); } catch { /* stages list is cosmetic */ }
       },

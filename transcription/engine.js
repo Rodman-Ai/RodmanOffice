@@ -117,6 +117,58 @@ export async function prepareAudio(file, { enhance = false, onProgress, onStage,
   throw lastErr || new Error('Audio preparation failed');
 }
 
+// ---- windowing helpers (for long recordings) -------------------------
+// A long file decoded whole is one big Float32Array in the WASM heap,
+// which overflows it ("Invalid typed array length"). We decode the whole
+// source to 16 kHz mono ONCE in JS (cheap, on the JS heap), then feed the
+// engine in time windows so the WASM heap only ever holds one window.
+
+// Decode any audio/video File to a 16 kHz mono Float32Array using WebAudio
+// (same path transcribe.js uses internally, just done once up front).
+async function decodeTo16kMono(file) {
+  const AC = self.AudioContext || self.webkitAudioContext;
+  if (!AC) throw new Error('Web Audio API unavailable for decoding.');
+  const ctx = new AC({ sampleRate: 16000 });
+  try {
+    const buf = await file.arrayBuffer();
+    const audio = await ctx.decodeAudioData(buf);
+    if (audio.numberOfChannels <= 1) return audio.getChannelData(0);
+    // Downmix to mono by averaging channels.
+    const n = audio.length;
+    const out = new Float32Array(n);
+    for (let c = 0; c < audio.numberOfChannels; c++) {
+      const ch = audio.getChannelData(c);
+      for (let i = 0; i < n; i++) out[i] += ch[i];
+    }
+    const inv = 1 / audio.numberOfChannels;
+    for (let i = 0; i < n; i++) out[i] *= inv;
+    return out;
+  } finally {
+    try { await ctx.close(); } catch { /* ignore */ }
+  }
+}
+
+// Wrap a Float32 PCM slice ([-1,1], 16 kHz mono) in a minimal WAV File so
+// transcribe.js can decode it through its normal File path.
+function floatToWavFile(float32, sampleRate = 16000) {
+  const n = float32.length;
+  const buffer = new ArrayBuffer(44 + n * 2);
+  const view = new DataView(buffer);
+  const ws = (off, s) => { for (let i = 0; i < s.length; i++) view.setUint8(off + i, s.charCodeAt(i)); };
+  ws(0, 'RIFF'); view.setUint32(4, 36 + n * 2, true); ws(8, 'WAVE');
+  ws(12, 'fmt '); view.setUint32(16, 16, true); view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true); view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true); view.setUint16(32, 2, true); view.setUint16(34, 16, true);
+  ws(36, 'data'); view.setUint32(40, n * 2, true);
+  let off = 44;
+  for (let i = 0; i < n; i++) {
+    const s = Math.max(-1, Math.min(1, float32[i]));
+    view.setInt16(off, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+    off += 2;
+  }
+  return new File([buffer], 'window.wav', { type: 'audio/wav' });
+}
+
 // ---- segment normalization ----
 // transcribe.js returns segments with millisecond `offsets` and/or
 // "HH:MM:SS,mmm" `from`/`to`. Normalize to the seconds-based shape that
@@ -212,99 +264,138 @@ export async function transcribe(o) {
   o.onStage?.('model-loaded');
   throwIfAborted();
 
-  o.onStage?.('preparing-audio');
-  const audioFile = await prepareAudio(o.file, {
-    enhance: !!o.enhance,
-    signal,
-    onProgress: o.onPrepare,
-    onStage: o.onStage,
-  });
-  o.onStage?.('audio-ready');
-  throwIfAborted();
+  // ---- decide on windowing --------------------------------------------
+  // Long audio decoded whole overflows the WASM heap. If we know the
+  // duration and it's long, we decode to 16 kHz mono once in JS and feed
+  // the engine in windows. WINDOW_SEC keeps each window's Float32 small
+  // (~19 MB at 5 min); the model stays resident across windows.
+  const WINDOW_SEC = 300;
+  const OVERLAP_SEC = 1; // small overlap so a word isn't clipped at a cut
+  const durationSec = o.durationSec || 0;
+  const windowed = durationSec > WINDOW_SEC + OVERLAP_SEC;
+  const windowCount = windowed ? Math.ceil(durationSec / WINDOW_SEC) : 1;
 
   const live = [];
   // Different transcribe.js builds fire the streaming hook under different
-  // names (onSegment / onNewSegment / print_segment). We register the same
-  // function under all of them, then dedup re-fires of the same segment by
-  // a cheap `t0|t1|text-prefix` key so the live pane doesn't show triples.
+  // names (onSegment / onNewSegment / print_segment); register the same fn
+  // under all and dedup by `t0|t1|text-prefix`. In windowed mode the engine
+  // reports window-relative times, so we shift by the current window start.
   const seenKeys = new Set();
   let firstSegmentSeen = false;
-  const onSegment = (seg) => {
-    if (signal?.aborted) return; // stop appending; the cleanup runs in finally
+  let windowStartSec = 0;
+  let windowIndex = 0;
+  const ingest = (seg) => {
     const [norm] = normalizeSegments([seg]);
     if (!norm) return;
-    const key = `${norm.t0.toFixed(3)}|${norm.t1.toFixed(3)}|${norm.text.slice(0, 32)}`;
+    const shifted = windowStartSec
+      ? { ...norm, t0: norm.t0 + windowStartSec, t1: norm.t1 + windowStartSec }
+      : norm;
+    const key = `${shifted.t0.toFixed(3)}|${shifted.t1.toFixed(3)}|${shifted.text.slice(0, 32)}`;
     if (seenKeys.has(key)) return;
     if (!firstSegmentSeen) { firstSegmentSeen = true; o.onStage?.('first-segment'); }
     seenKeys.add(key);
-    live.push(norm);
-    o.onSegment?.(norm);
+    live.push(shifted);
+    o.onSegment?.(shifted);
   };
+  const onSegment = (seg) => { if (!signal?.aborted) ingest(seg); };
 
   const transcriber = new FileTranscriber({
     createModule,
     model: modelFile,
-    onProgress: (p) => o.onProgress?.(typeof p === 'number' ? p / 100 : 0),
+    onProgress: (p) => {
+      const frac = typeof p === 'number' ? p / 100 : 0;
+      o.onProgress?.((windowIndex + frac) / windowCount);
+    },
     onSegment,
-    // transcribe.js has used a few names across versions for the
-    // per-segment hook; pass the same fn under the likely aliases so we
-    // get live streaming regardless of which one the build calls.
     onNewSegment: onSegment,
     print_segment: onSegment,
   });
 
   // If we get aborted while transcribe.js is running, the cleanest thing
   // we can do from JS is tear the transcriber down — transcribe.js
-  // doesn't document an abort path. The downstream UI uses the abort
-  // signal to stop rendering further segments either way.
-  const onAbort = () => {
-    try { transcriber.destroy?.(); } catch { /* noop */ }
-  };
+  // doesn't document an abort path.
+  const onAbort = () => { try { transcriber.destroy?.(); } catch { /* noop */ } };
   signal?.addEventListener?.('abort', onAbort, { once: true });
+
+  const tOpts = {
+    lang: o.language || 'en',
+    translate: !!o.translate,
+    threads: o.threads || Math.min(navigator.hardwareConcurrency || 4, 8),
+    suppress_non_speech: o.suppressNonSpeech !== false, // default ON
+    ...(o.audioCtx ? { audio_ctx: o.audioCtx } : {}),
+    ...(o.maxTokens ? { max_tokens: o.maxTokens } : {}),
+    ...(o.maxLen ? { max_len: o.maxLen } : {}),
+  };
+
+  const friendlyOom = (err) => {
+    const msg = err?.message || String(err);
+    if (/Invalid typed array length|out of memory|RuntimeError/i.test(msg)) {
+      const m = /Invalid typed array length:\s*(\d+)/.exec(msg);
+      const mins = m ? Math.round(+m[1] / 16000 / 60) : 0; // length = 16 kHz Float32 samples
+      return new Error(
+        'Ran out of memory while loading the audio into the engine' +
+        (mins > 0 ? ` (~${mins} min)` : '') +
+        '. Try a shorter clip, a smaller model (medium / base.en), or fewer threads. (' + msg + ')',
+      );
+    }
+    return err;
+  };
+
+  // Run one transcribe pass over a (small) File, reconciling its final
+  // result into `live` (covers builds that only return at the end).
+  const runPass = async (file) => {
+    let result;
+    try {
+      result = await transcriber.transcribe(file, tOpts);
+    } catch (err) {
+      if (err?.name === 'AbortError') throw err;
+      throw friendlyOom(err);
+    }
+    for (const s of normalizeSegments(result)) ingest(s);
+  };
 
   try {
     o.onStage?.('initialising-engine');
     await transcriber.init();
     o.onStage?.('engine-initialised');
     throwIfAborted();
-    o.onStage?.('transcribing');
-    let result;
-    try {
-      result = await transcriber.transcribe(audioFile, {
-        lang: o.language || 'en',
-        translate: !!o.translate,
-        threads: o.threads || Math.min(navigator.hardwareConcurrency || 4, 8),
-        // Genuinely exposed quality knobs (per the transcribe.js docs at
-        // transcribejs.dev). Defensive — silently ignored by builds that
-        // don't read them.
-        suppress_non_speech: o.suppressNonSpeech !== false, // default ON
-        ...(o.audioCtx ? { audio_ctx: o.audioCtx } : {}),
-        ...(o.maxTokens ? { max_tokens: o.maxTokens } : {}),
-        ...(o.maxLen ? { max_len: o.maxLen } : {}),
+
+    if (!windowed) {
+      // Short clip: hand the whole file to transcribe.js as before.
+      o.onStage?.('preparing-audio');
+      const audioFile = await prepareAudio(o.file, {
+        enhance: !!o.enhance, signal, onProgress: o.onPrepare, onStage: o.onStage,
       });
-    } catch (err) {
-      // `RangeError: Invalid typed array length: N` comes out of WASM when
-      // the audio Float32Array can't be allocated alongside the model.
-      // Translate to something users can act on.
-      const msg = err?.message || String(err);
-      if (/Invalid typed array length|out of memory|RuntimeError/i.test(msg)) {
-        const lengthMatch = /Invalid typed array length:\s*(\d+)/.exec(msg);
-        // The audio is decoded to 16 kHz mono Float32 (4 bytes/sample).
-        const mins = lengthMatch ? Math.round(+lengthMatch[1] / 4 / 16000 / 60) : 0;
-        throw new Error(
-          'Ran out of memory while loading the audio into the engine' +
-          (mins > 0 ? ` (~${mins} min clip)` : '') +
-          '. Try a shorter clip, a smaller model (medium / base.en), ' +
-          'or turn off Enhance audio. (' + msg + ')',
-        );
+      o.onStage?.('audio-ready');
+      throwIfAborted();
+      o.onStage?.('transcribing');
+      await runPass(audioFile);
+    } else {
+      // Long recording: decode once, then transcribe window by window.
+      o.onStage?.('decoding-audio');
+      const pcm = await decodeTo16kMono(o.file);
+      throwIfAborted();
+      const sr = 16000;
+      const winLen = WINDOW_SEC * sr;
+      const overlap = OVERLAP_SEC * sr;
+      for (windowIndex = 0; windowIndex < windowCount; windowIndex++) {
+        throwIfAborted();
+        const startSample = windowIndex * winLen;
+        if (startSample >= pcm.length) break;
+        windowStartSec = startSample / sr;
+        const endSample = Math.min(pcm.length, startSample + winLen + overlap);
+        let winFile = floatToWavFile(pcm.subarray(startSample, endSample), sr);
+        if (o.enhance) {
+          winFile = await prepareAudio(winFile, { enhance: true, signal, onProgress: o.onPrepare });
+        }
+        throwIfAborted();
+        o.onStage?.(`transcribing window ${windowIndex + 1}/${windowCount}`);
+        await runPass(winFile);
       }
-      throw err;
+      windowStartSec = 0;
     }
     throwIfAborted();
-    // Prefer the engine's final result; fall back to streamed segments.
-    let segments = normalizeSegments(result);
-    if (!segments.length && live.length) segments = live;
-    return { segments };
+    return { segments: live.slice() };
   } finally {
     signal?.removeEventListener?.('abort', onAbort);
     try { transcriber.destroy?.(); } catch { /* noop */ }
