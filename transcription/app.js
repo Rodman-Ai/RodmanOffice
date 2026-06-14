@@ -29,7 +29,9 @@ const RAM_GB = (typeof navigator !== 'undefined' && navigator.deviceMemory) || n
 // to base.en on these; a one-tap "use large-v3 anyway" link still works.
 const LOW_RAM = IS_MOBILE || (RAM_GB !== null && RAM_GB <= 4);
 const APP_DEFAULT_MODEL = LOW_RAM ? 'base.en-q5_1' : 'large-v3-q5_0';
-const APP_DEFAULT_THREADS = Math.min(HC, IS_MOBILE ? 4 : 8);
+// Default to single-threaded: lowest memory pressure and the most stable
+// across devices. Users can raise it in Settings → Threads.
+const APP_DEFAULT_THREADS = 1;
 
 // ---- state ----
 let currentFile = null;
@@ -58,63 +60,92 @@ const player = $('#player');
 const transcriptEl = $('#transcript');
 
 // ===================================================================
-// Cross-origin isolation banner — iOS-aware
+// Cross-origin isolation — ON-DEMAND
 // ===================================================================
-function refreshCoi() {
-  const isolated = engine.isCrossOriginIsolated();
-  try {
-    console.info('[coi] isolated=%s controller=%s reloadedFlag=%s',
-      isolated,
-      !!(navigator.serviceWorker && navigator.serviceWorker.controller),
-      (() => { try { return sessionStorage.getItem('coiReloaded'); } catch { return '?'; } })());
-  } catch { /* ignore */ }
-  $('#coiBanner').hidden = isolated;
-  if (isolated) {
-    try { sessionStorage.removeItem('coiReloaded'); } catch { /* ignore */ }
-    return;
-  }
-  // We're NOT isolated. Two cases:
-  //   1. Page hasn't reloaded under the SW yet — the inline bootstrap
-  //      script will do that automatically; show the "preparing" copy.
-  //   2. We already reloaded once this session and still aren't isolated
-  //      (an iOS Safari edge case where the SW didn't take control on
-  //      the first try). Surface a manual Reload button and helpful copy.
-  let alreadyTried = false;
-  try { alreadyTried = !!sessionStorage.getItem('coiReloaded'); } catch { /* ignore */ }
-  const title = $('#coiTitle');
-  const body = $('#coiBody');
-  const btn = $('#coiReloadBtn');
-  if (alreadyTried) {
-    title.textContent = 'Tap Reload to enable the transcription engine.';
-    body.textContent = IS_IOS
-      ? 'Safari sometimes needs an extra reload to enter the isolated tab where multi-threaded WebAssembly runs.'
-      : 'Your browser needs an extra reload to enter the isolated tab where multi-threaded WebAssembly runs.';
-    btn.hidden = false;
-  } else {
-    title.textContent = 'Preparing the high-performance engine…';
-    body.textContent = 'This tab needs cross-origin isolation for multi-threaded transcription.';
-    btn.hidden = true;
-  }
+// The whisper WASM (shout) is built with shared memory, so it needs
+// SharedArrayBuffer → the tab must be crossOriginIsolated (COOP+COEP,
+// synthesized by sw.js). Rather than forcing that on first load (a
+// reload dance that proved fragile), we load the app un-isolated and
+// usable, and acquire isolation lazily the first time the user actually
+// transcribes. After that single reload, the service worker controls
+// every future visit, so they start isolated automatically — no banner,
+// no reload, ever again.
+const COI_FLAG = 'coiResume';
+const coiBanner = $('#coiBanner');
+
+function hideCoiBanner() { coiBanner.hidden = true; coiBanner.className = 'banner banner-warn'; }
+function showCoiBanner({ ok = false, title, body, button = false }) {
+  coiBanner.hidden = false;
+  coiBanner.className = ok ? 'banner banner-ok' : 'banner banner-warn';
+  $('#coiTitle').textContent = title;
+  $('#coiBody').textContent = body;
+  $('#coiReloadBtn').hidden = !button;
 }
+
+// Called when the user starts a transcription on an un-isolated tab.
+// Returns false (and reloads) if it needs to set up isolation first.
+async function ensureIsolation() {
+  if (engine.isCrossOriginIsolated()) return true;
+  if (!window.isSecureContext || !('serviceWorker' in navigator)) {
+    showCoiBanner({
+      title: 'This browser can’t run the on-device engine.',
+      body: 'Multi-threaded WebAssembly needs a secure context with service-worker support. Try a recent Chrome, Edge, or Firefox.',
+    });
+    return false;
+  }
+  // Already reloaded once and STILL not isolated → don't loop; explain.
+  if (sessionStorage.getItem(COI_FLAG)) {
+    showCoiBanner({
+      title: 'Couldn’t enable the on-device engine.',
+      body: IS_IOS
+        ? 'Safari blocked the isolated tab needed for multi-threaded WebAssembly. Try Reload, or open in a recent Chrome/Edge.'
+        : 'This browser or host blocked the isolated tab needed for multi-threaded WebAssembly. Try Reload, or a recent Chrome / Edge / Firefox.',
+      button: true,
+    });
+    return false;
+  }
+  // First attempt: explain, make sure the SW is active, then reload into
+  // the isolated tab.
+  showCoiBanner({
+    title: 'Setting up the on-device engine…',
+    body: 'Transcription runs in an isolated browser tab (required by the WebAssembly engine). The page will reload once to turn that on — nothing is uploaded. After it reloads, choose your file again and press Transcribe.',
+  });
+  try {
+    await navigator.serviceWorker.register('sw.js', { scope: './' });
+    await Promise.race([
+      navigator.serviceWorker.ready,
+      new Promise((r) => setTimeout(r, 4000)),
+    ]);
+  } catch { /* reload anyway — the SW may already be active */ }
+  try { sessionStorage.setItem(COI_FLAG, '1'); } catch { /* ignore */ }
+  window.location.reload();
+  return false;
+}
+
+// On load: keep the banner hidden so the app is immediately usable. If we
+// just came back from an isolation reload, clear the flag and flash a
+// brief "ready" note when it worked.
+(function initIsolation() {
+  hideCoiBanner();
+  try {
+    console.info('[coi] isolated=%s controller=%s',
+      engine.isCrossOriginIsolated(),
+      !!(navigator.serviceWorker && navigator.serviceWorker.controller));
+  } catch { /* ignore */ }
+  if (!sessionStorage.getItem(COI_FLAG)) return;
+  if (engine.isCrossOriginIsolated()) {
+    try { sessionStorage.removeItem(COI_FLAG); } catch { /* ignore */ }
+    showCoiBanner({ ok: true, title: '✓ Engine ready', body: 'Choose your file and press Transcribe.' });
+    setTimeout(hideCoiBanner, 6000);
+  }
+  // Still not isolated: keep the flag; ensureIsolation() shows the
+  // "couldn’t enable" message when they next press Transcribe.
+})();
+
 $('#coiReloadBtn')?.addEventListener('click', () => {
-  try { sessionStorage.removeItem('coiReloaded'); } catch { /* ignore */ }
+  try { sessionStorage.removeItem(COI_FLAG); } catch { /* ignore */ }
   window.location.reload();
 });
-refreshCoi();
-window.addEventListener('load', () => setTimeout(refreshCoi, 200));
-// Watchdog: the inline bootstrap should reload us into the isolated tab
-// within a second or two. If we're still not isolated after a grace
-// period, force the manual Reload button (and its helpful copy) so the
-// user is never stranded on a static "Preparing…" with no way forward.
-let coiChecks = 0;
-const coiWatch = setInterval(() => {
-  if (engine.isCrossOriginIsolated()) { clearInterval(coiWatch); refreshCoi(); return; }
-  if (++coiChecks >= 4) { // ~6s at 1.5s/check
-    clearInterval(coiWatch);
-    try { sessionStorage.setItem('coiReloaded', '1'); } catch { /* ignore */ }
-    refreshCoi(); // now renders the manual Reload button
-  }
-}, 1500);
 
 // ===================================================================
 // Model picker
@@ -410,16 +441,16 @@ $('#runBtn').addEventListener('click', () => {
 // Exposed for testing / debugging.
 // ===================================================================
 const STAGE_LABELS = {
-  'loading-engine':       'Loading engine (JS imports)',
-  'downloading-model':    'Loading model bytes',
+  'loading-engine':       'Loading the speech engine (one-time, runs on your device)',
+  'downloading-model':    'Loading the model into memory',
   'preparing-audio':      'Preparing audio',
-  'audio-passthrough':    '  · passthrough (audio file, no enhance)',
-  'audio-read':           '  · reading file bytes',
-  'ffmpeg-run':           '  · running FFmpeg (full chain)',
-  'ffmpeg-fallback':      '  · FFmpeg fallback chain',
-  'initialising-engine':  'Initialising WASM (compile + model into FS)',
-  'transcribing':         'Transcribing (WASM running)',
-  'first-segment':        '  · first segment received',
+  'audio-passthrough':    '  · using the audio as-is (no enhancement)',
+  'audio-read':           '  · reading the file',
+  'ffmpeg-run':           '  · cleaning up audio (denoise + normalize)',
+  'ffmpeg-fallback':      '  · cleaning up audio (fallback settings)',
+  'initialising-engine':  'Warming up the neural network (compiling WASM)',
+  'transcribing':         'Transcribing — entirely on your device, nothing uploaded',
+  'first-segment':        '  · first words recognized',
 };
 const STAGE_ORDER = Object.keys(STAGE_LABELS);
 
@@ -477,6 +508,9 @@ function finishStages({ failed = false } = {}) {
 
 async function runTranscription() {
   if (!currentFile || running) return;
+  // On-demand cross-origin isolation: if the tab isn't isolated yet, set
+  // that up first (one reload). ensureIsolation() handles the messaging.
+  if (!engine.isCrossOriginIsolated()) { await ensureIsolation(); return; }
   running = true;
   runAbort = new AbortController();
   rawSegments = [];
@@ -532,10 +566,10 @@ async function runTranscription() {
         // "Starting…" through the multi-second engine + model + WASM
         // compile phase, and users assume it's hung.
         const label = {
-          'loading-engine':       'Loading engine…',
+          'loading-engine':       'Loading speech engine…',
           'downloading-model':    'Loading model…',
           'preparing-audio':      'Preparing audio…',
-          'initialising-engine':  'Initialising WASM…',
+          'initialising-engine':  'Warming up engine…',
           'transcribing':         'Transcribing…',
         }[stage];
         if (label) setBar('run', undefined, label);

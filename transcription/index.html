@@ -12,42 +12,24 @@
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="stylesheet" href="styles.css" />
 
-  <!-- Cross-origin isolation bootstrap. Registers the service worker that
-       synthesizes COOP/COEP, then reloads once so this document loads
-       under it and becomes crossOriginIsolated (required for the
-       multi-threaded WASM engine). The sessionStorage guard prevents a
-       reload loop on browsers/hosts where isolation can't be gained. -->
+  <!-- On-demand cross-origin isolation. Registers the service worker that
+       synthesizes COOP/COEP so isolation CAN be acquired, but does NOT
+       reload here — the app loads immediately and un-isolated. app.js'
+       ensureIsolation() does the one-time reload only when the user first
+       starts a transcription. Once registered, the SW controls future
+       visits so they load already isolated. -->
   <script>
-    // Cross-origin isolation bootstrap. We register the COI service
-    // worker, then reload exactly once so this document loads under it.
-    // `crossOriginIsolated` only becomes true on a fresh load under SW
-    // control — never inside the current document — so we just register
-    // and trigger the reload once. app.js' refreshCoi() clears
-    // `coiReloaded` once the new document confirms isolation.
     (async function () {
       if (!window.isSecureContext || !('serviceWorker' in navigator)) return;
-      if (window.crossOriginIsolated) {
-        sessionStorage.removeItem('coiReloaded');
-        return;
-      }
-      if (sessionStorage.getItem('coiReloaded')) return; // already tried this session
-      try {
-        await navigator.serviceWorker.register('sw.js', { scope: './' });
-        // Wait until a worker is actually active in this scope. `ready`
-        // is far more reliable than listening for `controllerchange`,
-        // which can fire before our listener is attached (so the reload
-        // never happens and the tab is stuck un-isolated — the symptom
-        // we saw). Once there's an active worker, reloading guarantees
-        // the next navigation is served by it WITH the COOP/COEP headers
-        // that make the tab crossOriginIsolated.
-        await Promise.race([
-          navigator.serviceWorker.ready,
-          new Promise(function (r) { setTimeout(r, 4000); }), // don't hang if activation stalls
-        ]);
-        if (window.crossOriginIsolated) { sessionStorage.removeItem('coiReloaded'); return; }
-        sessionStorage.setItem('coiReloaded', '1');
-        window.location.reload();
-      } catch (e) { /* app.js shows a manual Reload button */ }
+      if (window.crossOriginIsolated) return;
+      // ON-DEMAND isolation: register the COI service worker in the
+      // background so isolation CAN be acquired later, but do NOT reload
+      // now. The app stays immediately usable and un-isolated; we only
+      // reload into the isolated tab when the user actually starts a
+      // transcription (see ensureIsolation() in app.js). Once this SW is
+      // registered it controls future visits, so they load already
+      // isolated — no banner, no reload.
+      try { await navigator.serviceWorker.register('sw.js', { scope: './' }); } catch (e) { /* ignore */ }
     })();
   </script>
 
