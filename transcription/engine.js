@@ -83,12 +83,13 @@ async function tryFfmpegChain(bytes, ext, filters, onProgress) {
   return runFfmpeg(bytes, { inputName, outputName, args, onProgress });
 }
 
-export async function prepareAudio(file, { enhance = false, onProgress, signal } = {}) {
+export async function prepareAudio(file, { enhance = false, onProgress, onStage, signal } = {}) {
   const ext = (file.name.split('.').pop() || '').toLowerCase();
   const isVideo = VIDEO_EXTS.has(ext);
-  if (!isVideo && !enhance) return file;
+  if (!isVideo && !enhance) { onStage?.('audio-passthrough'); return file; }
   if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
 
+  onStage?.('audio-read');
   const bytes = new Uint8Array(await file.arrayBuffer());
   const chains = enhance
     ? [
@@ -99,8 +100,10 @@ export async function prepareAudio(file, { enhance = false, onProgress, signal }
     : [[]];
 
   let lastErr = null;
-  for (const chain of chains) {
+  for (let i = 0; i < chains.length; i++) {
     if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+    const chain = chains[i];
+    onStage?.(i === 0 ? 'ffmpeg-run' : 'ffmpeg-fallback');
     try {
       const out = await tryFfmpegChain(bytes, ext, chain, onProgress);
       return new File([out], 'audio.wav', { type: 'audio/wav' });
@@ -211,6 +214,7 @@ export async function transcribe(o) {
     enhance: !!o.enhance,
     signal,
     onProgress: o.onPrepare,
+    onStage: o.onStage,
   });
   throwIfAborted();
 
@@ -220,12 +224,14 @@ export async function transcribe(o) {
   // function under all of them, then dedup re-fires of the same segment by
   // a cheap `t0|t1|text-prefix` key so the live pane doesn't show triples.
   const seenKeys = new Set();
+  let firstSegmentSeen = false;
   const onSegment = (seg) => {
     if (signal?.aborted) return; // stop appending; the cleanup runs in finally
     const [norm] = normalizeSegments([seg]);
     if (!norm) return;
     const key = `${norm.t0.toFixed(3)}|${norm.t1.toFixed(3)}|${norm.text.slice(0, 32)}`;
     if (seenKeys.has(key)) return;
+    if (!firstSegmentSeen) { firstSegmentSeen = true; o.onStage?.('first-segment'); }
     seenKeys.add(key);
     live.push(norm);
     o.onSegment?.(norm);

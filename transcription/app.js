@@ -375,6 +375,77 @@ $('#runBtn').addEventListener('click', () => {
   runTranscription();
 });
 
+// ===================================================================
+// Stage tracker — a live checklist + per-step timing so you can see
+// which phase of the pipeline is running and how long each took.
+// Exposed for testing / debugging.
+// ===================================================================
+const STAGE_LABELS = {
+  'loading-engine':       'Loading engine (JS imports)',
+  'downloading-model':    'Loading model bytes',
+  'preparing-audio':      'Preparing audio',
+  'audio-passthrough':    '  · passthrough (audio file, no enhance)',
+  'audio-read':           '  · reading file bytes',
+  'ffmpeg-run':           '  · running FFmpeg (full chain)',
+  'ffmpeg-fallback':      '  · FFmpeg fallback chain',
+  'initialising-engine':  'Initialising WASM (compile + model into FS)',
+  'transcribing':         'Transcribing (WASM running)',
+  'first-segment':        '  · first segment received',
+};
+const STAGE_ORDER = Object.keys(STAGE_LABELS);
+
+let stageState = null;
+function resetStages() {
+  const el = $('#stages');
+  stageState = { entries: [], t0: performance.now(), tick: null };
+  el.innerHTML = '';
+  el.hidden = false;
+}
+function hideStages() {
+  if (stageState?.tick) { clearInterval(stageState.tick); stageState.tick = null; }
+  stageState = null;
+  $('#stages').hidden = true;
+}
+function renderStages() {
+  const el = $('#stages');
+  const now = performance.now();
+  el.innerHTML = stageState.entries.map((s) => {
+    const cls = s.endedAt ? 'done' : s.failed ? 'failed' : 'active';
+    const ico = s.endedAt ? '✓' : s.failed ? '⚠' : '⏳';
+    const ms  = (s.endedAt ?? now) - s.startedAt;
+    return `<li class="${cls}">`
+      + `<span class="ico">${ico}</span>`
+      + `<span>${escapeHtml(STAGE_LABELS[s.id] || s.id)}</span>`
+      + `<span class="elapsed">${(ms / 1000).toFixed(ms < 1000 ? 2 : 1)}s</span>`
+      + `</li>`;
+  }).join('');
+}
+function onEngineStage(id) {
+  if (!stageState) return;
+  const now = performance.now();
+  // Close the most recently-active TOP-LEVEL stage when a new top-level
+  // one starts; substages (those starting with '  · ') don't close their
+  // siblings.
+  const isSub = (STAGE_LABELS[id] || '').startsWith('  ·');
+  if (!isSub) {
+    for (const s of stageState.entries) if (!s.endedAt && !s.failed) s.endedAt = now;
+  }
+  stageState.entries.push({ id, startedAt: now });
+  renderStages();
+  if (!stageState.tick) stageState.tick = setInterval(renderStages, 250);
+}
+function finishStages({ failed = false } = {}) {
+  if (!stageState) return;
+  const now = performance.now();
+  for (const s of stageState.entries) {
+    if (s.endedAt) continue;
+    if (failed) s.failed = true;
+    else s.endedAt = now;
+  }
+  renderStages();
+  if (stageState.tick) { clearInterval(stageState.tick); stageState.tick = null; }
+}
+
 async function runTranscription() {
   if (!currentFile || running) return;
   running = true;
@@ -395,6 +466,7 @@ async function runTranscription() {
   setBar('run', 0, 'Starting…');
   $('#modelStatus').hidden = false;
   $('#runStatus').hidden = false;
+  resetStages();
   // Toggle the run button into a Cancel state.
   const runBtn = $('#runBtn');
   runBtn.textContent = 'Cancel';
@@ -419,6 +491,7 @@ async function runTranscription() {
       },
       onPrepare: (r) => setBar('run', 0.02 + (r || 0) * 0.08, 'Preparing audio…'),
       onStage: (stage) => {
+        onEngineStage(stage);
         // Without these the bar sits at "Starting…" through the multi-second
         // engine + model + WASM compile phase, and users assume it's hung.
         const label = {
@@ -458,6 +531,7 @@ async function runTranscription() {
     autoSaveTranscript({ immediate: true });
 
     setBar('run', 1, 'Done');
+    finishStages();
     const elapsed = (performance.now() - started) / 1000;
     if (audioDuration > 0) {
       const rtf = elapsed / audioDuration;
@@ -470,6 +544,7 @@ async function runTranscription() {
   } catch (err) {
     if (err?.name === 'AbortError') {
       setBar('run', 0, 'Cancelled');
+      finishStages({ failed: true });
       // Keep whatever has streamed so far — user can save or re-run.
       if (rawSegments.length) {
         energyMap = pcmChannel ? pp.buildEnergyMap(pcmChannel, pcmSampleRate, 0.1) : null;
@@ -487,6 +562,7 @@ async function runTranscription() {
       console.error(err);
       setBar('run', 0, '');
       $('#runDetail').textContent = '';
+      finishStages({ failed: true });
       transcriptEl.innerHTML =
         `<div class="error">⚠ ${escapeHtml(err?.message || String(err))}</div>`;
     }
