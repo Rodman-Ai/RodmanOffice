@@ -15,6 +15,13 @@
   --shadow: 0 1px 3px rgba(20, 22, 60, 0.08), 0 8px 24px rgba(20, 22, 60, 0.05);
 }
 * { box-sizing: border-box; }
+/* Several elements (`.recording-bar`, `.find-bar`, `.banner`, `.status`) set
+   `display: flex` and were also marked with the HTML `hidden` attribute as
+   their initial state. CSS `display` wins over the UA `[hidden] {display:none}`
+   rule, so they were actually visible on first paint — the recording bar
+   would show "Stop" before the user had clicked Record. Force-restore the
+   semantic of the attribute so `el.hidden = true` always hides. */
+[hidden] { display: none !important; }
 /* `overflow-x: clip` on html+body stops iOS Safari from auto-shrinking
    the layout when any descendant briefly reports an intrinsic width
    wider than the viewport (the cause of the "starts zoomed in" bug

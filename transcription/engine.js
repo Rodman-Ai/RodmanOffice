@@ -49,11 +49,13 @@ async function loadEngine() {
   return _enginePromise;
 }
 
-// ---- model → blob URL ----
-export async function getModelBlobUrl(modelId, onProgress) {
+// ---- model → File ----
+// Returns a real File object rather than a blob: URL. FileTranscriber accepts
+// either, but a File avoids the internal `fetch(blobUrl) → Response →
+// arrayBuffer()` round-trip — meaningful on a 1 GB whisper model.
+export async function getModelFile(modelId, onProgress) {
   const bytes = await getModel(modelId, onProgress);
-  const blob = new Blob([bytes], { type: 'application/octet-stream' });
-  return URL.createObjectURL(blob);
+  return new File([bytes], `${modelId}.bin`, { type: 'application/octet-stream' });
 }
 
 // ---- audio preparation (video extract / optional enhancement) ----
@@ -196,12 +198,15 @@ export async function transcribe(o) {
   const throwIfAborted = () => { if (signal?.aborted) throw new DOMException('Aborted', 'AbortError'); };
   throwIfAborted();
 
+  o.onStage?.('loading-engine');
   const { FileTranscriber, createModule } = await loadEngine();
   throwIfAborted();
   const modelId = o.modelId || DEFAULT_MODEL_ID;
-  const modelUrl = await getModelBlobUrl(modelId, o.onModel);
+  o.onStage?.('downloading-model');
+  const modelFile = await getModelFile(modelId, o.onModel);
   throwIfAborted();
 
+  o.onStage?.('preparing-audio');
   const audioFile = await prepareAudio(o.file, {
     enhance: !!o.enhance,
     signal,
@@ -228,7 +233,7 @@ export async function transcribe(o) {
 
   const transcriber = new FileTranscriber({
     createModule,
-    model: modelUrl,
+    model: modelFile,
     onProgress: (p) => o.onProgress?.(typeof p === 'number' ? p / 100 : 0),
     onSegment,
     // transcribe.js has used a few names across versions for the
@@ -248,8 +253,10 @@ export async function transcribe(o) {
   signal?.addEventListener?.('abort', onAbort, { once: true });
 
   try {
+    o.onStage?.('initialising-engine');
     await transcriber.init();
     throwIfAborted();
+    o.onStage?.('transcribing');
     const result = await transcriber.transcribe(audioFile, {
       lang: o.language || 'en',
       translate: !!o.translate,
@@ -270,7 +277,6 @@ export async function transcribe(o) {
   } finally {
     signal?.removeEventListener?.('abort', onAbort);
     try { transcriber.destroy?.(); } catch { /* noop */ }
-    URL.revokeObjectURL(modelUrl);
   }
 }
 

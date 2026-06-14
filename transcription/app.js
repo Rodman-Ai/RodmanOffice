@@ -418,6 +418,18 @@ async function runTranscription() {
             : `${fmtBytes(p.loaded)} / ${fmtBytes(p.total)}`);
       },
       onPrepare: (r) => setBar('run', 0.02 + (r || 0) * 0.08, 'Preparing audio…'),
+      onStage: (stage) => {
+        // Without these the bar sits at "Starting…" through the multi-second
+        // engine + model + WASM compile phase, and users assume it's hung.
+        const label = {
+          'loading-engine':       'Loading engine…',
+          'downloading-model':    'Loading model…',
+          'preparing-audio':      'Preparing audio…',
+          'initialising-engine':  'Initialising WASM…',
+          'transcribing':         'Transcribing…',
+        }[stage];
+        if (label) setBar('run', undefined, label);
+      },
       onSegment: (seg) => {
         rawSegments.push(seg); appendSegment(seg);
         if (rawSegments.length % 8 === 0) autoSaveTranscript();
@@ -503,7 +515,9 @@ function showReport(report) {
 }
 
 function setBar(which, ratio, detail) {
-  $(`#${which}Bar`).style.width = Math.max(0, Math.min(1, ratio)) * 100 + '%';
+  if (typeof ratio === 'number' && !Number.isNaN(ratio)) {
+    $(`#${which}Bar`).style.width = Math.max(0, Math.min(1, ratio)) * 100 + '%';
+  }
   $(`#${which}Detail`).textContent = detail || '';
 }
 
