@@ -282,6 +282,25 @@ export async function transcribe(o) {
   let firstSegmentSeen = false;
   let windowStartSec = 0;
   let windowIndex = 0;
+  // Progress is reported in AUDIO TIME: how many seconds of the recording
+  // have been transcribed (monotonic), out of the total. This is far more
+  // accurate than the engine's coarse per-window callback — it advances
+  // with every streamed segment (each segment ≈ a line) and naturally
+  // accounts for unequal last windows. We report a structured object so
+  // the UI can show "window N/M · MM:SS / MM:SS".
+  let totalSec = 0;        // set after decode
+  let currentWindowSec = 0; // duration of the window being transcribed
+  let processedSec = 0;     // max audio-seconds transcribed so far
+  const report = (sec) => {
+    processedSec = Math.max(processedSec, Math.min(sec, totalSec || sec));
+    o.onProgress?.({
+      ratio: totalSec ? Math.min(1, processedSec / totalSec) : 0,
+      processedSec,
+      totalSec,
+      window: windowIndex + 1,
+      windowCount,
+    });
+  };
   const ingest = (seg) => {
     const [norm] = normalizeSegments([seg]);
     if (!norm) return;
@@ -294,15 +313,18 @@ export async function transcribe(o) {
     seenKeys.add(key);
     live.push(shifted);
     o.onSegment?.(shifted);
+    report(shifted.t1); // each segment advances the audio-time progress
   };
   const onSegment = (seg) => { if (!signal?.aborted) ingest(seg); };
 
   const transcriber = new FileTranscriber({
     createModule,
     model: modelFile,
+    // The engine's own progress fraction (0..1 of the current window) is a
+    // useful fallback between segments — convert it to audio seconds.
     onProgress: (p) => {
       const frac = typeof p === 'number' ? p / 100 : 0;
-      o.onProgress?.((windowIndex + frac) / windowCount);
+      report(windowStartSec + frac * currentWindowSec);
     },
     onSegment,
     onNewSegment: onSegment,
@@ -382,6 +404,7 @@ export async function transcribe(o) {
     const winLen = WINDOW_SEC * sr;
     const overlap = OVERLAP_SEC * sr;
     windowCount = Math.max(1, Math.ceil(pcm.length / winLen));
+    totalSec = pcm.length / sr; // drives audio-time progress
     o.onStage?.('audio-ready');
 
     for (windowIndex = 0; windowIndex < windowCount; windowIndex++) {
@@ -390,6 +413,9 @@ export async function transcribe(o) {
       if (startSample >= pcm.length) break;
       windowStartSec = startSample / sr;
       const endSample = Math.min(pcm.length, startSample + winLen + (windowCount > 1 ? overlap : 0));
+      // Exclude the look-ahead overlap from the window's "own" duration so
+      // progress maps cleanly onto the recording timeline.
+      currentWindowSec = Math.min(WINDOW_SEC, totalSec - windowStartSec);
       let winFile = floatToWavFile(pcm.subarray(startSample, endSample), sr);
       if (o.enhance) {
         winFile = await prepareAudio(winFile, { enhance: true, signal, onProgress: o.onPrepare });

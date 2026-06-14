@@ -10,7 +10,7 @@ const $ = (s) => document.querySelector(s);
 // Visible build marker. Bump on every deploy — it shows in the header
 // subheading and the console so you can confirm at a glance whether the
 // browser is running fresh code (vs. a stale service-worker cache).
-const APP_VERSION = 'PR #118';
+const APP_VERSION = 'PR #119';
 try {
   console.info(`RodmanTranscribe ${APP_VERSION}`);
   const verEl = document.getElementById('appVersion');
@@ -650,8 +650,17 @@ async function runTranscription() {
         rawSegments.push(seg); appendSegment(seg);
         if (rawSegments.length % 8 === 0) autoSaveTranscript();
       },
-      onProgress: (ratio) => setBar('run', 0.1 + (ratio || 0) * 0.9,
-        `${Math.round((ratio || 0) * 100)}%`),
+      onProgress: (p) => {
+        // p is a structured object {ratio, processedSec, totalSec, window,
+        // windowCount} from the engine; tolerate a bare number too.
+        const ratio = typeof p === 'number' ? p : (p?.ratio || 0);
+        let detail = `${Math.round(ratio * 100)}%`;
+        if (p && typeof p === 'object' && p.totalSec) {
+          const win = p.windowCount > 1 ? `window ${p.window}/${p.windowCount} · ` : '';
+          detail = `${win}${fmtClock(p.processedSec)} / ${fmtClock(p.totalSec)} · ${Math.round(ratio * 100)}%`;
+        }
+        setBar('run', 0.1 + ratio * 0.9, detail);
+      },
     });
 
     // Prefer the engine's final segments (they often carry more detail than
