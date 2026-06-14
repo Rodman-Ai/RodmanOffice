@@ -10,7 +10,7 @@ const $ = (s) => document.querySelector(s);
 // Visible build marker. Bump on every deploy — it shows in the header
 // subheading and the console so you can confirm at a glance whether the
 // browser is running fresh code (vs. a stale service-worker cache).
-const APP_VERSION = 'v2026.06.14.1';
+const APP_VERSION = 'v2026.06.14.2';
 try {
   console.info(`RodmanTranscribe ${APP_VERSION}`);
   const verEl = document.getElementById('appVersion');
@@ -62,6 +62,12 @@ const transcriptEl = $('#transcript');
 // ===================================================================
 function refreshCoi() {
   const isolated = engine.isCrossOriginIsolated();
+  try {
+    console.info('[coi] isolated=%s controller=%s reloadedFlag=%s',
+      isolated,
+      !!(navigator.serviceWorker && navigator.serviceWorker.controller),
+      (() => { try { return sessionStorage.getItem('coiReloaded'); } catch { return '?'; } })());
+  } catch { /* ignore */ }
   $('#coiBanner').hidden = isolated;
   if (isolated) {
     try { sessionStorage.removeItem('coiReloaded'); } catch { /* ignore */ }
@@ -96,6 +102,19 @@ $('#coiReloadBtn')?.addEventListener('click', () => {
 });
 refreshCoi();
 window.addEventListener('load', () => setTimeout(refreshCoi, 200));
+// Watchdog: the inline bootstrap should reload us into the isolated tab
+// within a second or two. If we're still not isolated after a grace
+// period, force the manual Reload button (and its helpful copy) so the
+// user is never stranded on a static "Preparing…" with no way forward.
+let coiChecks = 0;
+const coiWatch = setInterval(() => {
+  if (engine.isCrossOriginIsolated()) { clearInterval(coiWatch); refreshCoi(); return; }
+  if (++coiChecks >= 4) { // ~6s at 1.5s/check
+    clearInterval(coiWatch);
+    try { sessionStorage.setItem('coiReloaded', '1'); } catch { /* ignore */ }
+    refreshCoi(); // now renders the manual Reload button
+  }
+}, 1500);
 
 // ===================================================================
 // Model picker
