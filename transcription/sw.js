@@ -13,7 +13,9 @@
 //      Cache Storage by the app) and the cross-origin WASM/CDN assets are
 //      deliberately NOT precached here.
 
-const VERSION = 'rtranscribe-v3';
+// Bumped to v4 when COEP switched credentialless → require-corp; ensures
+// returning clients drop the v3 shell and pick up the new headers.
+const VERSION = 'rtranscribe-v4';
 const SHELL = [
   './',
   './index.html',
@@ -42,12 +44,27 @@ self.addEventListener('activate', (e) => {
 });
 
 // Re-emit a response with the cross-origin-isolation headers attached.
+//
+// We use COEP `require-corp` (not `credentialless`) because iOS Safari
+// doesn't ship `credentialless` until 17.4 — far too narrow. `require-corp`
+// has been supported since Safari 15.2 / iOS 15.2. Every subresource
+// either is same-origin (the vendored engine under /vendor/) or is fetched
+// via this service worker (the HF model fetch), and SW-served responses
+// are same-origin to the page — so we don't need an explicit
+// `Cross-Origin-Resource-Policy` on individual resources to satisfy
+// require-corp. Adding CORP: cross-origin defensively on responses we
+// re-emit is still cheap insurance.
 function withCoiHeaders(response) {
   // Opaque (cross-origin no-cors) responses can't be rewritten — pass through.
   if (!response || response.status === 0) return response;
   const headers = new Headers(response.headers);
-  headers.set('Cross-Origin-Embedder-Policy', 'credentialless');
+  headers.set('Cross-Origin-Embedder-Policy', 'require-corp');
   headers.set('Cross-Origin-Opener-Policy', 'same-origin');
+  // Defensive: tag responses with CORP so a future code path that bypasses
+  // the SW (or fetches across origins directly) still passes require-corp.
+  if (!headers.has('Cross-Origin-Resource-Policy')) {
+    headers.set('Cross-Origin-Resource-Policy', 'cross-origin');
+  }
   return new Response(response.body, {
     status: response.status,
     statusText: response.statusText,

@@ -10,7 +10,7 @@ const $ = (s) => document.querySelector(s);
 // Visible build marker. Bump on every deploy — it shows in the header
 // subheading and the console so you can confirm at a glance whether the
 // browser is running fresh code (vs. a stale service-worker cache).
-const APP_VERSION = 'PR #122';
+const APP_VERSION = 'PR #123';
 try {
   console.info(`RodmanTranscribe ${APP_VERSION}`);
   const verEl = document.getElementById('appVersion');
@@ -64,11 +64,13 @@ try {
   const safariStr = safariM ? `${safariM[1]}.${safariM[2]}` : '?';
   const iosM = /OS (\d+)_(\d+)/.exec(ua);
   const iosStr = iosM ? `${iosM[1]}.${iosM[2]}` : null;
-  const tooOldForCredentialless =
-    isAppleWebKit && safariM && (+safariM[1] < 16 || (+safariM[1] === 16 && +safariM[2] < 4));
+  // Minimum for COEP require-corp (our isolation strategy after PR #123):
+  // Safari 15.2 / iOS 15.2. Anything older genuinely can't be isolated.
+  const tooOldForRequireCorp =
+    isAppleWebKit && safariM && (+safariM[1] < 15 || (+safariM[1] === 15 && +safariM[2] < 2));
   dbg(`env · UA Safari=${safariStr} iOS=${iosStr || 'n/a'} webkit=${isAppleWebKit} · SharedArrayBuffer=${typeof SharedArrayBuffer !== 'undefined'}`, 'info');
-  if (tooOldForCredentialless) {
-    dbg('Safari < 16.4 does NOT support COEP credentialless → cross-origin isolation cannot be acquired here. Update iOS, or open the page on a desktop browser.', 'warn');
+  if (tooOldForRequireCorp) {
+    dbg('Safari < 15.2 does NOT support COEP require-corp → cross-origin isolation cannot be acquired here. Update iOS, or open the page on a desktop browser.', 'warn');
   }
   // Probe what headers the service worker is ACTUALLY synthesizing on the
   // page response. If COOP/COEP are missing on the SW-served response,
@@ -178,7 +180,7 @@ async function ensureIsolation() {
     showCoiBanner({
       title: 'Couldn’t enable the on-device engine.',
       body: IS_IOS
-        ? 'Safari blocked the isolated tab needed for multi-threaded WebAssembly. This needs iOS 16.4 or newer. Try Reload, update iOS, or open the page on a desktop browser. (Chrome/Edge on iPhone use Safari\'s engine, so they hit the same limit.)'
+        ? 'Safari blocked the isolated tab needed for multi-threaded WebAssembly. This needs iOS 15.2 or newer. Try Reload first; if it still fails, update iOS or open the page on a desktop browser. (Chrome/Edge on iPhone use Safari\'s engine, so they hit the same limit.)'
         : 'This browser or host blocked the isolated tab needed for multi-threaded WebAssembly. Try Reload, or a recent Chrome / Edge / Firefox.',
       button: true,
     });
