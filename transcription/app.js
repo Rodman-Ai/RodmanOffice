@@ -10,7 +10,7 @@ const $ = (s) => document.querySelector(s);
 // Visible build marker. Bump on every deploy — it shows in the header
 // subheading and the console so you can confirm at a glance whether the
 // browser is running fresh code (vs. a stale service-worker cache).
-const APP_VERSION = 'PR #120';
+const APP_VERSION = 'PR #121';
 try {
   console.info(`RodmanTranscribe ${APP_VERSION}`);
   const verEl = document.getElementById('appVersion');
@@ -253,16 +253,32 @@ function showHardwareHint() {
 // Source selection
 // ===================================================================
 function setSource(file) {
-  if (!file) return;
+  if (!file) { dbg('setSource called with no file', 'warn'); return; }
+  dbg(`setSource · name="${file.name || '(no name)'}" size=${(file.size / 1e6).toFixed(2)}MB type="${file.type || '(no MIME)'}"`, 'info');
   clearSource(false);
   currentFile = file;
-  $('#sourceName').textContent = file.name;
+  $('#sourceName').textContent = file.name || '(unnamed file)';
   $('#sourceInfo').hidden = false;
   $('#dropTarget').classList.add('has-source');
   playerUrl = URL.createObjectURL(file);
   player.src = playerUrl;
   $('#runBtn').disabled = false;
-  drawWaveform(file).catch(() => { $('#waveform').hidden = true; });
+  drawWaveform(file).catch((err) => {
+    dbg(`waveform decode failed (transcribe still possible): ${err?.message || err}`, 'warn');
+    $('#waveform').hidden = true;
+  });
+  // Acquire cross-origin isolation NOW (a one-time reload), not at
+  // Transcribe time. The current page can hold the File reference in
+  // memory across the reload only by re-picking — but starting the
+  // reload here means by the time the user is ready to Transcribe,
+  // the engine is ready too. (If isolation was already acquired this
+  // session, ensureIsolation() is a no-op.)
+  if (!engine.isCrossOriginIsolated()) {
+    dbg('not isolated yet — kicking off ensureIsolation() so we are ready by Transcribe time', 'info');
+    // Fire and forget; ensureIsolation may reload the page. The user
+    // will need to re-pick the file once after that single reload.
+    ensureIsolation();
+  }
 }
 function clearSource(full = true) {
   currentFile = null;
@@ -281,21 +297,31 @@ function clearSource(full = true) {
     $('#runBtn').disabled = true;
   }
 }
-$('#chooseBtn').addEventListener('click', () => $('#filePicker').click());
+$('#chooseBtn').addEventListener('click', () => {
+  dbg('Choose file tapped (accept=audio/video + extension list)', 'info');
+  $('#filePicker').click();
+});
 $('#filePicker').addEventListener('change', (e) => {
   const f = e.target.files && e.target.files[0];
+  dbg(`filePicker change · files=${e.target.files?.length || 0}`, 'info');
   e.target.value = '';
   if (f) setSource(f);
+  else dbg('filePicker returned no file (cancelled, or iOS rejected by accept filter — try "Any file…")', 'warn');
 });
 // Escape hatch for iOS — voice memos shared into Files often arrive with
 // no extension and no MIME, so the `accept` filter on #filePicker greys
 // them out. This button uses a picker with no `accept` so they're
 // selectable. The decode step will tell us if it isn't really audio.
-$('#chooseAnyBtn')?.addEventListener('click', () => $('#anyFilePicker').click());
+$('#chooseAnyBtn')?.addEventListener('click', () => {
+  dbg('Any file… tapped (accept removed)', 'info');
+  $('#anyFilePicker').click();
+});
 $('#anyFilePicker')?.addEventListener('change', (e) => {
   const f = e.target.files && e.target.files[0];
+  dbg(`anyFilePicker change · files=${e.target.files?.length || 0}`, 'info');
   e.target.value = '';
   if (f) setSource(f);
+  else dbg('anyFilePicker returned no file (cancelled)', 'warn');
 });
 $('#clearSourceBtn').addEventListener('click', () => clearSource(true));
 
