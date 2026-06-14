@@ -86,7 +86,7 @@ async function tryFfmpegChain(bytes, ext, filters, onProgress) {
 export async function prepareAudio(file, { enhance = false, onProgress, onStage, signal } = {}) {
   const ext = (file.name.split('.').pop() || '').toLowerCase();
   const isVideo = VIDEO_EXTS.has(ext);
-  if (!isVideo && !enhance) { onStage?.('audio-passthrough'); return file; }
+  if (!isVideo && !enhance) { onStage?.('audio-passthrough'); onProgress?.(1); return file; }
   if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
 
   onStage?.('audio-read');
@@ -106,6 +106,7 @@ export async function prepareAudio(file, { enhance = false, onProgress, onStage,
     onStage?.(i === 0 ? 'ffmpeg-run' : 'ffmpeg-fallback');
     try {
       const out = await tryFfmpegChain(bytes, ext, chain, onProgress);
+      onProgress?.(1);
       return new File([out], 'audio.wav', { type: 'audio/wav' });
     } catch (err) {
       if (err?.name === 'AbortError') throw err;
@@ -263,18 +264,38 @@ export async function transcribe(o) {
     await transcriber.init();
     throwIfAborted();
     o.onStage?.('transcribing');
-    const result = await transcriber.transcribe(audioFile, {
-      lang: o.language || 'en',
-      translate: !!o.translate,
-      threads: o.threads || Math.min(navigator.hardwareConcurrency || 4, 8),
-      // Genuinely exposed quality knobs (per the transcribe.js docs at
-      // transcribejs.dev). Defensive — silently ignored by builds that
-      // don't read them.
-      suppress_non_speech: o.suppressNonSpeech !== false, // default ON
-      ...(o.audioCtx ? { audio_ctx: o.audioCtx } : {}),
-      ...(o.maxTokens ? { max_tokens: o.maxTokens } : {}),
-      ...(o.maxLen ? { max_len: o.maxLen } : {}),
-    });
+    let result;
+    try {
+      result = await transcriber.transcribe(audioFile, {
+        lang: o.language || 'en',
+        translate: !!o.translate,
+        threads: o.threads || Math.min(navigator.hardwareConcurrency || 4, 8),
+        // Genuinely exposed quality knobs (per the transcribe.js docs at
+        // transcribejs.dev). Defensive — silently ignored by builds that
+        // don't read them.
+        suppress_non_speech: o.suppressNonSpeech !== false, // default ON
+        ...(o.audioCtx ? { audio_ctx: o.audioCtx } : {}),
+        ...(o.maxTokens ? { max_tokens: o.maxTokens } : {}),
+        ...(o.maxLen ? { max_len: o.maxLen } : {}),
+      });
+    } catch (err) {
+      // `RangeError: Invalid typed array length: N` comes out of WASM when
+      // the audio Float32Array can't be allocated alongside the model.
+      // Translate to something users can act on.
+      const msg = err?.message || String(err);
+      if (/Invalid typed array length|out of memory|RuntimeError/i.test(msg)) {
+        const lengthMatch = /Invalid typed array length:\s*(\d+)/.exec(msg);
+        // The audio is decoded to 16 kHz mono Float32 (4 bytes/sample).
+        const mins = lengthMatch ? Math.round(+lengthMatch[1] / 4 / 16000 / 60) : 0;
+        throw new Error(
+          'Ran out of memory while loading the audio into the engine' +
+          (mins > 0 ? ` (~${mins} min clip)` : '') +
+          '. Try a shorter clip, a smaller model (medium / base.en), ' +
+          'or turn off Enhance audio. (' + msg + ')',
+        );
+      }
+      throw err;
+    }
     throwIfAborted();
     // Prefer the engine's final result; fall back to streamed segments.
     let segments = normalizeSegments(result);
