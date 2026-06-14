@@ -13,7 +13,7 @@
 //      Cache Storage by the app) and the cross-origin WASM/CDN assets are
 //      deliberately NOT precached here.
 
-const VERSION = 'rtranscribe-v2';
+const VERSION = 'rtranscribe-v3';
 const SHELL = [
   './',
   './index.html',
@@ -70,16 +70,24 @@ self.addEventListener('fetch', (event) => {
   event.respondWith((async () => {
     const url = new URL(request.url);
 
-    // Shell: cache-first, then re-emit with COI headers.
+    // Shell: NETWORK-FIRST, falling back to cache only when offline.
+    //
+    // This used to be cache-first, which meant a returning visitor kept
+    // running whatever app.js/engine.js/styles.css were cached under the
+    // first VERSION they ever saw — every subsequent deploy was invisible
+    // until VERSION changed. For an app that's actively iterated and served
+    // from GitHub Pages, always preferring the network (and only falling
+    // back to cache offline) is the correct trade-off: the model + CDN WASM
+    // already require the network on first real use anyway.
     if (request.method === 'GET' && SHELL_URLS.has(url.href)) {
-      const cached = await caches.match(request);
-      if (cached) return withCoiHeaders(cached);
       try {
         const fresh = await fetch(request);
         if (fresh.ok) caches.open(VERSION).then((c) => c.put(request, fresh.clone())).catch(() => {});
         return withCoiHeaders(fresh);
       } catch {
-        return withCoiHeaders(cached);
+        const cached = await caches.match(request);
+        if (cached) return withCoiHeaders(cached);
+        throw new Error('offline and shell not cached');
       }
     }
 
