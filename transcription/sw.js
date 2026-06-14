@@ -13,7 +13,7 @@
 //      Cache Storage by the app) and the cross-origin WASM/CDN assets are
 //      deliberately NOT precached here.
 
-const VERSION = 'rtranscribe-v1';
+const VERSION = 'rtranscribe-v2';
 const SHELL = [
   './',
   './index.html',
