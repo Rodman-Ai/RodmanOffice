@@ -10,7 +10,7 @@ const $ = (s) => document.querySelector(s);
 // Visible build marker. Bump on every deploy — it shows in the header
 // subheading and the console so you can confirm at a glance whether the
 // browser is running fresh code (vs. a stale service-worker cache).
-const APP_VERSION = 'PR #119';
+const APP_VERSION = 'PR #120';
 try {
   console.info(`RodmanTranscribe ${APP_VERSION}`);
   const verEl = document.getElementById('appVersion');
@@ -287,17 +287,26 @@ $('#filePicker').addEventListener('change', (e) => {
   e.target.value = '';
   if (f) setSource(f);
 });
+// Escape hatch for iOS — voice memos shared into Files often arrive with
+// no extension and no MIME, so the `accept` filter on #filePicker greys
+// them out. This button uses a picker with no `accept` so they're
+// selectable. The decode step will tell us if it isn't really audio.
+$('#chooseAnyBtn')?.addEventListener('click', () => $('#anyFilePicker').click());
+$('#anyFilePicker')?.addEventListener('change', (e) => {
+  const f = e.target.files && e.target.files[0];
+  e.target.value = '';
+  if (f) setSource(f);
+});
 $('#clearSourceBtn').addEventListener('click', () => clearSource(true));
 
 mountWindowDropzone({
   onFiles: (files) => {
-    for (const f of files) {
-      if (f.type.startsWith('audio/') || f.type.startsWith('video/') ||
-          /\.(mp3|wav|m4a|ogg|opus|flac|aac|mp4|mov|mkv|webm|avi|m4v|wma)$/i.test(f.name)) {
-        setSource(f);
-        return;
-      }
-    }
+    // Accept whatever the user dropped. If they explicitly dropped it on
+    // the app, trust it; the decode step (decodeTo16kMono) surfaces a
+    // friendly error if it can't actually be played as audio. The previous
+    // strict whitelist silently rejected extension-less iOS Voice Memos.
+    const f = files && files[0];
+    if (f) setSource(f);
   },
 });
 
