@@ -91,11 +91,13 @@
             <div class="drop-actions">
               <button class="btn" id="chooseBtn">Choose file</button>
               <button class="btn" id="recordBtn" type="button">Record mic</button>
+              <button class="btn btn-ghost btn-tiny" id="chooseAnyBtn" type="button" title="Show all files (useful for iOS Voice Memos without an extension)">Any file…</button>
             </div>
             <p class="drop-formats">MP3 · WAV · M4A · MP4 · MOV · MKV · WEBM · and more</p>
           </div>
         </div>
-        <input type="file" id="filePicker" accept="audio/*,video/*" hidden />
+        <input type="file" id="filePicker" accept="audio/*,video/*,.m4a,.mp4,.mov,.caf,.aac,.wav,.mp3,.ogg,.opus,.flac,.aiff,.aif,.amr,.3gp,.wma" hidden />
+        <input type="file" id="anyFilePicker" hidden />
         <div id="recordingBar" class="recording-bar" hidden>
           <span class="rec-dot" aria-hidden="true"></span>
           <span>Recording…</span>

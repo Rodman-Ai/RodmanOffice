@@ -393,10 +393,14 @@ export async function transcribe(o) {
       pcm = await decodeTo16kMono(o.file);
     } catch (err) {
       if (err?.name === 'AbortError') throw err;
+      const ext = (o.file?.name || '').split('.').pop().toLowerCase();
+      const hint = ext && ext.length <= 5 ? ` (.${ext})` : '';
       throw new Error(
-        'Could not decode the audio. The file may be too large to decode in ' +
-        'one piece in this browser, or in an unsupported codec — try converting ' +
-        'it to WAV/MP3 first. (' + (err?.message || err) + ')',
+        `Could not decode the audio file${hint}. It may not be an audio or ` +
+        'video file, may use an unsupported codec, or may be too large to ' +
+        'decode in one piece in this browser. For iOS Voice Memos, try ' +
+        'sharing the recording as "M4A Audio" from the Voice Memos app, ' +
+        'or convert to WAV/MP3 first. (' + (err?.message || err) + ')',
       );
     }
     throwIfAborted();
