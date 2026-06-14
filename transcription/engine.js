@@ -271,9 +271,7 @@ export async function transcribe(o) {
   // (~19 MB at 5 min); the model stays resident across windows.
   const WINDOW_SEC = 300;
   const OVERLAP_SEC = 1; // small overlap so a word isn't clipped at a cut
-  const durationSec = o.durationSec || 0;
-  const windowed = durationSec > WINDOW_SEC + OVERLAP_SEC;
-  const windowCount = windowed ? Math.ceil(durationSec / WINDOW_SEC) : 1;
+  let windowCount = 1;   // set from the ACTUAL decoded length below
 
   const live = [];
   // Different transcribe.js builds fire the streaming hook under different
@@ -360,40 +358,47 @@ export async function transcribe(o) {
     o.onStage?.('engine-initialised');
     throwIfAborted();
 
-    if (!windowed) {
-      // Short clip: hand the whole file to transcribe.js as before.
-      o.onStage?.('preparing-audio');
-      const audioFile = await prepareAudio(o.file, {
-        enhance: !!o.enhance, signal, onProgress: o.onPrepare, onStage: o.onStage,
-      });
-      o.onStage?.('audio-ready');
-      throwIfAborted();
-      o.onStage?.('transcribing');
-      await runPass(audioFile);
-    } else {
-      // Long recording: decode once, then transcribe window by window.
-      o.onStage?.('decoding-audio');
-      const pcm = await decodeTo16kMono(o.file);
-      throwIfAborted();
-      const sr = 16000;
-      const winLen = WINDOW_SEC * sr;
-      const overlap = OVERLAP_SEC * sr;
-      for (windowIndex = 0; windowIndex < windowCount; windowIndex++) {
-        throwIfAborted();
-        const startSample = windowIndex * winLen;
-        if (startSample >= pcm.length) break;
-        windowStartSec = startSample / sr;
-        const endSample = Math.min(pcm.length, startSample + winLen + overlap);
-        let winFile = floatToWavFile(pcm.subarray(startSample, endSample), sr);
-        if (o.enhance) {
-          winFile = await prepareAudio(winFile, { enhance: true, signal, onProgress: o.onPrepare });
-        }
-        throwIfAborted();
-        o.onStage?.(`transcribing window ${windowIndex + 1}/${windowCount}`);
-        await runPass(winFile);
-      }
-      windowStartSec = 0;
+    // ALWAYS decode to 16 kHz mono in JS first (on the JS heap — the same
+    // decode transcribe.js does internally, just once up front), then
+    // transcribe in windows sized to keep each chunk's Float32 small in the
+    // WASM heap. Short clips are simply a single window. The window count
+    // comes from the ACTUAL decoded length, so it never depends on a
+    // possibly-unknown/zero duration hint — that was why a 26-min file
+    // slipped through as "short" and OOM'd.
+    o.onStage?.('decoding-audio');
+    let pcm;
+    try {
+      pcm = await decodeTo16kMono(o.file);
+    } catch (err) {
+      if (err?.name === 'AbortError') throw err;
+      throw new Error(
+        'Could not decode the audio. The file may be too large to decode in ' +
+        'one piece in this browser, or in an unsupported codec — try converting ' +
+        'it to WAV/MP3 first. (' + (err?.message || err) + ')',
+      );
     }
+    throwIfAborted();
+    const sr = 16000;
+    const winLen = WINDOW_SEC * sr;
+    const overlap = OVERLAP_SEC * sr;
+    windowCount = Math.max(1, Math.ceil(pcm.length / winLen));
+    o.onStage?.('audio-ready');
+
+    for (windowIndex = 0; windowIndex < windowCount; windowIndex++) {
+      throwIfAborted();
+      const startSample = windowIndex * winLen;
+      if (startSample >= pcm.length) break;
+      windowStartSec = startSample / sr;
+      const endSample = Math.min(pcm.length, startSample + winLen + (windowCount > 1 ? overlap : 0));
+      let winFile = floatToWavFile(pcm.subarray(startSample, endSample), sr);
+      if (o.enhance) {
+        winFile = await prepareAudio(winFile, { enhance: true, signal, onProgress: o.onPrepare });
+      }
+      throwIfAborted();
+      o.onStage?.(windowCount > 1 ? `transcribing window ${windowIndex + 1}/${windowCount}` : 'transcribing');
+      await runPass(winFile);
+    }
+    windowStartSec = 0;
     throwIfAborted();
     return { segments: live.slice() };
   } finally {
