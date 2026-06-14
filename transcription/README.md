@@ -38,17 +38,19 @@ The transcription engine is the **transcribe.js** project (MIT):
 - `@transcribe/transcriber@3.0.1` — high-level `FileTranscriber`.
 - `@transcribe/shout@1.0.7` — the multi-threaded whisper.cpp WASM build.
 
-These are loaded at runtime from jsdelivr via the import map in
-`index.html` (pinned versions). The `shout` glue resolves its sibling
-`.wasm` + pthread worker from the same CDN directory automatically. No
-build step; nothing is compiled in this repo.
+These are **self-hosted** under `transcription/vendor/` (transcriber +
+shout), wired via the import map in `index.html`. This is mandatory,
+not an optimization: under cross-origin isolation the engine spawns its
+pthread worker as `new Worker(new URL("shout.wasm.js", import.meta.url))`,
+and a **cross-origin** (CDN) worker script throws `SecurityError`. The
+`shout` build embeds its `.wasm` inline (base64), so the vendored `.js`
+files are the whole engine — no separate binary, no build step.
 
 - Source: <https://github.com/TranscribeJs/transcribe.js>
 - Docs: <https://www.transcribejs.dev/docs/>
-
-To self-host instead of CDN, copy the package files under
-`transcription/vendor/transcribe/` and repoint the import map at the
-local paths.
+- Vendored: `@transcribe/transcriber@3.0.1` + `@transcribe/shout@1.0.7`
+  (MIT; `LICENSE` kept alongside each under `vendor/`). To update, fetch
+  the npm tarballs into `vendor/` and keep the import-map paths.
 
 **What's NOT exposed (backlog):** transcribe.js's wrapper doesn't pass
 `initial_prompt` / `temperature` / threshold tuning / beam search
@@ -126,7 +128,7 @@ precaches them.
 
 - The audio file you transcribe **never leaves your browser**.
 - Models stream from HuggingFace on first use and cache locally.
-- transcribe.js + its WASM are pinned and loaded from jsdelivr.
+- transcribe.js + its WASM are pinned and self-hosted under vendor/ (same-origin, required for the worker under COI).
 - The only outbound network for *transcript* data is the optional
   Claude proofread / translate / summary path, and only when you've
   pasted an Anthropic key into the AI bar.

@@ -33,16 +33,18 @@
     })();
   </script>
 
-  <!-- Pinned prebuilt whisper.cpp WASM via transcribe.js (MIT). The shout
-       glue resolves its sibling .wasm / worker from the same jsdelivr
-       directory automatically. The transcriber package has no dist/
-       folder — `src/index.js` is the package main; jsdelivr serves
-       relative imports inside it directly off the same /src/ path. -->
+  <!-- Prebuilt whisper.cpp WASM via transcribe.js (MIT), SELF-HOSTED under
+       vendor/. This MUST be same-origin: under cross-origin isolation the
+       engine spawns its pthread worker as `new Worker(new URL(
+       "shout.wasm.js", import.meta.url))`, and a cross-origin (CDN) worker
+       script throws SecurityError. The shout build embeds its .wasm inline
+       (base64), so the .js files are the whole engine. Pinned:
+       @transcribe/transcriber@3.0.1 + @transcribe/shout@1.0.7. -->
   <script type="importmap">
   {
     "imports": {
-      "@transcribe/transcriber": "https://cdn.jsdelivr.net/npm/@transcribe/transcriber@3.0.1/src/index.js",
-      "@transcribe/shout": "https://cdn.jsdelivr.net/npm/@transcribe/shout@1.0.7/src/shout/shout.wasm.js"
+      "@transcribe/transcriber": "./vendor/transcriber/src/index.js",
+      "@transcribe/shout": "./vendor/shout/src/shout/shout.wasm.js"
     }
   }
   </script>
