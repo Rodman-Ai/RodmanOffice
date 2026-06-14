@@ -10,7 +10,7 @@ const $ = (s) => document.querySelector(s);
 // Visible build marker. Bump on every deploy — it shows in the header
 // subheading and the console so you can confirm at a glance whether the
 // browser is running fresh code (vs. a stale service-worker cache).
-const APP_VERSION = 'PR #121';
+const APP_VERSION = 'PR #122';
 try {
   console.info(`RodmanTranscribe ${APP_VERSION}`);
   const verEl = document.getElementById('appVersion');
@@ -55,6 +55,35 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 try {
   dbg(`${APP_VERSION} loaded · secureContext=${window.isSecureContext} · crossOriginIsolated=${engine.isCrossOriginIsolated()} · controller=${!!(navigator.serviceWorker && navigator.serviceWorker.controller)}`, 'info');
+  // Browser environment + isolation diagnostics. iOS Safari ≥ 16.4 is the
+  // earliest version that honours COEP "credentialless"; older Safaris
+  // can't be cross-origin isolated by the coi-serviceworker technique.
+  const ua = navigator.userAgent || '';
+  const isAppleWebKit = /AppleWebKit/.test(ua) && !/Chrome|CriOS|EdgiOS|Firefox|FxiOS/.test(ua);
+  const safariM = /Version\/(\d+)\.(\d+)/.exec(ua);
+  const safariStr = safariM ? `${safariM[1]}.${safariM[2]}` : '?';
+  const iosM = /OS (\d+)_(\d+)/.exec(ua);
+  const iosStr = iosM ? `${iosM[1]}.${iosM[2]}` : null;
+  const tooOldForCredentialless =
+    isAppleWebKit && safariM && (+safariM[1] < 16 || (+safariM[1] === 16 && +safariM[2] < 4));
+  dbg(`env · UA Safari=${safariStr} iOS=${iosStr || 'n/a'} webkit=${isAppleWebKit} · SharedArrayBuffer=${typeof SharedArrayBuffer !== 'undefined'}`, 'info');
+  if (tooOldForCredentialless) {
+    dbg('Safari < 16.4 does NOT support COEP credentialless → cross-origin isolation cannot be acquired here. Update iOS, or open the page on a desktop browser.', 'warn');
+  }
+  // Probe what headers the service worker is ACTUALLY synthesizing on the
+  // page response. If COOP/COEP are missing on the SW-served response,
+  // the browser will refuse isolation even with the SW in control.
+  (async () => {
+    try {
+      const r = await fetch(window.location.href, { cache: 'no-store' });
+      const coop = r.headers.get('Cross-Origin-Opener-Policy') || '(missing)';
+      const coep = r.headers.get('Cross-Origin-Embedder-Policy') || '(missing)';
+      dbg(`headers on page response · COOP=${coop} · COEP=${coep}`, 'info');
+      if (!engine.isCrossOriginIsolated() && coop !== '(missing)' && coep !== '(missing)') {
+        dbg('SW IS sending the headers but the browser still refuses isolation — almost always means this Safari build does not honour COEP credentialless. Open on desktop Chrome/Edge/Firefox or update iOS.', 'warn');
+      }
+    } catch (e) { dbg(`header probe failed: ${e?.message || e}`, 'warn'); }
+  })();
 } catch { /* ignore */ }
 document.getElementById('debugCopyBtn')?.addEventListener('click', () => {
   const text = Array.from(document.querySelectorAll('#debugLines li')).map((li) => li.textContent).join('\n');
@@ -149,7 +178,7 @@ async function ensureIsolation() {
     showCoiBanner({
       title: 'Couldn’t enable the on-device engine.',
       body: IS_IOS
-        ? 'Safari blocked the isolated tab needed for multi-threaded WebAssembly. Try Reload, or open in a recent Chrome/Edge.'
+        ? 'Safari blocked the isolated tab needed for multi-threaded WebAssembly. This needs iOS 16.4 or newer. Try Reload, update iOS, or open the page on a desktop browser. (Chrome/Edge on iPhone use Safari\'s engine, so they hit the same limit.)'
         : 'This browser or host blocked the isolated tab needed for multi-threaded WebAssembly. Try Reload, or a recent Chrome / Edge / Firefox.',
       button: true,
     });
