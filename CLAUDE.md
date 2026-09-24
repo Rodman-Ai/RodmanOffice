@@ -2,7 +2,7 @@
 
 A static, browser-first office suite (Word + Sheets + Slides +
 Diagrams (RodmanVision) + Image editor + Converter + Accounting +
-CRM + Transcription) that runs from GitHub Pages with no
+CRM + Transcription + FileMerger) that runs from GitHub Pages with no
 app-specific build step for most surfaces. Every file format the
 suite speaks is implemented from scratch under `/lib/`.
 
@@ -18,6 +18,7 @@ suite speaks is implemented from scratch under `/lib/`.
 /crm/         Next.js 14 + TypeScript + Tailwind (LeoCRM, Google Sheets backend)
 /sheets/      pnpm React + Vite monorepo
 /transcription/ Vanilla HTML + ESM speech-to-text studio (whisper.cpp WASM)
+/filemerger/ Vanilla HTML + ESM merger: videos → one MP4 (WebCodecs/Mediabunny), PDFs → one PDF
 
 /lib/         Shared engines. Every app imports from these:
   /lib/docs/      DOCX, PDF, RTF, ODT, EPUB, MD, HTML, …
@@ -89,6 +90,8 @@ its dependencies directly under `lib/<engine>/vendor/`:
 - `lib/images/vendor/pdfjs/` — Mozilla pdf.js, used for PDF reading +
   text extraction (Compress PDF, PDF→image).
 - `lib/sheets/vendor/xlsx.mjs` — `@e965/xlsx` ESM bundle.
+- `lib/video/vendor/mediabunny/`: Mediabunny ESM bundle (MPL-2.0), WebCodecs
+  demux/decode/encode/mux for FileMerger's video tab.
 - `lib/video/vendor/ffmpeg/` — `@ffmpeg/ffmpeg` + `@ffmpeg/core`
   WASM build (~25 MB, lazy-loaded on first video conversion).
 

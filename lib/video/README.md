@@ -16,6 +16,7 @@ fetched on the first video conversion of a session.
 | Dependency | Vendored file(s) | Version | License | Used for |
 |---|---|---:|---|---|
 | `@ffmpeg/ffmpeg` | `vendor/ffmpeg/ffmpeg.mjs` (concatenated bundle), `vendor/ffmpeg/ffmpeg-worker.mjs` | 0.12.10 | MIT | High-level FFmpeg.wasm worker driver. |
+| `mediabunny` | `vendor/mediabunny/mediabunny.min.mjs` (upstream `dist/bundles/mediabunny.min.mjs`), `vendor/mediabunny/LICENSE` | 1.59.1 | MPL-2.0 | WebCodecs demux / decode / encode / MP4 mux for FileMerger's video tab (`/filemerger/video-merge.js`). Imported directly, not through `index.js`. |
 | `@ffmpeg/core` | `vendor/ffmpeg/ffmpeg-core.js`, `vendor/ffmpeg/ffmpeg-core.wasm` | 0.12.6 | LGPL-2.1 (FFmpeg) + MIT (build glue) | Single-threaded FFmpeg compiled to WebAssembly. |
 
 The `ffmpeg-core.wasm` binary is a build of FFmpeg with `--enable-gpl=no`,

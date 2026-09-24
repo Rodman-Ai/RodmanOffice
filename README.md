@@ -13,6 +13,7 @@ A complete office suite that runs free in your browser.
 | Accounting | [`accounting/`](./accounting/) | Live (vendored from [RodBooks](https://github.com/Rodman-Ai/RodBooks)) |
 | CRM | [`crm/`](./crm/) | Live (vendored from [LeoCRM](https://github.com/Rodman-Ai/LeoCRM), built in CI) |
 | File Converter | [`converter/`](./converter/) | Live (built in-suite, uses shared `/lib` engines) |
+| FileMerger | [`filemerger/`](./filemerger/) | Live (video tab vendored from [MP4 Merger](https://github.com/Rodman-Ai/mp4merger); PDF tab built in-suite) |
 
 ## How it works
 
@@ -95,6 +96,7 @@ patch each — a "← Apps" button that links to `../`:
 - `sheets/` ← [AiCell](https://github.com/Rodman-Ai/AiCell) (pnpm + Vite + React 19, built in CI). Patched in `sheets/apps/web/src/App.tsx` (back-to-launcher anchor at the top-left of the toolbar) and `sheets/apps/web/src/styles.css` (`.rodmanoffice-back`).
 - `crm/` ← [LeoCRM](https://github.com/Rodman-Ai/LeoCRM) (Next.js, built in CI). Patched in `crm/src/components/AppShell.tsx` — a back-to-launcher anchor in the desktop sidebar and another in the mobile header, both linking to absolute path `/RodmanOffice/` (not Next's `<Link>`, since basePath rewriting would otherwise scope the URL under `/RodmanOffice/crm/`).
 - `converter/` is built in-suite and intentionally consumes shared `/lib` engines.
+- `filemerger/` ← [MP4 Merger](https://github.com/Rodman-Ai/mp4merger) (TypeScript + Vite upstream). Vendored without a build step: `src/main.ts` → `filemerger/video.js` and `src/merge.ts` → `filemerger/video-merge.js` with the types stripped, and the `mediabunny` npm dependency vendored as `lib/video/vendor/mediabunny/mediabunny.min.mjs`. Local changes: the "← Apps" link, a Videos / PDFs tab shell (`filemerger/app.js`) that routes dropped files by type, and the PDF tab (`filemerger/pdf.js` on the hand-rolled `lib/docs/pdfmerge.js`).
 - `lib/` contains shared document, spreadsheet, slide, and image engines used by multiple apps. Treat changes there as cross-app changes.
 
 To pull updates for `word/` or `accounting/`, re-copy the upstream
