@@ -18,11 +18,12 @@
     }
   });
 
-  // Keyboard shortcut: 1-7 jumps to the corresponding app tile.
+  // Keyboard shortcut: 1-9 open the first nine app tiles, 0 the tenth.
+  // Modified presses (Ctrl/Cmd+1 switches browser tabs) are left alone.
   document.addEventListener('keydown', (e) => {
     if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
-    const idx = Number(e.key) - 1;
-    if (!Number.isInteger(idx) || idx < 0 || idx > 6) return;
+    if (e.ctrlKey || e.metaKey || e.altKey || !/^[0-9]$/.test(e.key)) return;
+    const idx = e.key === '0' ? 9 : Number(e.key) - 1;
     const tiles = grid.querySelectorAll('.tile');
     const tile = tiles[idx];
     if (!tile || tile.classList.contains('is-disabled')) return;
