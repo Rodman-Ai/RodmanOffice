@@ -4,6 +4,11 @@
 RodmanConvert app loads it lazily — the ~25 MB wasm binary is only
 fetched on the first video conversion of a session.
 
+It also hosts the vendored Mediabunny bundle (`vendor/mediabunny/`),
+which FileMerger's video tab imports directly for WebCodecs-based
+(hardware) decode, encode and MP4 muxing. It is not re-exported from
+`index.js`.
+
 ## Public surface
 
 | File | Purpose |

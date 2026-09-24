@@ -516,7 +516,7 @@ button.icon {
   font-size: 13px;
 }
 
-.clip .meta > .warn {
+.clip.pdf .meta > .warn {
   display: block;
 }
 

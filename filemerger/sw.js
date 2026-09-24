@@ -1,11 +1,12 @@
 // FileMerger service worker: offline app shell.
 // Network-first, cache-fallback. Mirrors /converter/sw.js.
 //
-// The shared engines (Mediabunny under /lib/video/, the PDF merger
-// under /lib/docs/, pdf.js under /lib/images/) sit outside this
-// worker's scope, so they are never precached; the browser HTTP
-// cache holds them after first use.
-const VERSION = 'filemerger-v1';
+// Only the app shell below is precached. The shared engines the page
+// imports (Mediabunny under /lib/video/, the PDF merger under
+// /lib/docs/, pdf.js under /lib/images/) are cached by the fetch
+// handler on first use, so each works offline only after it has
+// loaded once online.
+const VERSION = 'filemerger-v2';
 const CACHE_PREFIX = 'filemerger-';
 const APP_SHELL = [
   './',
