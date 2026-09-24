@@ -93,7 +93,14 @@ export async function addFiles(files) {
 }
 
 async function thumbnail(entry) {
-  const doc = await openWithPdfjs(entry.bytes);
+  let doc;
+  try {
+    doc = await openWithPdfjs(entry.bytes);
+  } catch (err) {
+    // Rasterized files need pdf.js; for the rest a missing thumbnail is fine.
+    if (entry.rasterize) throw err;
+    return '';
+  }
   try {
     if (entry.rasterize) entry.pageCount = doc.numPages;
     const page = await doc.getPage(1);
@@ -274,6 +281,8 @@ function render() {
     return li;
   }));
   listHead.hidden = entries.length === 0;
+  $('pdf-sort-name').disabled = running;
+  $('pdf-clear').disabled = running;
   updateSummary();
 }
 
@@ -339,12 +348,14 @@ async function startMerge() {
     phase.textContent = text;
   };
   const started = performance.now();
+  // Work from a snapshot: files dropped mid-merge join the list for next time.
+  const jobs = entries.slice();
   try {
     const sources = [];
-    const rasterJobs = entries.filter((e) => e.rasterize);
+    const rasterJobs = jobs.filter((e) => e.rasterize);
     const rasterTotal = rasterJobs.reduce((s, e) => s + selectedPageCount(e), 0);
     let rasterDone = 0;
-    for (const e of entries) {
+    for (const e of jobs) {
       const pages = parsePageRanges(e.range, e.pageCount);
       const src = { name: e.file.name.replace(/\.pdf$/i, ''), rotate: e.rotate };
       if (e.rasterize) {
@@ -372,7 +383,7 @@ async function startMerge() {
     download.download = outputName();
     openLink.href = resultUrl;
     result.hidden = false;
-    const pages = sources.reduce((s, src, i) => s + (src.images?.length ?? src.pages?.length ?? entries[i].pageCount), 0);
+    const pages = sources.reduce((s, src, i) => s + (src.images?.length ?? src.pages?.length ?? jobs[i].pageCount), 0);
     const secs = ((performance.now() - started) / 1000).toFixed(1);
     setProgress(1, 'Done');
     showStatus(`Merged ${pages} page${pages === 1 ? '' : 's'} from ${sources.length} file${sources.length === 1 ? '' : 's'} in ${secs}s. Output: ${fmtBytes(blob.size)}.`);

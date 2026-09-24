@@ -21,12 +21,12 @@ suite speaks is implemented from scratch under `/lib/`.
 /filemerger/ Vanilla HTML + ESM merger: videos → one MP4 (WebCodecs/Mediabunny), PDFs → one PDF
 
 /lib/         Shared engines. Every app imports from these:
-  /lib/docs/      DOCX, PDF, RTF, ODT, EPUB, MD, HTML, …
+  /lib/docs/      DOCX, PDF, RTF, ODT, EPUB, MD, HTML, …, lossless PDF merge (pdfmerge.js)
   /lib/sheets/    CSV, TSV, XLSX, JSON, NDJSON, YAML, vCard, iCal …
   /lib/slides/    PPTX read/write + the deckToHtml ↔ htmlToDeck bridge
   /lib/diagrams/  VSDX read/write + 132-shape stencil library + SVG/PNG/PDF export
   /lib/images/    Canvas encoders for ~25 image formats + PDF + PSD
-  /lib/video/     FFmpeg.wasm wrapper for video / audio transcoding
+  /lib/video/     FFmpeg.wasm wrapper for video / audio transcoding (+ vendored Mediabunny)
   /lib/audio/     whisper.cpp speech-to-text — model catalog/cache, formats
   /lib/claude/    Anthropic API client used by every "Ask Claude" panel
 
