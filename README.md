@@ -9,10 +9,12 @@ A complete office suite that runs free in your browser.
 | Word Processor | [`word/`](./word/) | Live (vendored from [RodmanWord](https://github.com/Rodman-Ai/RodmanWord)) |
 | Spreadsheets | [`sheets/`](./sheets/) | Live (vendored from [AiCell](https://github.com/Rodman-Ai/AiCell), built in CI) |
 | Slideshows | [`slides/`](./slides/) | Live (RodmanSlides — built in-suite) |
+| Vision (diagrams) | [`vision/`](./vision/) | Live (RodmanVision, a VSDX diagram editor; built in-suite, `/diagrams/` redirects here) |
 | Image Editor | [`image/`](./image/) | Live (vendored from [Retro-paint](https://github.com/Rodman-Ai/Retro-paint)) |
 | Accounting | [`accounting/`](./accounting/) | Live (vendored from [RodBooks](https://github.com/Rodman-Ai/RodBooks)) |
 | CRM | [`crm/`](./crm/) | Live (vendored from [LeoCRM](https://github.com/Rodman-Ai/LeoCRM), built in CI) |
 | File Converter | [`converter/`](./converter/) | Live (built in-suite, uses shared `/lib` engines) |
+| Transcription | [`transcription/`](./transcription/) | Live (RodmanTranscribe; built in-suite on vendored whisper.cpp WASM) |
 | FileMerger | [`filemerger/`](./filemerger/) | Live (video tab vendored from [MP4 Merger](https://github.com/Rodman-Ai/mp4merger); PDF tab built in-suite) |
 
 ## How it works
@@ -74,16 +76,19 @@ All other apps are static drop-ins with no build step.
 
 ## Adding an app
 
-1. Create a folder at the suite root (`word/`, `sheets/`, `slides/`, `image/`, `accounting/`, `crm/`, `converter/`).
+1. Create a folder at the suite root, named with the app's slug (like `converter/` or `filemerger/`).
 2. Put a self-contained static site inside (`index.html` + assets).
 3. Add an "← Apps" link back to `../` somewhere in the chrome.
 4. Use `localStorage` keys prefixed with the app slug
-   (`sheets.*`, `slides.*`, `image.*`, `accounting.*`, `crm.*`) so co-pinned PWAs don't collide.
+   (`sheets.*`, `slides.*`, `image.*`, `accounting.*`, `crm.*`, `filemerger.*`) so co-pinned PWAs don't collide.
 5. Register the app's service worker with `scope: './'` so it stays
    confined to its own folder.
 6. If the app depends on `/lib`, document which workflows need those
    shared engines and do not claim full offline support unless those
    assets are controlled by that app's service worker.
+7. Add a tile to the launcher grid in `/index.html`. Number keys open
+   tiles by position (1-9, then 0 for the tenth); tiles past the tenth
+   have no shortcut.
 
 ## Vendor sync
 
@@ -96,7 +101,7 @@ patch each — a "← Apps" button that links to `../`:
 - `sheets/` ← [AiCell](https://github.com/Rodman-Ai/AiCell) (pnpm + Vite + React 19, built in CI). Patched in `sheets/apps/web/src/App.tsx` (back-to-launcher anchor at the top-left of the toolbar) and `sheets/apps/web/src/styles.css` (`.rodmanoffice-back`).
 - `crm/` ← [LeoCRM](https://github.com/Rodman-Ai/LeoCRM) (Next.js, built in CI). Patched in `crm/src/components/AppShell.tsx` — a back-to-launcher anchor in the desktop sidebar and another in the mobile header, both linking to absolute path `/RodmanOffice/` (not Next's `<Link>`, since basePath rewriting would otherwise scope the URL under `/RodmanOffice/crm/`).
 - `converter/` is built in-suite and intentionally consumes shared `/lib` engines.
-- `filemerger/` ← [MP4 Merger](https://github.com/Rodman-Ai/mp4merger) (TypeScript + Vite upstream). Vendored without a build step: `src/main.ts` → `filemerger/video.js` and `src/merge.ts` → `filemerger/video-merge.js` with the types stripped, and the `mediabunny` npm dependency vendored as `lib/video/vendor/mediabunny/mediabunny.min.mjs`. Local changes: the "← Apps" link, a Videos / PDFs tab shell (`filemerger/app.js`) that routes dropped files by type, and the PDF tab (`filemerger/pdf.js` on the hand-rolled `lib/docs/pdfmerge.js`).
+- `filemerger/` ← [MP4 Merger](https://github.com/Rodman-Ai/mp4merger) (TypeScript + Vite upstream). Vendored without a build step: `src/main.ts` → `filemerger/video.js` and `src/merge.ts` → `filemerger/video-merge.js` with the types stripped, and the `mediabunny` npm dependency vendored as `lib/video/vendor/mediabunny/mediabunny.min.mjs`. Local changes: the "← Apps" link, Sort and Clear locked during a merge (`render()` in `video.js`), a Videos / PDFs tab shell (`filemerger/app.js`) that routes dropped files by type, and the PDF tab (`filemerger/pdf.js` on the hand-rolled `lib/docs/pdfmerge.js`).
 - `lib/` contains shared document, spreadsheet, slide, and image engines used by multiple apps. Treat changes there as cross-app changes.
 
 To pull updates for `word/` or `accounting/`, re-copy the upstream

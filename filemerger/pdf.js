@@ -157,6 +157,13 @@ function selectedPageCount(entry) {
 }
 
 function render() {
+  // Rebuilding the rows would drop focus from a page-range box the user is
+  // typing in (other files finish loading in the background), so note it
+  // and restore it afterwards.
+  const active = document.activeElement;
+  const focused = active instanceof HTMLInputElement && list.contains(active)
+    ? { id: active.closest('li')?.dataset.id, start: active.selectionStart, end: active.selectionEnd }
+    : null;
   list.replaceChildren(...entries.map((entry, idx) => {
     const li = document.createElement('li');
     li.className = 'clip pdf' + (entry.ready ? '' : ' loading');
@@ -258,9 +265,12 @@ function render() {
     );
     li.append(index, thumb, body, ctrl);
 
+    // A draggable row swallows mouse text selection in the range box, so
+    // only make the row draggable when the press starts outside the box.
+    li.addEventListener('pointerdown', (ev) => {
+      li.draggable = !running && !(ev.target instanceof HTMLInputElement);
+    });
     li.addEventListener('dragstart', (ev) => {
-      // Let text selection inside the range input work normally.
-      if (ev.target instanceof HTMLInputElement) { ev.preventDefault(); return; }
       dragId = entry.id;
       li.classList.add('dragging');
       ev.dataTransfer.effectAllowed = 'move';
@@ -280,6 +290,13 @@ function render() {
     });
     return li;
   }));
+  if (focused) {
+    const input = list.querySelector(`li[data-id="${focused.id}"] input`);
+    if (input && !input.disabled) {
+      input.focus();
+      input.setSelectionRange(focused.start, focused.end);
+    }
+  }
   listHead.hidden = entries.length === 0;
   $('pdf-sort-name').disabled = running;
   $('pdf-clear').disabled = running;

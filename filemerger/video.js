@@ -309,6 +309,10 @@ function render() {
   const total = ready.reduce((s, e) => s + e.info.duration, 0);
   listHead.hidden = entries.length === 0;
   summary.textContent = `${entries.length} clip${entries.length === 1 ? '' : 's'} · ${fmtTime(total)} total`;
+  // RodmanOffice: Clear disposes the inputs a running merge reads from, so
+  // lock the list controls while merging (upstream leaves them enabled).
+  $('sort-name').disabled = !!running;
+  $('clear').disabled = !!running;
   updateMergeButton();
 }
 function updateMergeButton() {

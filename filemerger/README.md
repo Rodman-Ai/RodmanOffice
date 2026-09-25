@@ -14,7 +14,9 @@ Merge videos into one MP4, or PDFs into one PDF, entirely in the browser.
 
 `video.js` and `video-merge.js` are upstream's `src/main.ts` and `src/merge.ts`
 with the TypeScript types stripped (TypeScript `transpileModule`, ES2022), so no
-build step is needed. The only logic change is that drag-and-drop moved to `app.js`.
+build step is needed. Local logic changes: drag-and-drop moved to `app.js`, and
+Sort and Clear are disabled while a merge runs (upstream leaves them enabled, and
+Clear then disposes the inputs the merge is reading, which crashes it).
 The `mediabunny` dependency is vendored at
 `lib/video/vendor/mediabunny/mediabunny.min.mjs` (MPL-2.0, see `lib/video/README.md`).
 
@@ -32,11 +34,14 @@ format engines. It copies page objects byte-for-byte, so merging is lossless.
 Encrypted files (and any the parser can't read) are rendered with the vendored
 pdf.js at about 200 dpi and merged as JPEG pages; the UI flags these files.
 
+Internal links keep working: named destinations are converted to direct page
+links during the copy, and links to pages you left out are removed (viewers
+would otherwise send them to page 1). Web links are untouched.
+
 What does not carry over from the source files: each source's own bookmarks,
-named destinations, form-field interactivity (fields keep their appearance but
-can't be filled), layer visibility settings, accessibility tagging, attachments
-and document JavaScript. Links that point to pages you left out stop working.
-The full list is in the header of `lib/docs/pdfmerge.js`.
+form-field interactivity (fields keep their appearance but can't be filled),
+layer visibility settings, accessibility tagging, attachments and document
+JavaScript. The full list is in the header of `lib/docs/pdfmerge.js`.
 
 Page ranges accept `1-3, 5, 8-` (open-ended), `5-1` (reverse order) and repeats;
 spaces around the dash are fine.
