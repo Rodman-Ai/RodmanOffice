@@ -18,7 +18,7 @@ suite speaks is implemented from scratch under `/lib/`.
 /crm/         Next.js 14 + TypeScript + Tailwind (LeoCRM, Google Sheets backend)
 /sheets/      pnpm React + Vite monorepo
 /transcription/ Vanilla HTML + ESM speech-to-text studio (whisper.cpp WASM)
-/filemerger/ Vanilla HTML + ESM merger: videos → one MP4 (WebCodecs/Mediabunny), PDFs → one PDF
+/filemerger/ Vanilla HTML + ESM merger: videos → one MP4 (WebCodecs/Mediabunny); PDFs, images, docs → one PDF packet
 
 /lib/         Shared engines. Every app imports from these:
   /lib/docs/      DOCX, PDF, RTF, ODT, EPUB, MD, HTML, …, lossless PDF merge (pdfmerge.js)

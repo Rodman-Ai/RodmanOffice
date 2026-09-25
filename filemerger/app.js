@@ -2,6 +2,7 @@
 //
 // The two tabs load independently, so a browser without WebCodecs
 // (which the video tab's Mediabunny engine needs) can still merge PDFs.
+import { kindOf } from './packet.js';
 const tabs = {
   video: { tab: document.getElementById('tab-video'), panel: document.getElementById('panel-video') },
   pdf: { tab: document.getElementById('tab-pdf'), panel: document.getElementById('panel-pdf') },
@@ -47,9 +48,10 @@ if (!tabs[initial]) {
 show(tabs[initial] ? initial : 'video', false);
 
 // Files can be dropped anywhere on the page. Videos go to the video
-// tab and PDFs to the PDF tab, switching to whichever received files.
+// tab; PDFs, images and documents to the PDF tab. The view switches to
+// whichever tab received files.
 const isVideo = (f) => f.type.startsWith('video/') || /\.(mp4|m4v|mov|mkv|webm)$/i.test(f.name);
-const isPdf = (f) => f.type === 'application/pdf' || /\.pdf$/i.test(f.name);
+const isPdf = (f) => !isVideo(f) && kindOf(f) !== null;
 const zones = document.querySelectorAll('.drop');
 let dragDepth = 0;
 
