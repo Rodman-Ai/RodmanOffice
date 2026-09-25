@@ -526,6 +526,8 @@ input.invalid {
 
 .field.check {
   display: flex;
+  flex-wrap: wrap;
+  gap: 4px 24px;
   align-items: flex-end;
 }
 
@@ -551,4 +553,19 @@ input.invalid {
     flex-wrap: wrap;
     justify-content: flex-end;
   }
+}
+
+.drop-formats {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+}
+
+.clip .meta > .note {
+  display: block;
+  font-size: 12px;
+}
+
+#pdf-bates input[type='number'] {
+  max-width: 110px;
 }

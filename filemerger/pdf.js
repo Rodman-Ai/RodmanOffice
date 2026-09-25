@@ -1,11 +1,13 @@
-// FileMerger: PDF tab.
+// FileMerger: PDF tab (PDFs, images and documents into one PDF packet).
 //
-// Merging is lossless: lib/docs/pdfmerge.js copies each chosen page's
+// PDF merging is lossless: lib/docs/pdfmerge.js copies each chosen page's
 // objects (content streams, fonts, images) byte-for-byte into one new
-// PDF, so text stays selectable and nothing is re-compressed. pdf.js
-// (vendored under lib/images/) is only used for thumbnails, and to
-// rasterize encrypted files, which the object copier can't read.
+// PDF, so text stays selectable and nothing is re-compressed. Images and
+// documents are turned into merge sources by packet.js. pdf.js (vendored
+// under lib/images/) is only used for thumbnails, and to rasterize
+// encrypted files, which the object copier can't read.
 import { mergePdfs, inspectPdf, parsePageRanges } from '../lib/docs/pdfmerge.js';
+import * as packet from './packet.js';
 
 const $ = (id) => document.getElementById(id);
 const list = $('pdf-list');
@@ -24,6 +26,12 @@ const statusBox = $('pdf-status');
 const result = $('pdf-result');
 const download = $('pdf-download');
 const openLink = $('pdf-open');
+const pageSizeSel = $('pdf-page-size');
+const contentsBox = $('pdf-contents');
+const numberingSel = $('pdf-numbering');
+const batesFields = $('pdf-bates');
+const batesPrefix = $('pdf-bates-prefix');
+const batesStart = $('pdf-bates-start');
 
 let entries = [];
 let nextId = 1;
@@ -67,21 +75,18 @@ function showStatus(msg, isError = false) {
 export async function addFiles(files) {
   const added = [];
   for (const file of files) {
-    const entry = { id: nextId++, file, range: '', rotate: 0 };
+    const kind = packet.kindOf(file);
+    if (!kind) continue;
+    const entry = { id: nextId++, file, kind, range: '', rotate: 0 };
     entries.push(entry);
     added.push(entry);
   }
   render();
   await Promise.all(added.map(async (entry) => {
     try {
-      entry.bytes = new Uint8Array(await entry.file.arrayBuffer());
-      const info = await inspectPdf(entry.bytes).catch(() => null);
-      entry.encrypted = !!info?.encrypted;
-      entry.pageCount = info?.pageCount || 0;
-      // The object reader couldn't parse it (or it's encrypted): let pdf.js
-      // count pages, and the file will be rasterized at merge time.
-      if (!info || info.encrypted) entry.rasterize = true;
-      entry.thumb = await thumbnail(entry);
+      if (entry.kind === 'pdf') await preparePdf(entry);
+      else if (entry.kind === 'image') await prepareImage(entry);
+      else await prepareConverted(entry);
     } catch (err) {
       entry.error = err?.name === 'PasswordException'
         ? 'Password-protected; unlock it first'
@@ -91,6 +96,42 @@ export async function addFiles(files) {
     render();
   }));
 }
+
+async function preparePdf(entry) {
+  entry.bytes = new Uint8Array(await entry.file.arrayBuffer());
+  const info = await inspectPdf(entry.bytes).catch(() => null);
+  entry.encrypted = !!info?.encrypted;
+  entry.pageCount = info?.pageCount || 0;
+  // The object reader couldn't parse it (or it's encrypted): let pdf.js
+  // count pages, and the file will be rasterized at merge time.
+  if (!info || info.encrypted) entry.rasterize = true;
+  entry.thumb = await thumbnail(entry);
+}
+
+async function prepareImage(entry) {
+  entry.image = await packet.loadImage(entry.file);
+  entry.pageCount = 1;
+  entry.thumb = URL.createObjectURL(entry.file);
+}
+
+// Documents, spreadsheets and slides: converted to PDF now so the page
+// count and thumbnail are real, and again when the paper size changes.
+async function prepareConverted(entry) {
+  if (entry.html == null) {
+    entry.html = await packet.toHtml(entry.file, entry.kind);
+    entry.unsupportedChars = packet.hasUnsupportedChars(entry.html);
+  }
+  entry.bytes = await packet.htmlToPdf(entry.html, baseName(entry.file.name), pageSizeSel.value);
+  entry.pageCount = (await inspectPdf(entry.bytes)).pageCount;
+  if (entry.pageCount < 2) entry.range = ''; // the range box is hidden
+  // Swap thumbnails only once the new one exists: rows re-render while
+  // other files convert, and must never point at a revoked URL.
+  const old = entry.thumb;
+  entry.thumb = await thumbnail(entry);
+  if (old) URL.revokeObjectURL(old);
+}
+
+const baseName = (name) => name.replace(/\.[^.]+$/, '');
 
 async function thumbnail(entry) {
   let doc;
@@ -156,6 +197,34 @@ function selectedPageCount(entry) {
   }
 }
 
+// "Pages [1-3, 5]" box for picking part of a multi-page file.
+function rangeRow(entry) {
+  const row = document.createElement('label');
+  row.className = 'range';
+  row.append('Pages ');
+  const input = document.createElement('input');
+  input.type = 'text';
+  const n = entry.pageCount;
+  input.placeholder = `All, or e.g. 1-${Math.min(3, n)}${n >= 5 ? ', 5' : ''}`;
+  input.value = entry.range;
+  input.disabled = running;
+  input.spellcheck = false;
+  const err = rangeError(entry);
+  const errSpan = document.createElement('span');
+  errSpan.className = 'warn';
+  errSpan.textContent = err ? ` ${err}` : '';
+  input.classList.toggle('invalid', !!err);
+  input.addEventListener('input', () => {
+    entry.range = input.value;
+    const e = rangeError(entry);
+    input.classList.toggle('invalid', !!e);
+    errSpan.textContent = e ? ` ${e}` : '';
+    updateSummary();
+  });
+  row.append(input, errSpan);
+  return row;
+}
+
 function render() {
   // Rebuilding the rows would drop focus from a page-range box the user is
   // typing in (other files finish loading in the background), so note it
@@ -199,7 +268,7 @@ function render() {
     } else if (entry.ready) {
       const chips = document.createElement('div');
       chips.className = 'chips';
-      const chipTexts = [`${entry.pageCount} page${entry.pageCount === 1 ? '' : 's'}`, fmtBytes(entry.file.size)];
+      const chipTexts = [packet.describe(entry.file, entry.kind), `${entry.pageCount} page${entry.pageCount === 1 ? '' : 's'}`, fmtBytes(entry.file.size)];
       if (entry.rotate) chipTexts.push(`↻ ${entry.rotate}°`);
       for (const text of chipTexts) {
         const c = document.createElement('span');
@@ -216,30 +285,19 @@ function render() {
           : "Couldn't read its structure: pages will be merged as images";
         meta.append(w);
       }
-      const rangeRow = document.createElement('label');
-      rangeRow.className = 'range';
-      rangeRow.append('Pages ');
-      const input = document.createElement('input');
-      input.type = 'text';
-      const n = entry.pageCount;
-      input.placeholder = n > 1 ? `All, or e.g. 1-${Math.min(3, n)}${n >= 5 ? ', 5' : ''}` : 'All';
-      input.value = entry.range;
-      input.disabled = running;
-      input.spellcheck = false;
-      const err = rangeError(entry);
-      const errSpan = document.createElement('span');
-      errSpan.className = 'warn';
-      errSpan.textContent = err ? ` ${err}` : '';
-      input.classList.toggle('invalid', !!err);
-      input.addEventListener('input', () => {
-        entry.range = input.value;
-        const e = rangeError(entry);
-        input.classList.toggle('invalid', !!e);
-        errSpan.textContent = e ? ` ${e}` : '';
-        updateSummary();
-      });
-      rangeRow.append(input, errSpan);
-      meta.append(rangeRow);
+      if (entry.html && packet.isRich(entry.file)) {
+        const n = document.createElement('span');
+        n.className = 'note';
+        n.textContent = 'Converted as text and tables: pictures and exact layout are not kept. For a faithful copy, save it as PDF from its own app first.';
+        meta.append(n);
+      }
+      if (entry.unsupportedChars) {
+        const w = document.createElement('span');
+        w.className = 'warn';
+        w.textContent = 'Has characters the converter can\'t draw (non-Latin scripts, emoji); they will print as "?"';
+        meta.append(w);
+      }
+      if (entry.pageCount > 1) meta.append(rangeRow(entry));
     } else {
       meta.textContent = 'Reading…';
     }
@@ -300,6 +358,7 @@ function render() {
   listHead.hidden = entries.length === 0;
   $('pdf-sort-name').disabled = running;
   $('pdf-clear').disabled = running;
+  pageSizeSel.disabled = running;
   updateSummary();
 }
 
@@ -374,8 +433,10 @@ async function startMerge() {
     let rasterDone = 0;
     for (const e of jobs) {
       const pages = parsePageRanges(e.range, e.pageCount);
-      const src = { name: e.file.name.replace(/\.pdf$/i, ''), rotate: e.rotate };
-      if (e.rasterize) {
+      const src = { name: baseName(e.file.name), rotate: e.rotate };
+      if (e.kind === 'image') {
+        src.images = [packet.layoutImage(e.image, pageSizeSel.value)];
+      } else if (e.rasterize) {
         const all = pages ?? Array.from({ length: e.pageCount }, (_, i) => i);
         src.images = await rasterize(e, all, () => {
           rasterDone++;
@@ -392,6 +453,8 @@ async function startMerge() {
     const out = await mergePdfs(sources, {
       bookmarks: bookmarksBox.checked,
       title: outputName().replace(/\.pdf$/i, ''),
+      contents: contentsBox.checked && { pageSize: packet.PAGE_SIZES[pageSizeSel.value] || packet.PAGE_SIZES.letter },
+      stamp: stampOption(),
       onProgress: (r) => setProgress(base + (1 - base) * r, 'Copying pages…'),
     });
     const blob = new Blob([out], { type: 'application/pdf' });
@@ -403,7 +466,8 @@ async function startMerge() {
     const pages = sources.reduce((s, src, i) => s + (src.images?.length ?? src.pages?.length ?? jobs[i].pageCount), 0);
     const secs = ((performance.now() - started) / 1000).toFixed(1);
     setProgress(1, 'Done');
-    showStatus(`Merged ${pages} page${pages === 1 ? '' : 's'} from ${sources.length} file${sources.length === 1 ? '' : 's'} in ${secs}s. Output: ${fmtBytes(blob.size)}.`);
+    const extra = contentsBox.checked ? ', plus a contents page' : '';
+    showStatus(`Merged ${pages} page${pages === 1 ? '' : 's'} from ${sources.length} file${sources.length === 1 ? '' : 's'}${extra} in ${secs}s. Output: ${fmtBytes(blob.size)}.`);
   } catch (err) {
     console.error(err);
     showStatus(`Merge failed: ${err instanceof Error ? err.message : String(err)}`, true);
@@ -413,6 +477,44 @@ async function startMerge() {
   }
 }
 
+// Page numbers or Bates numbers, stamped on every page of the packet.
+function stampOption() {
+  if (numberingSel.value === 'page') {
+    return { text: (i, n) => `Page ${i + 1} of ${n}`, position: 'center' };
+  }
+  if (numberingSel.value === 'bates') {
+    const prefix = batesPrefix.value.trim();
+    const start = Math.max(0, Math.floor(Number(batesStart.value) || 1));
+    return { text: (i) => `${prefix}${String(start + i).padStart(6, '0')}`, position: 'right' };
+  }
+  return null;
+}
+
+// Packet options are remembered per browser.
+const OPTIONS_KEY = 'filemerger.packet';
+function saveOptions() {
+  const o = {
+    pageSize: pageSizeSel.value, contents: contentsBox.checked, bookmarks: bookmarksBox.checked,
+    numbering: numberingSel.value, batesPrefix: batesPrefix.value, batesStart: batesStart.value,
+  };
+  try { localStorage.setItem(OPTIONS_KEY, JSON.stringify(o)); } catch { /* storage unavailable */ }
+}
+function loadOptions() {
+  let o = null;
+  try { o = JSON.parse(localStorage.getItem(OPTIONS_KEY)); } catch { /* none saved */ }
+  // Letter where it's the norm, A4 elsewhere.
+  pageSizeSel.value = o?.pageSize || (/^en-(US|CA)$|^es-(MX|US)$|^fr-CA$/.test(navigator.language) ? 'letter' : 'a4');
+  if (!pageSizeSel.value) pageSizeSel.value = 'letter';
+  if (o) {
+    contentsBox.checked = !!o.contents;
+    bookmarksBox.checked = o.bookmarks !== false;
+    numberingSel.value = o.numbering || 'none';
+    batesPrefix.value = o.batesPrefix ?? '';
+    batesStart.value = o.batesStart || '1';
+  }
+  batesFields.hidden = numberingSel.value !== 'bates';
+}
+
 function outputName() {
   const n = nameInput.value.trim() || 'merged.pdf';
   return /\.pdf$/i.test(n) ? n : `${n}.pdf`;
@@ -420,6 +522,7 @@ function outputName() {
 
 // ---------- wiring ----------
 
+fileInput.accept = packet.ACCEPT;
 fileInput.addEventListener('change', () => {
   if (fileInput.files) addFiles(Array.from(fileInput.files));
   fileInput.value = '';
@@ -435,5 +538,27 @@ $('pdf-clear').addEventListener('click', () => {
   render();
 });
 mergeBtn.addEventListener('click', startMerge);
+for (const el of [contentsBox, bookmarksBox, batesPrefix, batesStart]) el.addEventListener('change', saveOptions);
+numberingSel.addEventListener('change', () => {
+  batesFields.hidden = numberingSel.value !== 'bates';
+  saveOptions();
+});
+// Converted documents are laid out on the paper size, so re-convert them.
+pageSizeSel.addEventListener('change', async () => {
+  saveOptions();
+  const affected = entries.filter((e) => e.html && !e.error);
+  affected.forEach((e) => { e.ready = false; });
+  render();
+  await Promise.all(affected.map(async (e) => {
+    try {
+      await prepareConverted(e);
+    } catch (err) {
+      e.error = err instanceof Error ? err.message : String(err);
+    }
+    e.ready = true;
+    render();
+  }));
+});
+loadOptions();
 
 render();

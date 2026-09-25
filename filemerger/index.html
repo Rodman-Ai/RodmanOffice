@@ -28,14 +28,14 @@
       <header>
         <h1>FileMerger</h1>
         <p class="sub">
-          Join videos into one MP4, or PDFs into one PDF. Everything runs in your browser; files never leave your
-          machine.
+          Join videos into one MP4, or PDFs, images and documents into one PDF packet. Everything runs in your
+          browser; files never leave your machine.
         </p>
       </header>
 
       <div class="tabs" role="tablist" aria-label="What to merge">
         <button type="button" role="tab" id="tab-video" aria-controls="panel-video" aria-selected="true">Videos</button>
-        <button type="button" role="tab" id="tab-pdf" aria-controls="panel-pdf" aria-selected="false">PDFs</button>
+        <button type="button" role="tab" id="tab-pdf" aria-controls="panel-pdf" aria-selected="false">PDFs &amp; documents</button>
       </div>
 
       <div id="panel-video" role="tabpanel" aria-labelledby="tab-video">
@@ -151,13 +151,15 @@
 
       <div id="panel-pdf" role="tabpanel" aria-labelledby="tab-pdf" hidden>
         <p class="panel-sub">
-          Join PDFs losslessly: pages are copied as-is, so text stays selectable and images keep their quality. Pick
-          page ranges and rotate files before merging.
+          Combine PDFs, photos, scans and documents into one PDF packet. PDF pages are copied as-is, so text stays
+          selectable and nothing loses quality. Pick page ranges, rotate files, and add a contents page or page numbers.
         </p>
         <section class="card">
           <label id="pdf-drop" class="drop">
-            <input id="pdf-file-input" type="file" accept="application/pdf,.pdf" multiple hidden />
-            <strong>Drop PDFs here</strong> or click to choose
+            <input id="pdf-file-input" type="file" multiple hidden />
+            <strong>Drop PDFs, images or documents here</strong> or click to choose
+            <span class="drop-formats">PDF · JPEG, PNG, WebP, GIF (HEIC in Safari) · Word, RTF, ODT, text,
+              Markdown, HTML · Excel, CSV · PowerPoint</span>
           </label>
           <div class="list-head" id="pdf-list-head" hidden>
             <span id="pdf-summary"></span>
@@ -174,14 +176,35 @@
             <label for="pdf-name">File name</label>
             <input id="pdf-name" type="text" value="merged.pdf" spellcheck="false" />
           </div>
-          <div class="field check">
+          <div class="field">
+            <label for="pdf-page-size">Paper size for images and documents</label>
+            <select id="pdf-page-size">
+              <option value="letter">Letter (8.5 × 11 in)</option>
+              <option value="a4">A4 (210 × 297 mm)</option>
+              <option value="image">Match each image</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="pdf-numbering">Page numbers</label>
+            <select id="pdf-numbering">
+              <option value="none">None</option>
+              <option value="page">“Page 1 of N”, bottom center</option>
+              <option value="bates">Bates number, bottom right</option>
+            </select>
+            <div id="pdf-bates" class="inline" hidden>
+              <input id="pdf-bates-prefix" type="text" placeholder="Prefix, e.g. ACME" spellcheck="false" aria-label="Bates prefix" />
+              <input id="pdf-bates-start" type="number" min="0" value="1" aria-label="First Bates number" />
+            </div>
+          </div>
+          <div class="field check full">
+            <label><input id="pdf-contents" type="checkbox" /> Start with a contents page (clickable, lists each file and its page)</label>
             <label><input id="pdf-bookmarks" type="checkbox" checked /> Add a bookmark for each file</label>
           </div>
         </section>
 
         <section class="card run">
           <div class="buttons">
-            <button type="button" id="pdf-merge" class="primary" disabled>Merge PDFs</button>
+            <button type="button" id="pdf-merge" class="primary" disabled>Merge into one PDF</button>
           </div>
           <div id="pdf-progress" class="progress" hidden>
             <div class="progress-head">

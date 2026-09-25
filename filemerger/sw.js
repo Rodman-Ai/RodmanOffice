@@ -6,7 +6,7 @@
 // /lib/docs/, pdf.js under /lib/images/) are cached by the fetch
 // handler on first use, so each works offline only after it has
 // loaded once online.
-const VERSION = 'filemerger-v2';
+const VERSION = 'filemerger-v3';
 const CACHE_PREFIX = 'filemerger-';
 const APP_SHELL = [
   './',
@@ -16,6 +16,7 @@ const APP_SHELL = [
   './video.js',
   './video-merge.js',
   './pdf.js',
+  './packet.js',
   './manifest.webmanifest',
   './icon.svg',
 ];

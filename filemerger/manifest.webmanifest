@@ -1,7 +1,7 @@
 {
   "name": "FileMerger",
   "short_name": "FileMerger",
-  "description": "Merge videos into one MP4 or PDFs into one PDF, entirely in your browser.",
+  "description": "Merge videos into one MP4, or PDFs, images and documents into one PDF packet, entirely in your browser.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
