@@ -72,6 +72,8 @@ window.addEventListener('drop', async (ev) => {
   const files = Array.from(ev.dataTransfer?.files ?? []);
   const videos = files.filter(isVideo);
   const pdfs = files.filter(isPdf);
+  const rejected = files.filter((f) => !isVideo(f) && !isPdf(f));
+  if (rejected.length) (await pdf).notifySkipped(rejected);
   if (!videos.length && !pdfs.length) return;
   // Prefer the visible tab when a drop contains both kinds.
   const current = tabs.pdf.panel.hidden ? 'video' : 'pdf';

@@ -41,6 +41,9 @@ Drop any mix of these, in any order:
 | Excel (XLSX, XLS), CSV, TSV | Each sheet becomes a table (`lib/sheets`). |
 | PowerPoint (PPTX) | Slide titles and text as an outline (`lib/slides`). |
 
+Files are recognized by extension, or by type when the name has none (as
+some apps share them). Anything else is skipped with a notice naming it.
+
 Converted files keep their text, headings, lists and tables, but not pictures
 or exact layout, because `savePdf` draws with the built-in PDF fonts. For the
 same reason, characters outside Latin-1 (other scripts, emoji) print as "?";

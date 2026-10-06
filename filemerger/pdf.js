@@ -32,6 +32,7 @@ const numberingSel = $('pdf-numbering');
 const batesFields = $('pdf-bates');
 const batesPrefix = $('pdf-bates-prefix');
 const batesStart = $('pdf-bates-start');
+const skipNotice = $('skip-notice');
 
 let entries = [];
 let nextId = 1;
@@ -72,8 +73,22 @@ function showStatus(msg, isError = false) {
 
 // ---------- file list ----------
 
+// Says which files were left out, instead of dropping them silently.
+let skipTimer = 0;
+export function notifySkipped(files, what = "FileMerger can't use") {
+  if (!files.length) return;
+  const names = files.slice(0, 3).map((f) => f.name).join(', ') + (files.length > 3 ? `, and ${files.length - 3} more` : '');
+  skipNotice.textContent = `Skipped ${files.length === 1 ? 'a file' : `${files.length} files`} ${what}: ${names}.`;
+  skipNotice.hidden = false;
+  clearTimeout(skipTimer);
+  skipTimer = setTimeout(() => { skipNotice.hidden = true; }, 10000);
+}
+
 export async function addFiles(files) {
   const added = [];
+  // Reached from the PDF tab's file picker ("All files"); drops are
+  // pre-sorted by app.js.
+  notifySkipped(Array.from(files).filter((f) => !packet.kindOf(f)), "that can't go into a PDF");
   for (const file of files) {
     const kind = packet.kindOf(file);
     if (!kind) continue;
@@ -121,13 +136,23 @@ async function prepareConverted(entry) {
     entry.html = await packet.toHtml(entry.file, entry.kind);
     entry.unsupportedChars = packet.hasUnsupportedChars(entry.html);
   }
-  entry.bytes = await packet.htmlToPdf(entry.html, baseName(entry.file.name), pageSizeSel.value);
-  entry.pageCount = (await inspectPdf(entry.bytes)).pageCount;
+  // Paper-size changes can overlap; only the latest conversion may land.
+  const seq = (entry.convSeq = (entry.convSeq || 0) + 1);
+  const bytes = await packet.htmlToPdf(entry.html, baseName(entry.file.name), pageSizeSel.value);
+  const { pageCount } = await inspectPdf(bytes);
+  if (seq !== entry.convSeq) return;
+  entry.bytes = bytes;
+  entry.pageCount = pageCount;
   if (entry.pageCount < 2) entry.range = ''; // the range box is hidden
   // Swap thumbnails only once the new one exists: rows re-render while
   // other files convert, and must never point at a revoked URL.
+  const thumb = await thumbnail(entry);
+  if (seq !== entry.convSeq) {
+    if (thumb) URL.revokeObjectURL(thumb);
+    return;
+  }
   const old = entry.thumb;
-  entry.thumb = await thumbnail(entry);
+  entry.thumb = thumb;
   if (old) URL.revokeObjectURL(old);
 }
 
@@ -484,7 +509,8 @@ function stampOption() {
   }
   if (numberingSel.value === 'bates') {
     const prefix = batesPrefix.value.trim();
-    const start = Math.max(0, Math.floor(Number(batesStart.value) || 1));
+    const n = Number(batesStart.value);
+    const start = batesStart.value.trim() !== '' && Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 1;
     return { text: (i) => `${prefix}${String(start + i).padStart(6, '0')}`, position: 'right' };
   }
   return null;
