@@ -13,6 +13,7 @@ import { targetsForItem, ready as matrixReady } from './matrix.js';
 import { createQueue, downloadBlob, emitZip } from './bulk.js';
 import * as docs from '../lib/docs/index.js';
 import * as images from '../lib/images/index.js';
+import * as pdfImage from '../lib/images/pdf-image.js';
 import * as sheets from '../lib/sheets/index.js';
 import * as slides from '../lib/slides/index.js';
 import * as diagrams from '../lib/diagrams/index.js';
@@ -229,7 +230,7 @@ async function encodeCanvasToTarget(canvas, target, name, options) {
     // Photoshop PDF: a single-page PDF wrapping the canvas as a
     // JPEG image. Photoshop, Acrobat and Preview all open it
     // straight back as a flattened image.
-    const blob = await images.encodePdfFromCanvas(canvas, { format: 'jpeg', quality });
+    const blob = await images.encodePdfFromCanvas(canvas, { format: 'jpeg', quality, maxPageSide: 792 });
     const buf = await blob.arrayBuffer();
     return { bytes: buf, mime: target.mime };
   }
@@ -386,8 +387,30 @@ function hasAlpha(canvas) {
 }
 
 async function runImage(source, target, options) {
+  if (target.ext === 'pdf' && !options?.scale && !options?.colors && typeof options?.quality !== 'number') {
+    const bytes = await imageToPdfDirect(source);
+    if (bytes) return { bytes, mime: target.mime };
+  }
   const canvas = await decodeImageSourceToCanvas(source);
   return encodeCanvasToTarget(canvas, target, source.name, options);
+}
+
+// Image -> PDF without re-encoding: JPEG bytes are embedded as-is and
+// upright (EXIF orientation), other browser-readable formats losslessly,
+// on a page shaped like the picture (at most 11 in on the long side).
+// Returns null for formats only our own decoders read (PSD, TIFF, ...),
+// which then take the canvas path.
+async function imageToPdfDirect(source) {
+  let img;
+  try {
+    img = await pdfImage.loadImage(new File([source.bytes], source.name, { type: source.mime }));
+  } catch {
+    return null;
+  }
+  const out = await docs.mergePdfs([{ images: [pdfImage.layoutImage(img, 'image')] }], {
+    title: (source.name || 'image').replace(/\.[^.]+$/, ''),
+  });
+  return out.buffer.slice(out.byteOffset, out.byteOffset + out.byteLength);
 }
 
 // ---------- PDF as image (any PDF rasterized to a canvas) ----------
@@ -411,9 +434,27 @@ async function runPdfAsImage(source, target, onProgress, options) {
     const buf = await blob.arrayBuffer();
     return { bytes: buf, mime: target.mime };
   }
-  const { canvas } = await images.decodePdfPage(source.bytes, 0);
-  if (onProgress) onProgress(1);
-  return encodeCanvasToTarget(canvas, target, source.name, options);
+  const total = await images.pdfPageCount(source.bytes);
+  if (total <= 1) {
+    const { canvas } = await images.decodePdfPage(source.bytes, 0);
+    if (onProgress) onProgress(1);
+    return encodeCanvasToTarget(canvas, target, source.name, options);
+  }
+  // Single-image formats hold one page, so a multi-page PDF becomes a
+  // zip with one image per page (it used to silently keep page 1).
+  // Pages are rendered and encoded one at a time to bound memory.
+  const stem = (source.name || 'document').replace(/\.[^.]+$/, '');
+  const ext = target.outputExt || target.ext;
+  const width = String(total).length;
+  const entries = [];
+  for (let i = 0; i < total; i++) {
+    const { canvas } = await images.decodePdfPage(source.bytes, i);
+    const out = await encodeCanvasToTarget(canvas, target, source.name, options);
+    entries.push({ name: `${stem}-page${String(i + 1).padStart(width, '0')}.${ext}`, data: new Uint8Array(out.bytes) });
+    canvas.width = canvas.height = 0;
+    if (onProgress) onProgress((i + 1) / total);
+  }
+  return { bytes: docs.buildZip(entries), mime: 'application/zip', ext: 'zip' };
 }
 
 // PDF → PDF compression. Rasterizes every page at the level's
@@ -481,6 +522,18 @@ async function runSlides(source, target) {
       return { bytes: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), mime: target.mime };
     }
     const bytes = await writeDocFromHtml(html, target, source.name);
+    return { bytes: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), mime: target.mime };
+  }
+  if (sourceExt === 'json') {
+    // A deck saved by RodmanSlides (detect.js routes it here). It is
+    // the deck model itself, so PPTX is a real export, not a copy.
+    const deck = JSON.parse(decodeText(source.bytes));
+    if (!Array.isArray(deck.slides)) throw new Error('This .json is not a RodmanSlides deck.');
+    if (target.ext === 'pptx') {
+      const bytes = await blobToBytes(slides.savePptx(deck));
+      return { bytes: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), mime: target.mime };
+    }
+    const bytes = await writeDocFromHtml(deckToHtml(deck), target, source.name);
     return { bytes: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), mime: target.mime };
   }
   if (target.ext === 'pptx') {
@@ -1227,7 +1280,9 @@ function queuedInputBytes() {
 }
 
 async function detectFile(file) {
-  const headBuf = await file.slice(0, 16).arrayBuffer();
+  // 2 KB: detect() peeks into .json files for a Slides deck's
+  // "slides": [ array, which a 16-byte head could never contain.
+  const headBuf = await file.slice(0, 2048).arrayBuffer();
   return detect(file.name, new Uint8Array(headBuf));
 }
 
@@ -1351,6 +1406,8 @@ async function convertAll() {
   render();
 
   for (const item of jobs) {
+    // Removed (×) after Convert was clicked: don't convert or download it.
+    if (!queue.items.has(item.id)) { tickOverall(); continue; }
     queue.setStatus(item.id, 'converting', { error: null });
     queue.setProgress(item.id, null);
     queue.setLoadingMessage(item.id, null);
@@ -1419,9 +1476,11 @@ async function convertAll() {
         }
       }
 
-      const outName = renameWithExt(item.file.name, item.target.outputExt || item.target.ext);
+      const outName = renameWithExt(item.file.name, output.ext || item.target.outputExt || item.target.ext);
       if (bundleZip) {
-        collected.push({ name: outName, bytes: output.bytes });
+        // photo.png and photo.jpg both -> PDF would otherwise share one
+        // zip entry name, and unzipping keeps only one of them.
+        collected.push({ name: uniqueName(outName, collected), bytes: output.bytes });
       } else {
         downloadBlob(new Blob([output.bytes], { type: output.mime }), outName);
       }
@@ -1449,6 +1508,18 @@ async function convertAll() {
   render();
 }
 
+function uniqueName(name, taken) {
+  const used = new Set(taken.map((e) => e.name.toLowerCase()));
+  if (!used.has(name.toLowerCase())) return name;
+  const dot = name.lastIndexOf('.');
+  const stem = dot > 0 ? name.slice(0, dot) : name;
+  const ext = dot > 0 ? name.slice(dot) : '';
+  for (let n = 2; ; n++) {
+    const candidate = `${stem} (${n})${ext}`;
+    if (!used.has(candidate.toLowerCase())) return candidate;
+  }
+}
+
 function renameWithExt(name, ext) {
   return name.replace(/\.[^.]+$/, '') + '.' + ext;
 }
@@ -1463,7 +1534,9 @@ function timestamp() {
 
 pickBtn.addEventListener('click', () => fileInput.click());
 fileInput.addEventListener('change', () => {
-  if (fileInput.files && fileInput.files.length) addFiles(fileInput.files);
+  // Copy the list first: clearing the input empties its live FileList,
+  // and addFiles awaits per file, so only the first file used to land.
+  if (fileInput.files && fileInput.files.length) addFiles(Array.from(fileInput.files));
   fileInput.value = '';
 });
 
@@ -1474,7 +1547,7 @@ fileInput.addEventListener('change', () => {
   dropZone.addEventListener(ev, (e) => { e.preventDefault(); dropZone.classList.remove('is-hover'); });
 });
 dropZone.addEventListener('drop', (e) => {
-  if (e.dataTransfer && e.dataTransfer.files.length) addFiles(e.dataTransfer.files);
+  if (e.dataTransfer && e.dataTransfer.files.length) addFiles(Array.from(e.dataTransfer.files));
 });
 
 convertBtn.addEventListener('click', convertAll);

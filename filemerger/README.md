@@ -37,6 +37,7 @@ Drop any mix of these, in any order:
 | PDF | Pages copied losslessly (below). |
 | JPEG | Embedded byte-for-byte; the EXIF orientation is applied by the page's placement, so phone photos come out upright with no re-compression. |
 | PNG, WebP, GIF, BMP, AVIF, SVG, HEIC (Safari only) | Decoded by the browser and stored losslessly, keeping transparency. SVG is rasterized at 2400 px on its long edge. |
+| TIFF, Netpbm (PPM/PGM/PBM/PAM), TGA, PCX, SGI, Sun raster, Farbfeld, WBMP, XBM, XPM, HDR, ICNS | Read by the suite's own decoders (`lib/images/decode.js`) when the browser can't, then stored losslessly. |
 | Word (DOCX, DOC), RTF, ODT, EPUB, HTML, text, Markdown | Converted with the suite's own engines (`lib/docs` to HTML, then `savePdf`). |
 | Excel (XLSX, XLS), CSV, TSV | Each sheet becomes a table (`lib/sheets`). |
 | PowerPoint (PPTX) | Slide titles and text as an outline (`lib/slides`). |
@@ -53,9 +54,11 @@ from its own app and drop that in instead.
 Packet options (remembered per browser under `filemerger.packet`):
 
 - **Paper size** for images and converted files: Letter, A4, or "Match each
-  image". The default follows the browser's locale. Images are centered in a
-  half-inch margin, turned landscape when wide, and never enlarged beyond
-  1 px = 1 pt. Changing it re-converts documents. PDFs keep their own sizes.
+  image". The default follows the browser's locale. On Letter or A4, images are
+  centered in a half-inch margin, turned landscape when wide, and never enlarged
+  beyond 1 px = 1 pt. "Match each image" gives each picture a page of its own
+  shape, at most 11 in on the long side. Changing the size re-converts
+  documents. PDFs keep their own sizes.
 - **Page numbers**: "Page 1 of N" (bottom center) or Bates numbers (a prefix and
   a 6-digit number from a chosen start, bottom right). Stamped on every page,
   upright even on rotated pages.

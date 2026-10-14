@@ -12,6 +12,8 @@ file-format bridges that are shared across the suite.
 | `image-io.js` | Canvas-based raster decode/encode helpers for PNG, JPEG, WebP, BMP, ICO, SVG, and general image conversion. |
 | `psd.js` | PSD/PSB read/write facade around vendored `ag-psd`. |
 | `pdf.js` | PDF page rasterization and single-image PDF export using vendored PDF.js. |
+| `decode.js` | Hand-rolled decoders for formats browsers can't open: TIFF, Netpbm, TGA, PCX, SGI, Sun raster, Farbfeld, WBMP, XBM, XPM, Radiance HDR, ICNS. `image-io.js` `decodeFile` / `decodeToCanvas` fall back to it, so everything the suite writes it can read back. |
+| `pdf-image.js` | Images as PDF pages for `lib/docs/pdfmerge.js`: JPEG passed through byte-for-byte (EXIF orientation applied), other formats lossless; page layout. Used by FileMerger and the Converter's image → PDF. |
 
 ## Vendored Dependencies
 
