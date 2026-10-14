@@ -286,7 +286,11 @@ const HTML_TABLE_BRIDGE = SHEET_OUTPUTS.filter((o) => TABLE_BRIDGE_EXTS.has(o.ex
 export function targetsForItem({ family, ext }) {
   const base = targetsFor(family);
   if (family === 'document' && ext === 'pdf') {
-    return [...base, PDF_COMPRESS_TARGET, ...PDF_IMAGE_BRIDGE];
+    // PDF -> PDF through the document writer extracts the text and lays
+    // it out again, dropping images and layout. Say so, since the plain
+    // "PDF (.pdf)" label read like a lossless copy.
+    const relabeled = base.map((o) => (o.ext === 'pdf' ? { ...o, label: 'PDF, rebuilt from its text only (.pdf)' } : o));
+    return [...relabeled, PDF_COMPRESS_TARGET, ...PDF_IMAGE_BRIDGE];
   }
   if (family === 'document' && (ext === 'html' || ext === 'md')) return [...base, ...HTML_TABLE_BRIDGE];
   return base;

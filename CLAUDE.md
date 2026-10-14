@@ -25,7 +25,7 @@ suite speaks is implemented from scratch under `/lib/`.
   /lib/sheets/    CSV, TSV, XLSX, JSON, NDJSON, YAML, vCard, iCal …
   /lib/slides/    PPTX read/write + the deckToHtml ↔ htmlToDeck bridge
   /lib/diagrams/  VSDX read/write + 132-shape stencil library + SVG/PNG/PDF export
-  /lib/images/    Canvas encoders for ~25 image formats + PDF + PSD
+  /lib/images/    Encoders for ~25 image formats, decoders for those browsers can't read (decode.js), PDF + PSD
   /lib/video/     FFmpeg.wasm wrapper for video / audio transcoding (+ vendored Mediabunny)
   /lib/audio/     whisper.cpp speech-to-text — model catalog/cache, formats
   /lib/claude/    Anthropic API client used by every "Ask Claude" panel

@@ -20,9 +20,20 @@ canvas, and parser APIs.
 Cross-family bridges:
 
 - Spreadsheet → PDF (rasterized as HTML tables).
-- Image source → PDF (single-page, JPEG-wrapped).
+- Image source → PDF (single page shaped like the picture, at most 11 in
+  on the long side). With default options, JPEGs are embedded byte-for-byte
+  and upright (EXIF orientation), and other browser-readable formats
+  losslessly, via `lib/images/pdf-image.js`. Setting quality, resolution
+  or colours, or a source only our own decoders read (PSD, TIFF, ...),
+  goes through the canvas and is JPEG-wrapped.
 - PDF → image: any PDF rasterizes to PNG/JPEG/WebP/PSD/BMP/ICO/PPM/TGA/TIFF
-  (and any of the other single-canvas image targets).
+  (and any of the other single-canvas image targets). A multi-page PDF
+  gives a `.zip` with one image per page (`name-page01.png`, ...).
+- PDF → "PDF, rebuilt from its text only": the document writer re-lays out
+  the extracted text; images and layout are not kept. For a smaller copy
+  of the same pages, use Compressed PDF.
+- A Slides deck saved as `.json` (detected by its `"slides": [` array) converts
+  like a PPTX: to PowerPoint, PDF, Word, Markdown, HTML or text.
 - PDF → CBZ: every PDF page rasterizes into a comic-book ZIP archive.
 - PDF → multi-page TIFF: every PDF page becomes one IFD inside a single `.tif`.
 - AVIF write is gated on browser support and only appears in the target
