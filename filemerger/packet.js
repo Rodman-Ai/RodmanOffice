@@ -25,22 +25,29 @@ export const PAGE_SIZES = {
   a4: [595.28, 841.89],
 };
 
-const extOf = (name) => (name.split('.').pop() || '').toLowerCase();
+// '' when the name has no extension (files shared from some apps and
+// browsers arrive as just "scan" or "image"), so the MIME type decides.
+const extOf = (name) => (/\.([^./\\]+)$/.exec(name)?.[1] || '').toLowerCase();
 
 /** 'pdf' | 'image' | 'document' | 'sheet' | 'slides' | null */
 export function kindOf(file) {
   const ext = extOf(file.name);
   if (ext === 'pdf' || file.type === 'application/pdf') return 'pdf';
-  if (IMAGE_EXT.includes(ext) || (file.type.startsWith('image/') && !ext)) return 'image';
+  if (IMAGE_EXT.includes(ext)) return 'image';
   if (DOC_EXT.includes(ext)) return 'document';
   if (SHEET_EXT.includes(ext)) return 'sheet';
   if (SLIDE_EXT.includes(ext)) return 'slides';
+  if (!ext) {
+    if (file.type.startsWith('image/')) return 'image';
+    if (file.type === 'text/plain' || file.type === 'text/markdown' || file.type === 'text/html') return 'document';
+    if (file.type === 'text/csv') return 'sheet';
+  }
   return null;
 }
 
 /** Short label for the file list, e.g. "JPEG image" or "DOCX, converted". */
 export function describe(file, kind) {
-  const ext = extOf(file.name).toUpperCase();
+  const ext = (extOf(file.name) || file.type.split('/')[1] || '').toUpperCase();
   if (kind === 'pdf') return 'PDF';
   if (kind === 'image') return `${ext === 'JPG' || ext === 'JPE' || ext === 'JFIF' ? 'JPEG' : ext} image`;
   return `${ext}, converted`;
@@ -333,12 +340,13 @@ export function hasUnsupportedChars(html) {
 
 /** Converts a document, spreadsheet or PPTX file to HTML. */
 export async function toHtml(file, kind) {
-  const ext = extOf(file.name);
+  const ext = extOf(file.name) || { 'text/html': 'html', 'text/markdown': 'md', 'text/csv': 'csv' }[file.type] || '';
   const bytes = new Uint8Array(await file.arrayBuffer());
   const buf = bytes.buffer;
   if (kind === 'sheet') {
     const sheets = await import('../lib/sheets/index.js');
-    const wb = ext === 'tsv' ? sheets.parseTsvWorkbook(decodeText(bytes), file.name) : sheets.importSpreadsheet(bytes, file.name);
+    const name = extOf(file.name) ? file.name : `${file.name}.${ext}`; // importSpreadsheet picks its parser by name
+    const wb = ext === 'tsv' ? sheets.parseTsvWorkbook(decodeText(bytes), name) : sheets.importSpreadsheet(bytes, name);
     return workbookToHtml(wb);
   }
   if (kind === 'slides') {
