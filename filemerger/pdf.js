@@ -117,9 +117,10 @@ async function preparePdf(entry) {
   const info = await inspectPdf(entry.bytes).catch(() => null);
   entry.encrypted = !!info?.encrypted;
   entry.pageCount = info?.pageCount || 0;
-  // The object reader couldn't parse it (or it's encrypted): let pdf.js
-  // count pages, and the file will be rasterized at merge time.
-  if (!info || info.encrypted) entry.rasterize = true;
+  // The object reader couldn't parse it, found no pages, or it's
+  // encrypted: let pdf.js (more forgiving) count pages, and the file is
+  // rasterized at merge time.
+  if (!info || info.encrypted || !info.pageCount) entry.rasterize = true;
   entry.thumb = await thumbnail(entry);
 }
 
