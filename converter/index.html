@@ -14,6 +14,34 @@
         navigator.serviceWorker.register('sw.js').catch(() => {});
       });
     }
+    // Startup check, independent of app.js: if the converter hasn't
+    // started a few seconds after load (a script failed to load or parse
+    // in this browser), say so on the page with the error and browser, so
+    // it can be reported. app.js sets window.__converterReady when wired.
+    (function () {
+      var errors = [];
+      window.addEventListener('error', function (e) {
+        var t = e.target;
+        if (t && t !== window && (t.src || t.href)) errors.push('Could not load ' + (t.src || t.href));
+        else if (e.message) errors.push(e.message + (e.filename ? ' (' + e.filename.split('/').slice(-2).join('/') + ':' + e.lineno + ')' : ''));
+      }, true);
+      window.addEventListener('unhandledrejection', function (e) {
+        var r = e.reason; errors.push(String(r && r.message || r));
+      });
+      window.addEventListener('load', function () {
+        setTimeout(function () {
+          if (window.__converterReady) return;
+          var box = document.createElement('div');
+          box.className = 'engine-error';
+          box.setAttribute('role', 'alert');
+          box.textContent = "The converter didn't start in this browser, so choosing or dropping files won't work. "
+            + (errors.length ? 'Error: ' + errors.slice(0, 3).join(' | ') + '. ' : 'No error was reported. ')
+            + 'Browser: ' + navigator.userAgent;
+          var zone = document.getElementById('dropZone');
+          if (zone) zone.parentNode.insertBefore(box, zone);
+        }, 6000);
+      });
+    })();
   </script>
 </head>
 <body>
@@ -38,7 +66,7 @@
         <svg viewBox="0 0 64 64" width="56" height="56"><path fill="currentColor" d="M32 6l14 14h-9v18h-10V20h-9zM10 44h44v12H10z"/></svg>
       </div>
       <p class="drop-title">Drop files here</p>
-      <p class="drop-sub">or <button id="pickBtn" class="link-btn" type="button">choose files</button>. Documents, spreadsheets, images.</p>
+      <p class="drop-sub">or <label id="pickBtn" class="link-btn" for="fileInput" tabindex="0" role="button">choose files</label>. Documents, spreadsheets, images, video, audio.</p>
       <input id="fileInput" type="file" multiple hidden />
     </section>
 

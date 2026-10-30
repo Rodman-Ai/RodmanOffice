@@ -1585,7 +1585,13 @@ function timestamp() {
 
 // ---------- Wiring ----------
 
-pickBtn.addEventListener('click', () => fileInput.click());
+// "choose files" is a <label for="fileInput">, so the browser opens the
+// picker natively (no script needed). Enter/Space for keyboard users:
+pickBtn.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  e.preventDefault();
+  fileInput.click();
+});
 fileInput.addEventListener('change', () => {
   // Copy the list first: clearing the input empties its live FileList,
   // and addFiles awaits per file, so only the first file used to land.
@@ -1607,7 +1613,7 @@ dropZone.addEventListener('drop', (e) => {
 // Clicks from the link, or the input's own click bubbling up, are left
 // to their handlers so the picker never opens twice.
 dropZone.addEventListener('click', (e) => {
-  if (e.target.closest('button, a, input')) return;
+  if (e.target.closest('button, a, input, label')) return;
   fileInput.click();
 });
 dropZone.addEventListener('keydown', (e) => {
@@ -1642,6 +1648,9 @@ clearBtn.addEventListener('click', () => { queue.clear(); render(); });
 // this browser. The probe times out after ~250ms so this never
 // blocks boot meaningfully.
 matrixReady.then(render);
+
+// File intake is wired: tell the startup check in index.html.
+window.__converterReady = true;
 
 // Start loading the engines now, so a conversion rarely has to wait.
 // A failure shows the reload banner (see showEngineError).
