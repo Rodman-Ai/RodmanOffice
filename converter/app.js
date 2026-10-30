@@ -11,12 +11,57 @@
 import { detect } from './detect.js';
 import { targetsForItem, ready as matrixReady } from './matrix.js';
 import { createQueue, downloadBlob, emitZip } from './bulk.js';
-import * as docs from '../lib/docs/index.js';
-import * as images from '../lib/images/index.js';
-import * as pdfImage from '../lib/images/pdf-image.js';
-import * as sheets from '../lib/sheets/index.js';
-import * as slides from '../lib/slides/index.js';
-import * as diagrams from '../lib/diagrams/index.js';
+
+// The conversion engines are loaded in the background, not imported up
+// front: with xlsx, ag-psd and pdf.js they are ~2.7 MB, and as static
+// imports nothing on the page (file picker, drop zone) worked until all
+// of it had downloaded and run (15 s on a 3G-like link), or ever, if one
+// file failed to load. Conversions await loadEngines(). Browsers cache a
+// failed module import for the life of the page, so a failure can't be
+// retried in place: the page says so and offers a reload.
+let docs, images, pdfImage, sheets, slides, diagrams, htmlToDeck, deckToHtml;
+let enginesPromise = null;
+function loadEngines() {
+  if (!enginesPromise) {
+    enginesPromise = Promise.all([
+      import('../lib/docs/index.js'),
+      import('../lib/images/index.js'),
+      import('../lib/images/pdf-image.js'),
+      import('../lib/sheets/index.js'),
+      import('../lib/slides/index.js'),
+      import('../lib/diagrams/index.js'),
+    ]).then(([d, i, p, sh, sl, di]) => {
+      docs = d; images = i; pdfImage = p; sheets = sh; slides = sl; diagrams = di;
+      // htmlToDeck / deckToHtml live in lib/slides/html-bridge.js so the
+      // Word and Slides apps can reuse the same implementation.
+      ({ htmlToDeck, deckToHtml } = sl);
+    });
+    enginesPromise.catch(showEngineError);
+  }
+  return enginesPromise;
+}
+
+function engineErrorText(err) {
+  return `Part of the converter couldn't load (${err instanceof Error ? err.message : String(err)}). Check your connection, then reload the page.`;
+}
+
+// A banner above the drop zone, shown as soon as the background load
+// fails, so nobody finds out only after choosing files.
+function showEngineError(err) {
+  if (document.getElementById('engineError')) return;
+  const box = document.createElement('div');
+  box.id = 'engineError';
+  box.className = 'engine-error';
+  box.setAttribute('role', 'alert');
+  box.textContent = engineErrorText(err) + ' ';
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'secondary-btn';
+  btn.textContent = 'Reload';
+  btn.addEventListener('click', () => location.reload());
+  box.appendChild(btn);
+  dropZone.before(box);
+}
 // lib/video pulls in the FFmpeg.wasm vendor blob (~25 MB) the
 // first time any of its functions are called. We deliberately
 // import it lazily inside runVideo() so the converter shell
@@ -149,9 +194,6 @@ async function writeDocFromHtml(html, target, name) {
   }
 }
 
-// htmlToDeck / deckToHtml live in lib/slides/html-bridge.js so the
-// Word and Slides apps can reuse the same implementation.
-const { htmlToDeck, deckToHtml } = slides;
 
 // Decode bytes as UTF-8 and strip a leading BOM. UTF-16 BOMs get a
 // friendly error so the user knows to re-save the file as UTF-8 —
@@ -1405,6 +1447,17 @@ async function convertAll() {
   startOverall(jobs.length);
   render();
 
+  try {
+    await loadEngines();
+  } catch (err) {
+    const msg = engineErrorText(err);
+    for (const item of jobs) queue.setStatus(item.id, 'error', { error: msg });
+    isConverting = false;
+    endOverall();
+    render();
+    return;
+  }
+
   for (const item of jobs) {
     // Removed (×) after Convert was clicked: don't convert or download it.
     if (!queue.items.has(item.id)) { tickOverall(); continue; }
@@ -1550,6 +1603,37 @@ dropZone.addEventListener('drop', (e) => {
   if (e.dataTransfer && e.dataTransfer.files.length) addFiles(Array.from(e.dataTransfer.files));
 });
 
+// The whole box opens the picker, not just the "choose files" link.
+// Clicks from the link, or the input's own click bubbling up, are left
+// to their handlers so the picker never opens twice.
+dropZone.addEventListener('click', (e) => {
+  if (e.target.closest('button, a, input')) return;
+  fileInput.click();
+});
+dropZone.addEventListener('keydown', (e) => {
+  if (e.target !== dropZone || (e.key !== 'Enter' && e.key !== ' ')) return;
+  e.preventDefault();
+  fileInput.click();
+});
+
+// Files dropped anywhere on the page are taken too. Without this, a file
+// dropped just outside the box made the browser open it in the tab,
+// leaving the converter.
+window.addEventListener('dragover', (e) => {
+  if (!e.dataTransfer || !Array.from(e.dataTransfer.types || []).includes('Files')) return;
+  e.preventDefault();
+  dropZone.classList.add('is-hover');
+});
+window.addEventListener('dragleave', (e) => {
+  if (!e.relatedTarget) dropZone.classList.remove('is-hover');
+});
+window.addEventListener('drop', (e) => {
+  if (e.defaultPrevented) return; // handled by the drop box above
+  e.preventDefault();
+  dropZone.classList.remove('is-hover');
+  if (e.dataTransfer && e.dataTransfer.files.length) addFiles(Array.from(e.dataTransfer.files));
+});
+
 convertBtn.addEventListener('click', convertAll);
 clearBtn.addEventListener('click', () => { queue.clear(); render(); });
 
@@ -1558,3 +1642,7 @@ clearBtn.addEventListener('click', () => { queue.clear(); render(); });
 // this browser. The probe times out after ~250ms so this never
 // blocks boot meaningfully.
 matrixReady.then(render);
+
+// Start loading the engines now, so a conversion rarely has to wait.
+// A failure shows the reload banner (see showEngineError).
+loadEngines().catch(() => {});
