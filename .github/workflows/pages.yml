@@ -66,13 +66,18 @@ jobs:
       - name: Stage Pages artifact
         run: |
           mkdir -p _site
+          # Leading slashes anchor each exclude to the repo root. Unanchored,
+          # 'sheets' also matched lib/sheets/, so the shared spreadsheet
+          # engine was never deployed (Converter, Accounting and FileMerger
+          # spreadsheet features failed on the live site).
           rsync -a \
-            --exclude='_site' \
-            --exclude='.git' \
-            --exclude='.github' \
-            --exclude='crm' \
-            --exclude='sheets' \
+            --exclude='/_site' \
+            --exclude='/.git' \
+            --exclude='/.github' \
+            --exclude='/crm' \
+            --exclude='/sheets' \
             ./ _site/
+          test -f _site/lib/sheets/index.js
           cp -r crm/out _site/crm
           cp -r sheets/apps/web/dist _site/sheets
 
