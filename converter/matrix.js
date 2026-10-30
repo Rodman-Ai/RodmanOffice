@@ -4,7 +4,9 @@
 //
 // Entry shape: { ext, mime, label }.
 
-import { isAvifEncodeSupported } from '../lib/images/index.js';
+// image-io.js directly, not the images index: the index also pulls in
+// pdf.js and ag-psd, which the page shouldn't wait for before it works.
+import { isAvifEncodeSupported } from '../lib/images/image-io.js';
 
 const DOC_OUTPUTS = [
   { ext: 'docx', mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', label: 'Word (.docx)' },
